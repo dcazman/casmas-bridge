@@ -1,0 +1,9 @@
+services:
+  anchor-mcp:
+    build: /srv/mergerfs/warehouse/anchor-mcp
+    container_name: anchor-mcp
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - MCP_TOKEN=${MCP_TOKEN}
+      - ANCHOR_URL=http://localhost:7778

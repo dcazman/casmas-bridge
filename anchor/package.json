@@ -1,0 +1,16 @@
+{
+  "name": "anchor",
+  "version": "2.0.0",
+  "description": "Anchor — personal AI memory layer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^9.4.3",
+    "multer": "^2.0.0",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.7.0"
+  }
+}

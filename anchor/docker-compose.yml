@@ -1,0 +1,10 @@
+services:
+  dan-notes:
+    build: /srv/mergerfs/warehouse/dan-notes
+    container_name: dan-notes
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /srv/mergerfs/warehouse/dan-notes/data:/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
