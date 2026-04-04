@@ -4,10 +4,14 @@ const crypto = require('crypto');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = 7778;
 const DB_PATH = '/data/notes.db';
+const BRIDGE_PATH = '/bridge';
 
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001';
 const MODEL_OPUS  = 'claude-opus-4-5';
@@ -177,48 +181,35 @@ function buildChatContext(question) {
 }
 
 const ALL_TYPES = [
-  // Work scope
   'work','work-task','work-decision','work-idea','meeting',
-  // Personal scope
   'personal','personal-task','personal-decision',
   'home','home-task','home-decision',
   'kids','kids-task',
   'health','health-task',
   'finance','finance-task',
   'social','calendar','email',
-  // Universal
   'pi','idea','random','brain-dump'
 ];
 
 const WORK_SCOPE_TYPES = ['work','work-task','work-decision','work-idea','meeting','calendar','email'];
 
-
 // ── Cat shorthand parser ───────────────────────────────────────
 const CAT_SHORTHAND = {
-  // Work
   'w':'work','wt':'work-task','wd':'work-decision','wi':'work-idea','m':'meeting',
-  // Personal
   'p':'personal','pt':'personal-task','pd':'personal-decision',
-  // Home
   'ho':'home','ht':'home-task','hod':'home-decision',
-  // Kids
   'k':'kids','kt':'kids-task',
-  // Health
   'h':'health','hat':'health-task',
-  // Finance
   'f':'finance','ft':'finance-task',
-  // Universal
   's':'social','c':'calendar','e':'email',
   'i':'idea','pi':'pi','r':'random','bd':'brain-dump'
 };
 
 function parseCatDump(raw) {
-  // Match lines like "cat p", "cat work", "cat health" etc
   const catLineRe = /^cat\s+(\S+)/i;
   const lines = raw.split('\n');
   const sections = [];
   let current = null;
-
   for (const line of lines) {
     const match = line.match(catLineRe);
     if (match) {
@@ -227,9 +218,7 @@ function parseCatDump(raw) {
       const type = CAT_SHORTHAND[key] || (ALL_TYPES.includes(key) ? key : null);
       current = { type: type || 'brain-dump', lines: [] };
     } else {
-      if (current) {
-        if (line.trim()) current.lines.push(line);
-      }
+      if (current && line.trim()) current.lines.push(line);
     }
   }
   if (current && current.lines.length) sections.push(current);
@@ -239,30 +228,23 @@ function parseCatDump(raw) {
 const TYPE_COLORS = {
   'pending':          '#475569',
   'brain-dump':       '#60a5fa',
-  // Work
   'work':             '#38bdf8',
   'work-task':        '#0ea5e9',
   'work-decision':    '#0284c7',
   'work-idea':        '#7dd3fc',
   'meeting':          '#fb923c',
-  // Personal
   'personal':         '#e879f9',
   'personal-task':    '#d946ef',
   'personal-decision':'#a21caf',
-  // Home
   'home':             '#fdba74',
   'home-task':        '#f97316',
   'home-decision':    '#ea580c',
-  // Kids
   'kids':             '#fde68a',
   'kids-task':        '#fbbf24',
-  // Health
   'health':           '#f87171',
   'health-task':      '#ef4444',
-  // Finance
   'finance':          '#4ade80',
   'finance-task':     '#16a34a',
-  // Universal
   'social':           '#86efac',
   'calendar':         '#c084fc',
   'email':            '#67e8f9',
@@ -283,18 +265,24 @@ function decryptNote(n) {
   };
 }
 
+// ── DTS fix: format stored UTC timestamp for display ──────────
+// created_at is stored as UTC in SQLite. We send it to the client
+// and let JS format it in the user's local timezone via toLocaleString().
+// The data-ts attribute holds the ISO string; JS formats on render.
 function renderNote(n) {
   n = decryptNote(n);
   const color = typeColor(n.type);
   const isPending = n.status === 'pending';
   const isReview = n.status === 'review';
   const typeOpts = ALL_TYPES.map(t => '<option value="' + t + '"' + (t === n.type ? ' selected' : '') + '>' + t + '</option>').join('');
+  // Pass raw UTC timestamp to client; JS will render in local time
+  const tsAttr = 'data-ts="' + escapeHtml(n.created_at) + '"';
   return `
   <div class="note${isPending ? ' note-pending' : isReview ? ' note-review' : ''}">
     <div class="note-meta">
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${escapeHtml(n.type)}</span>
       ${isPending ? '<span class="pending-badge">⏳ unsynced</span>' : isReview ? '<span class="review-badge">👁 needs review</span>' : ''}
-      <span class="note-date">${new Date(n.created_at).toLocaleString()}</span>
+      <span class="note-date" ${tsAttr}></span>
     </div>
     <div class="formatted">${escapeHtml(n.formatted || n.raw_input)}</div>
     ${n.tags && !isPending ? '<div class="note-tags">' + escapeHtml(n.tags).split(',').map(t => '<span class="tag">' + t.trim() + '</span>').join('') + '</div>' : ''}
@@ -308,7 +296,6 @@ function renderNote(n) {
     </div>
   </div>`;
 }
-
 
 // ── PWA routes ─────────────────────────────────────────────────
 const ICON_BUF = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAADNElEQVR4nO3bzUkGQRRE0YnEtTGYjCZnkm4+ERRE8b+d6u46A3f/oOss5zgGfVc3txfpzEZt19i1TUYvPWf8qs/wpd9ASB8sjc74VZ/xqz4AVJ3xqz7jV30AqDoAVJ3xqz4AVB0Aqg4AVQeAqjN+VQeAqgNA1QGg6gBQdQCoOgBUHQCqDgBVB4CqA0DVAaDqlgNwd/9wrblLb2Q7AOkH1b4YpgaQfjztD2FaAOkHUwcCAATAbKUfSj0IABAAs5V+JAFg/KpAAIAAmKn04wgAAAQAAAIAAAEAgAAAQAAAIAAAEAAACAAABAAAAgAAAQCAAABAAAAgAAAQAAAIAAAEAAACAAABAEB76Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BGDAVz07wEAQHUAAFAdAABUB8MEADR56Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BEAdJXeGAACAAABAIAAyB8BQFfpjQEgAAAQAAAIgPwRgwGkfxhvCAAAqgMAgOoAAKA6ACYGoMlLbwwAAQCAAABAAOSPAKCr9MYAEAAACAAABED+CAC6Sm8MAAEAgAAAQADkjwCgq/TGABAAAAgAAARA/ggAukpvDAABAIAAAEAA5I8YDCD9w/gyP6cDAMDqxccMAAAAAAAAAADMAkCTl94YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BEAdJXeGAACAAABAIAAyB8BQFfpjQEgAAAQAAAIgPwRAHSV3hgAAgAAAQCAAMgfAUBX6Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAEwKAYO/S2wJAAAAgACYGAMGepTcFgABYBQAEe5Xe0pIAQFi/9Ha2AADDWqU3sjUAaWQAqDoAVB0Aqg4AVQeAqgNA1QGg6gBQdQCoOgBUHQCq7nj60kdIqQBQdQCoOgBUHQCq7nj50odIZ3e8/tLHSGcHgKo73n7pg6Szejd+CNTSh+MHQA19CgAC7dyX44dAu/bt8UOg3frx+EHQDv1p+BBo5YaNHwat0k+3/AhS9zTFq3XEhQAAAABJRU5ErkJggg==', 'base64');
@@ -329,7 +316,7 @@ app.get('/manifest.json', (req, res) => {
   res.json({
     name: "Anchor",
     short_name: "Anchor",
-    description: "Casmas family memory — focused on Dan",
+    description: "Dan's memory, context, and second brain",
     start_url: "/",
     display: "standalone",
     background_color: "#0d1117",
@@ -410,8 +397,6 @@ app.get('/', (req, res) => {
     .header-time { font-size:0.85rem; color:#e2e8f0; text-align:right; }
     .btn-logout { font-size:0.78rem; color:#475569; text-decoration:none; padding:5px 10px; border:1px solid #1e2d45; border-radius:6px; transition:all .15s; }
     .btn-logout:hover { color:#f87171; border-color:#f87171; }
-    .btn-logout { font-size:0.78rem; color:#475569; text-decoration:none; padding:5px 10px; border:1px solid #1e2d45; border-radius:6px; transition:all .15s; }
-    .btn-logout:hover { color:#f87171; border-color:#f87171; }
     .main { padding:24px 32px; max-width:1400px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
     @media(max-width:900px){.main{grid-template-columns:1fr;}}
     .panel { background:#161b27; border:1px solid #1e2d45; border-radius:12px; padding:20px; }
@@ -440,6 +425,8 @@ app.get('/', (req, res) => {
     .btn-secondary:hover { background:#243447; }
     .btn-opus { background:#1e1a35; color:#a78bfa; border:1px solid #a78bfa40; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; transition:all .15s; font-weight:600; }
     .btn-opus:hover { background:#2d2550; }
+    .btn-bridge { background:#1e2d45; color:#4ade80; border:1px solid #4ade8040; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; transition:all .15s; font-weight:600; }
+    .btn-bridge:hover { background:#243447; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
     .btn-row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
     .file-row { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
@@ -488,7 +475,6 @@ app.get('/', (req, res) => {
     .panel h2:hover { color:#bfdbfe; }
     .panel h2 .chevron { margin-left:auto; font-size:0.75rem; color:#475569; transition:transform .2s; }
     .panel h2 .chevron.open { transform:rotate(180deg); }
-    .panel-body { }
     .panel-body.collapsed { display:none; }
   </style>
 </head>
@@ -507,7 +493,7 @@ app.get('/', (req, res) => {
     </svg>
     <div class="header-text">
       <h1>Anchor</h1>
-      <p>Casmas family memory — focused on Dan</p>
+      <p>Dan's memory, context, and second brain</p>
     </div>
     <div class="header-time" id="headerTime"></div>
 ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/logout" class="btn-logout">Sign out</a>' : ""}
@@ -536,56 +522,66 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
 
       <div class="panel">
         <h2 onclick="togglePanel('syncBody','syncChev')"><span class="dot" style="background:#f59e0b"></span>Sync Queue<span class="chevron" id="syncChev">▼</span></h2>
-        <div class="panel-body collapsed" id="syncBody"><div class="sync-bar">
-          <span class="sync-count"><strong id="pendingCount">${pendingCount}</strong> notes pending (~${pendingTokens} tokens)</span>
-          ${autoSyncFlag ? '<span class="sync-auto">⚡ auto-sync recommended</span>' : ''}
-          <span class="sync-last">Last sync: ${lastSyncStr}</span>
-          <button class="btn btn-sync" id="syncBtn" onclick="runSync()" ${pendingCount===0?'disabled':''}>Sync Now</button>
+        <div class="panel-body collapsed" id="syncBody">
+          <div class="sync-bar">
+            <span class="sync-count"><strong id="pendingCount">${pendingCount}</strong> notes pending (~${pendingTokens} tokens)</span>
+            ${autoSyncFlag ? '<span class="sync-auto">⚡ auto-sync recommended</span>' : ''}
+            <span class="sync-last">Last sync: ${lastSyncStr}</span>
+            <button class="btn btn-sync" id="syncBtn" onclick="runSync()" ${pendingCount===0?'disabled':''}>Sync Now</button>
+          </div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+            <button class="btn-bridge" onclick="pullBridge()">⬇ Pull Bridge</button>
+            <span class="status" id="bridgeStatus" style="margin:0;"></span>
+          </div>
+          <div class="status" id="syncStatus"></div>
+          <div class="loading" id="syncLoading">⏳ Classifying with Haiku...</div>
         </div>
-        <div class="status" id="syncStatus"></div>
-        <div class="loading" id="syncLoading">⏳ Classifying with Haiku...</div>
-        </div></div>
+      </div>
 
       <div class="panel">
         <h2 onclick="togglePanel('notesBody','notesChev')"><span class="dot" style="background:#34d399"></span>Notes<span class="chevron" id="notesChev">▼</span></h2>
-        <div class="panel-body collapsed" id="notesBody"><div class="search-row">
-          <input type="text" id="searchQ" placeholder="Search your notes..." value="${escapeHtml(q||'')}">
-          <select id="searchType">
-            <option value="">All types</option>
-            ${typeOptions}
-          </select>
-          <select id="sortOrder">
-            <option value="newest" ${sortSelected('newest')}>Newest first</option>
-            <option value="oldest" ${sortSelected('oldest')}>Oldest first</option>
-            <option value="type" ${sortSelected('type')}>By category</option>
-            <option value="unsynced" ${sortSelected('unsynced')}>Unsynced first</option>
-            <option value="open-loops" ${sortSelected('open-loops')}>Open loops first</option>
-            <option value="type-date" ${sortSelected('type-date')}>Category + date</option>
-          </select>
-          <button class="btn btn-secondary" onclick="applySearch()">Search</button>
+        <div class="panel-body collapsed" id="notesBody">
+          <div class="search-row">
+            <input type="text" id="searchQ" placeholder="Search your notes..." value="${escapeHtml(q||'')}">
+            <select id="searchType">
+              <option value="">All types</option>
+              ${typeOptions}
+            </select>
+            <select id="sortOrder">
+              <option value="newest" ${sortSelected('newest')}>Newest first</option>
+              <option value="oldest" ${sortSelected('oldest')}>Oldest first</option>
+              <option value="type" ${sortSelected('type')}>By category</option>
+              <option value="unsynced" ${sortSelected('unsynced')}>Unsynced first</option>
+              <option value="open-loops" ${sortSelected('open-loops')}>Open loops first</option>
+              <option value="type-date" ${sortSelected('type-date')}>Category + date</option>
+            </select>
+            <button class="btn btn-secondary" onclick="applySearch()">Search</button>
+          </div>
+          <div class="notes-list">
+            ${notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet — add your first brain dump above.</div>'}
+          </div>
         </div>
-        <div class="notes-list">
-          ${notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet — add your first brain dump above.</div>'}
-        </div>
-        </div></div>
+      </div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:20px;">
       <div class="panel">
         <h2 onclick="togglePanel('chatBody','chatChev')"><span class="dot" style="background:#a78bfa"></span>Ask Anchor<span class="chevron" id="chatChev">▼</span></h2>
-        <div class="panel-body collapsed" id="chatBody"><div class="chat-messages" id="chatMessages">
-          <div class="msg ai">Ask me anything about your notes — open loops, decisions, patterns, what you've been putting off.</div>
+        <div class="panel-body collapsed" id="chatBody">
+          <div class="chat-messages" id="chatMessages">
+            <div class="msg ai">Ask me anything about your notes — open loops, decisions, patterns, what you've been putting off.</div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chatInput" placeholder="What are my open loops this week?">
+            <button class="btn btn-primary" onclick="sendChat('haiku')">Ask</button>
+          </div>
+          <div class="chat-model-row">
+            <span class="model-label">Need deeper analysis?</span>
+            <button class="btn btn-opus" onclick="sendChat('opus')">⚡ Ask Opus</button>
+          </div>
+          <div class="loading" id="chatLoading" style="margin-top:8px;">⏳ Reading your notes...</div>
         </div>
-        <div class="chat-input-row">
-          <input type="text" id="chatInput" placeholder="What are my open loops this week?">
-          <button class="btn btn-primary" onclick="sendChat('haiku')">Ask</button>
-        </div>
-        <div class="chat-model-row">
-          <span class="model-label">Need deeper analysis?</span>
-          <button class="btn btn-opus" onclick="sendChat('opus')">⚡ Ask Opus</button>
-        </div>
-        <div class="loading" id="chatLoading" style="margin-top:8px;">⏳ Reading your notes...</div>
-        </div></div>
+      </div>
 
       ${hasOTD ? `
       <div class="panel">
@@ -598,6 +594,16 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
   </div>
 
   <script>
+    // ── DTS fix: render all note timestamps in local time ──────
+    document.querySelectorAll('.note-date[data-ts]').forEach(el => {
+      const ts = el.getAttribute('data-ts');
+      if (ts) {
+        // SQLite stores as "YYYY-MM-DD HH:MM:SS" without Z — treat as UTC
+        const utc = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
+        el.textContent = new Date(utc).toLocaleString();
+      }
+    });
+
     function updateClock() {
       document.getElementById('headerTime').textContent = new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
     }
@@ -630,7 +636,6 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
           document.getElementById('input').value = '';
           clearFileInput();
           const msg = data.split > 1 ? '✓ Split into ' + data.split + ' notes' : '✓ Saved — sync when ready';
-          // (split/flagged handled on sync result)
           document.getElementById('noteStatus').textContent = msg;
           document.getElementById('pendingCount').textContent = data.pendingCount;
           if (data.pendingCount > 0) document.getElementById('syncBtn').disabled = false;
@@ -654,7 +659,6 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
           let syncMsg = '✓ Synced ' + data.processed + ' notes';
           if (data.splits > 0) syncMsg += ', split ' + data.splits;
           if (data.flagged > 0) syncMsg += ', ' + data.flagged + ' flagged for review';
-          if (data.proposed && data.proposed.length > 0) syncMsg += ', ' + data.proposed.length + ' new category proposed';
           document.getElementById('syncStatus').textContent = syncMsg;
           setTimeout(() => location.reload(), 1000);
         } else {
@@ -663,6 +667,21 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
         }
       } catch(e) { document.getElementById('syncStatus').textContent = '✗ Sync failed'; btn.disabled = false; }
       document.getElementById('syncLoading').style.display = 'none';
+    }
+
+    async function pullBridge() {
+      const status = document.getElementById('bridgeStatus');
+      status.textContent = '⏳ Pulling...';
+      try {
+        const res = await fetch('/pull-bridge', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          status.textContent = '✓ ' + data.ingested + ' ingested, ' + data.skipped + ' skipped';
+          if (data.ingested > 0) setTimeout(() => location.reload(), 1200);
+        } else {
+          status.textContent = '✗ ' + (data.error || 'Failed');
+        }
+      } catch(e) { status.textContent = '✗ Failed'; }
     }
 
     let recognition = null;
@@ -762,7 +781,6 @@ app.post('/note', upload.single('file'), async (req, res) => {
     }
     if (!raw) return res.json({ ok:false, error:'No input' });
 
-    // Check for cat markup — split into multiple pre-classified notes
     const catSections = parseCatDump(raw);
     if (catSections.length > 0) {
       const insert = db.prepare(`INSERT INTO notes (type,status,raw_input,formatted) VALUES (?,?,?,?)`);
@@ -776,7 +794,6 @@ app.post('/note', upload.single('file'), async (req, res) => {
       return res.json({ ok:true, pendingCount: count, split: catSections.length });
     }
 
-    // No cat markup — save as pending for Haiku to classify
     db.prepare(`INSERT INTO notes (type,status,raw_input,formatted) VALUES ('pending','pending',?,?)`)
       .run(encrypt(raw), encrypt(raw));
     const { count } = getPendingStats();
@@ -787,13 +804,57 @@ app.post('/note', upload.single('file'), async (req, res) => {
   }
 });
 
-// ── POST /sync — split + flag engine ──────────────────────────
+// ── POST /pull-bridge ──────────────────────────────────────────
+// Pulls latest from casmas-bridge repo and ingests new .md files from /bridge/md/
+app.post('/pull-bridge', async (req, res) => {
+  try {
+    // git pull
+    try {
+      execSync('git -C ' + BRIDGE_PATH + ' pull', { timeout: 30000 });
+    } catch(e) {
+      return res.json({ ok: false, error: 'git pull failed: ' + e.message });
+    }
+
+    const mdDir = path.join(BRIDGE_PATH, 'md');
+    if (!fs.existsSync(mdDir)) {
+      return res.json({ ok: true, ingested: 0, skipped: 0, note: 'md/ folder not found in bridge' });
+    }
+
+    const files = fs.readdirSync(mdDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
+    let ingested = 0;
+    let skipped = 0;
+
+    for (const file of files) {
+      const seenKey = 'bridge:file:' + file;
+      const already = db.prepare('SELECT key FROM secrets WHERE key=?').get(seenKey);
+      if (already) { skipped++; continue; }
+
+      const filePath = path.join(mdDir, file);
+      const content = fs.readFileSync(filePath, 'utf8').trim();
+      if (!content) { skipped++; continue; }
+
+      const raw = '[Bridge: ' + file + ']\n' + content;
+      db.prepare(`INSERT INTO notes (type,status,raw_input,formatted) VALUES ('pending','pending',?,?)`)
+        .run(encrypt(raw), encrypt(raw));
+
+      // Mark as seen
+      db.prepare('INSERT OR REPLACE INTO secrets (key,value) VALUES (?,?)').run(seenKey, '1');
+      ingested++;
+    }
+
+    res.json({ ok: true, ingested, skipped });
+  } catch(e) {
+    console.error('pull-bridge error:', e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /sync ─────────────────────────────────────────────────
 app.post('/sync', async (req, res) => {
   const pending = db.prepare("SELECT id, raw_input FROM notes WHERE status='pending'").all();
   if (!pending.length) return res.json({ ok:true, processed:0 });
   const decrypted = pending.map(n => ({ id: n.id, text: decrypt(n.raw_input) }));
 
-  // Pull classification guide from DB
   const guideRow = db.prepare("SELECT formatted FROM notes WHERE type='pi' AND formatted LIKE '%Classification Guide%' ORDER BY created_at DESC LIMIT 1").get();
   const guide = guideRow ? decrypt(guideRow.formatted) : '';
 
@@ -830,7 +891,6 @@ Return ONLY a valid JSON array of result objects. No markdown, no backticks, no 
     const results = JSON.parse(rawText);
 
     const insert = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
-    const update = db.prepare("UPDATE notes SET status='processed' WHERE id=?");
     const flag   = db.prepare("UPDATE notes SET status='review', type='brain-dump' WHERE id=?");
 
     const proposed = [];
@@ -838,22 +898,18 @@ Return ONLY a valid JSON array of result objects. No markdown, no backticks, no 
     db.transaction((items) => {
       const seen = new Set();
       for (const item of items) {
-        // Track proposed new categories
         if (item.proposed_type) {
           proposed.push({ source_id: item.source_id, proposed_type: item.proposed_type, formatted: item.formatted });
         }
-        // Flag uncertain notes for review
         if (item.uncertain) {
           if (!seen.has(item.source_id)) { flag.run(item.source_id); seen.add(item.source_id); }
           continue;
         }
-        // First result for this source_id updates the original note
         if (!seen.has(item.source_id)) {
           db.prepare("UPDATE notes SET type=?,status='processed',formatted=?,tags=?,open_loops=? WHERE id=?")
             .run(item.type, encrypt(item.formatted), encrypt(item.tags||''), encrypt(item.open_loops||''), item.source_id);
           seen.add(item.source_id);
         } else {
-          // Additional splits become new notes
           insert.run(item.type, 'processed', encrypt(item.formatted), encrypt(item.formatted), encrypt(item.tags||''), encrypt(item.open_loops||''));
         }
       }
@@ -904,8 +960,7 @@ app.post('/reclassify', (req, res) => {
   res.json({ ok:true });
 });
 
-
-// ── MCP internal routes (called by anchor-mcp only) ───────────
+// ── MCP internal routes ────────────────────────────────────────
 function isMcpRequest(req) {
   return req.headers['x-mcp-caller'] !== undefined;
 }
