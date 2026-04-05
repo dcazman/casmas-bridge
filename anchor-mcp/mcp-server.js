@@ -14,7 +14,7 @@ const ANCHOR_URL = process.env.ANCHOR_URL || 'http://192.168.50.23:7778';
 const MCP_TOKEN = process.env.MCP_TOKEN;
 const REPO_PATH = process.env.REPO_PATH || '/repo/casmas-bridge';
 const SSH_KEY_PATH = process.env.SSH_KEY_PATH || '/root/.ssh/deploy_key';
-const WAREHOUSE = '/srv/mergerfs/warehouse';
+const WAREHOUSE = process.env.WAREHOUSE || '/warehouse';
 
 if (!MCP_TOKEN) { console.error('FATAL: MCP_TOKEN not set'); process.exit(1); }
 
@@ -61,13 +61,10 @@ function sh(cmd, opts = {}) {
   return execAsync(cmd, { shell: true, ...opts });
 }
 
-// Services that need a full compose rebuild (source baked into image)
 const REBUILD_SERVICES = ['anchor'];
-// Services that just need a restart (no source baked in)
-const RESTART_ONLY = ['gmr', 'mealie', 'dozzle', 'seerr', 'cloudflared'];
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.2.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.3.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -197,7 +194,7 @@ function createMcpServer(caller) {
   );
 
   server.tool('rebuild_service',
-    'Sync source from casmas-bridge repo and rebuild/restart a service. Use for anchor (full rebuild). Other services just restart.',
+    'Sync source from casmas-bridge repo and rebuild/restart a service. anchor = full compose rebuild. Others = docker restart.',
     { service: z.string().describe('Service name, e.g. "anchor", "gmr"') },
     async ({ service }) => {
       try {
@@ -207,14 +204,12 @@ function createMcpServer(caller) {
         let steps = [];
 
         if (REBUILD_SERVICES.includes(service)) {
-          // Copy source files from repo to production folder, then full compose rebuild
           await sh(`cp -r ${repoPath}/. ${prodPath}/`);
           steps.push(`Synced ${repoPath} → ${prodPath}`);
           const { stdout } = await sh(`docker compose -f ${composeFile} up -d --build 2>&1`);
-          steps.push(`Rebuilt ${service} via compose.`);
+          steps.push(`Rebuilt ${service}.`);
           steps.push(stdout.trim());
         } else {
-          // Just restart the container
           const { stdout } = await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
           steps.push(stdout.trim());

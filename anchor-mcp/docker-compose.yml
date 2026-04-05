@@ -8,7 +8,9 @@ services:
       - ANCHOR_URL=http://localhost:7778
       - REPO_PATH=/repo/casmas-bridge
       - SSH_KEY_PATH=/root/.ssh/deploy_key
+      - WAREHOUSE=/warehouse
     volumes:
       - /srv/mergerfs/warehouse/casmas-bridge:/repo/casmas-bridge
+      - /srv/mergerfs/warehouse:/warehouse
       - /root/.ssh/deploy_key:/root/.ssh/deploy_key:ro
       - /var/run/docker.sock:/var/run/docker.sock
