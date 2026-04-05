@@ -1,10 +1,20 @@
 services:
-  dan-notes:
-    build: /srv/mergerfs/warehouse/dan-notes
-    container_name: dan-notes
+  anchor:
+    build: /srv/mergerfs/warehouse/anchor
+    container_name: anchor
     restart: unless-stopped
     network_mode: host
-    volumes:
-      - /srv/mergerfs/warehouse/dan-notes/data:/data
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ANCHOR_URL=http://localhost:7778
+      - API_SPEND_LIMIT=40
+      - PLAN_RENEWAL_DATE=2026-05-01
+      # SMTP optional — add these to enable email alerts
+      # - SMTP_HOST=smtp.gmail.com
+      # - SMTP_PORT=587
+      # - SMTP_USER=dan.casmas@gmail.com
+      # - SMTP_PASS=your-app-password
+      # - ALERT_EMAIL=dan.casmas@gmail.com
+    volumes:
+      - /srv/mergerfs/warehouse/anchor/data:/data
+      - /srv/mergerfs/warehouse/casmas-bridge:/bridge
