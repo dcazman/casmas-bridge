@@ -53,6 +53,7 @@ function gitEnv() {
 }
 
 function sh(cmd, opts = {}) {
+  console.log('[sh] cmd:', cmd, 'opts:', JSON.stringify(opts));
   return execAsync(cmd, { shell: true, ...opts });
 }
 
@@ -155,7 +156,7 @@ function createMcpServer(caller) {
         const { stdout: pushOut } = await sh('git push', opts);
         return { content: [{ type: 'text', text: `Committed & pushed.\n${commitOut}\n${pushOut}` }] };
       } catch (err) {
-        return { content: [{ type: 'text', text: `Git error: ${err.message}` }] };
+        return { content: [{ type: 'text', text: `Git error: ${err.message}\n${err.stack}` }] };
       }
     }
   );
@@ -166,10 +167,11 @@ function createMcpServer(caller) {
     async ({ service }) => {
       try {
         const composePath = `/srv/mergerfs/warehouse/${service}`;
-        const { stdout } = await sh('docker compose up -d --build', { cwd: composePath });
-        return { content: [{ type: 'text', text: `Rebuilt ${service}.\n${stdout}` }] };
+        console.log('[rebuild_service] composePath:', composePath);
+        const { stdout, stderr } = await sh('docker compose up -d --build', { cwd: composePath });
+        return { content: [{ type: 'text', text: `Rebuilt ${service}.\n${stdout}\n${stderr}` }] };
       } catch (err) {
-        return { content: [{ type: 'text', text: `Rebuild error: ${err.message}` }] };
+        return { content: [{ type: 'text', text: `Rebuild error: ${err.message}\n${err.stack}` }] };
       }
     }
   );
