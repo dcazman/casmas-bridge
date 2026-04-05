@@ -9,12 +9,13 @@ services:
       - ANCHOR_URL=http://localhost:7778
       - API_SPEND_LIMIT=40
       - TZ=America/New_York
-      # SMTP optional — add these to enable email alerts
-      # - SMTP_HOST=smtp.gmail.com
-      # - SMTP_PORT=587
-      # - SMTP_USER=dan.casmas@gmail.com
-      # - SMTP_PASS=your-app-password
-      # - ALERT_EMAIL=dan.casmas@gmail.com
+      - USE_OLLAMA=${USE_OLLAMA:-false}
+      - OLLAMA_URL=${OLLAMA_URL:-http://192.168.50.50:11434}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - ALERT_EMAIL=${ALERT_EMAIL:-}
     volumes:
       - /srv/mergerfs/warehouse/anchor/data:/data
       - /srv/mergerfs/warehouse/casmas-bridge:/bridge

@@ -22,7 +22,7 @@ async function callAI(system, userContent) {
     const resp = await fetch(OLLAMA_URL + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama3.2:3b', stream: false, messages: [{ role: 'system', content: ollamaSystem }, { role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'mistral', format: 'json', stream: false, messages: [{ role: 'system', content: ollamaSystem }, { role: 'user', content: userContent }] })
     });
     const data = await resp.json();
     return { text: data.message?.content || '', usage: null };
@@ -52,7 +52,8 @@ router.post('/', async (req, res) => {
     const { text, usage } = await callAI(SYS, 'Process:\n' + JSON.stringify(dec));
     if (usage) logUsage(usage.input_tokens, usage.output_tokens, USE_OLLAMA ? 'ollama' : MODEL_HAIKU, 'sync');
 
-    const results = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const results = Array.isArray(parsed) ? parsed : (parsed.results || parsed.notes || [parsed]);
     const ins  = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
     const flag = db.prepare("UPDATE notes SET status='review',type='brain-dump' WHERE id=?");
 

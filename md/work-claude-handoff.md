@@ -1,5 +1,5 @@
 # Casmas Bridge — Work Claude Handoff
-**Last updated:** April 6, 2026
+**Last updated:** April 5, 2026
 **Written by:** Personal Claude (synced from Anchor)
 
 ---
@@ -29,7 +29,7 @@ Add in Claude.ai → Settings → Connectors → GitHub. Then read this file and
 | Service | URL | Notes |
 |---|---|---|
 | Anchor 2.0 | anchor.thecasmas.com | Personal AI memory app |
-| anchor-mcp | mcp.thecasmas.com:8000 | MCP gateway, 11 tools |
+| anchor-mcp | mcp.thecasmas.com:8000 | MCP gateway, 12 tools |
 | GMR | gmr.thecasmas.com | DNS mail lookup tool |
 | Mealie, Dozzle, Seerr | local only | Home services |
 | Cloudflared, Watchtower | — | Tunnel + auto-updates |
@@ -39,16 +39,21 @@ Add in Claude.ai → Settings → Connectors → GitHub. Then read this file and
 |---|---|
 | Plex | Media server |
 | Sonarr / Radarr / Profilarr | Media management |
-| **Ollama** | **LIVE** — llama3.2:3b at 192.168.50.50:11434, Metal GPU, persistent via LaunchAgent |
+| **Ollama** | **LIVE** — llama3.2:3b (chat) + mistral (sync/classification) at 192.168.50.50:11434, Metal GPU, persistent via LaunchAgent (has been crashing — under investigation) |
 | FileFlows | Media transcoding, nights only |
 
 ### Anchor 2.0 — Current State
 - Stack: Node/Express + SQLite (better-sqlite3), AES-256-GCM encrypted
 - Modular codebase: `routes/` (notes, sync, chat, bridge, mcp, ui) + `lib/` (db, crypto, usage, email, helpers)
-- **Ollama connected** — Ask button = local llama3.2:3b (free). Ask Claude ($) = Anthropic Opus (paid)
+- **Ollama connected** — Ask button = local llama3.2:3b (free). Ask Claude ($) = Anthropic API (paid), always visible
+- Engine label in header shows 🦙 Ollama or 🤖 Anthropic depending on active engine
+- TZ=America/New_York set in docker-compose (DST fixed)
+- Ollama system prompt loads from `/bridge/md/ollama-system-prompt.md` at runtime
+- Chat history panel (collapsible, localStorage, 30 entries)
+- SMTP email working (mail.privateemail.com → dcasmas@gmail.com)
+- Alert button live in Sync Queue
 - Data: `/srv/mergerfs/warehouse/anchor/data/notes.db`
 - Config: `/srv/mergerfs/warehouse/anchor/.env`
-- New logo: anchor on book with seaweed (Anchor 2.0 branding)
 - Runs outside OMV GUI via plain docker compose
 
 ### casmas-bridge Repo
@@ -65,7 +70,7 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 
 ---
 
-## anchor-mcp Tools (11 total)
+## anchor-mcp Tools (12 total)
 
 `add_note`, `get_notes`, `search_notes`, `get_open_loops`, `get_summary`, `get_pi`, `reclassify_note`, `delete_note`, `write_file`, `read_file`, `git_commit_push`, `rebuild_service`
 
@@ -73,14 +78,20 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 
 ---
 
-## Open Work Tasks (as of April 6, 2026)
+## Open Work Tasks (as of April 5, 2026)
 
-### Anchor — Next Build Session
-- Remove Claude.ai weekly usage widget from header (CLAUDE_USAGE_PCT approach too manual)
-- DST timestamp fix: replace SQLite `datetime('now')` with `new Date().toLocaleString('sv-SE', {timeZone: 'America/New_York'})` in db.js inserts
-- Wire Ollama system prompt MD (`md/ollama-system-prompt.md`) to load at runtime in routes/sync.js and routes/chat.js instead of hardcoded string
-- Date grouping headers in notes list (Today / Yesterday / This Week)
-- Weekly Anchor DB groom pass (recurring)
+### Anchor — Immediate (from April 5 build session)
+- [ ] Sync sanitized `anchor/docker-compose.yml` to casmas-bridge (live file has hardcoded SMTP password — use `${VAR}` placeholders in repo version)
+- [ ] Sync sanitized `anchor-mcp/docker-compose.yml` to casmas-bridge (MCP_TOKEN hardcoded in live file)
+- [ ] Deploy rebuild_service fix to anchor-mcp: `docker compose -f /srv/mergerfs/warehouse/anchor-mcp/docker-compose.yml up -d --build` (fix already in casmas-bridge/anchor-mcp/mcp-server.js)
+- [ ] Set up weekly groom cron: `0 9 * * 0 curl -s -X POST http://192.168.50.23:7778/groom`
+- [ ] Investigate Ollama crash pattern on M4 (LaunchAgent com.ollama.serve has KeepAlive=true but crashing)
+- [ ] casmas-bridge cleanup — delete `_chat_buttons_patch.txt` and `_pull_bridge_patch.js` (stale files)
+- [ ] Remove tokens from sync area in Anchor UI
+
+### Anchor — Soon
+- [ ] Date grouping headers in notes list (Today / Yesterday / This Week)
+- [ ] Token cost display near Ask Claude ($) button (deferred)
 
 ### Infrastructure / Future
 - Casmas Core hardware spec — NVIDIA mini PC $500-700 for dedicated local LLM (current Ollama on M4 Mac is interim)
@@ -88,6 +99,7 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 - Hey Anchor Pi listener (Pi 5 hardware broken, parked)
 - Obsidian export target (future)
 - Multer upgrade to 2.x (security, non-breaking, low priority)
+- Proactive email alerts from Anchor (future)
 
 ---
 
@@ -98,6 +110,7 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 - **anchor-mcp runs outside OMV GUI** — plain docker compose, env vars baked into compose file on disk
 - **No background GitHub polling** — only Anchor or Claude triggers a bridge sync (intent-driven)
 - **Work Claude uses GitHub MCP** — employer blocks custom connectors, GitHub MCP is policy-safe
+- **USE_OLLAMA=true hardcoded** in anchor docker-compose
 
 ---
 
@@ -105,10 +118,14 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 
 Dan's employer is Sonos. He's a Senior Messaging Engineer. Manager is Paul Henry.
 
-Recent work activity (April 3, 2026):
-- Jeff Williams: ExternalSecret namespace targeting (argocd vs drive-copy). File moved, namespace Jeff's domain. PR rebased, logs visible.
-- Sharif Kadri (Director of Revenue Systems): AI/Kit conversation. Dan keeping eye on inspiration for Kit project.
-- Paul Henry: loose conversation noted.
+Recent work activity:
+- April 3, 2026: Jeff Williams — ExternalSecret namespace targeting (argocd vs drive-copy). File moved, namespace Jeff's domain. PR rebased, logs visible.
+- April 3, 2026: Sharif Kadri (Director of Revenue Systems) — AI/Kit conversation. Dan keeping eye on inspiration for Kit project.
+- April 3, 2026: Paul Henry — loose conversation noted.
+
+### Upcoming Schedule (from Anchor calendar notes)
+- **Monday** — 9:30 AM, 2 hours taken
+- **Thursday** — 4 hours off starting 11 AM
 
 Work Claude should check `md/session-latest.md` for any more recent work context if it exists.
 
