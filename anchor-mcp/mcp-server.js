@@ -53,7 +53,7 @@ function gitEnv() {
 }
 
 function sh(cmd, opts = {}) {
-  return execAsync(cmd, { shell: '/bin/sh', ...opts });
+  return execAsync(cmd, { shell: true, ...opts });
 }
 
 function createMcpServer(caller) {
