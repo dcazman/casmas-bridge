@@ -8,10 +8,11 @@ const { getUsageStats } = require('../lib/usage');
 const { esc, typeColor, ALL_TYPES } = require('../lib/helpers');
 const { emailEnabled } = require('./bridge');
 
-const PLAN_RENEWAL_DATE = process.env.PLAN_RENEWAL_DATE || '';
+const PLAN_RENEWAL_DATE  = process.env.PLAN_RENEWAL_DATE  || '';
+const CLAUDE_USAGE_PCT   = parseFloat(process.env.CLAUDE_USAGE_PCT || '0');
 
-// Load the new Anchor 2.0 icon
-const ICON_PATH = path.join(__dirname, '../assets/Anchor and book with seaweed decoration.png');
+// Anchor 2.0 icon
+const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
 
 function renderNote(n) {
@@ -75,20 +76,27 @@ router.get('/', (req, res) => {
   const TG = [{l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},{l:'Personal',t:['personal','personal-task','personal-decision']},{l:'Home',t:['home','home-task','home-decision']},{l:'Kids',t:['kids','kids-task']},{l:'Health',t:['health','health-task']},{l:'Finance',t:['finance','finance-task']},{l:'Universal',t:['social','calendar','email','idea','pi','random','brain-dump']}];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
+
+  // Claude.ai weekly usage (set via CLAUDE_USAGE_PCT env var)
+  const claudePct = Math.min(100, CLAUDE_USAGE_PCT);
+  const claudeColor = claudePct >= 90 ? '#f87171' : claudePct >= 70 ? '#f59e0b' : '#4ade80';
+
+  // Anthropic API spend (tracked locally)
   const uc = parseFloat(usage.pct)>=90?'#f87171':parseFloat(usage.pct)>=70?'#f59e0b':'#4ade80';
+
   let rs = '';
-  if (PLAN_RENEWAL_DATE) { const rd=new Date(PLAN_RENEWAL_DATE); rs='Plan renews '+rd.toLocaleDateString()+' ('+(Math.ceil((rd-now)/86400000))+'d)'; }
+  if (PLAN_RENEWAL_DATE) { const rd=new Date(PLAN_RENEWAL_DATE); rs='Renews '+rd.toLocaleDateString()+' ('+(Math.ceil((rd-now)/86400000))+'d)'; }
 
   const useOllama = process.env.USE_OLLAMA === 'true';
   const engineLabel = useOllama ? '🦙 Ollama (local)' : '🤖 Anthropic API';
 
   res.send(`<!DOCTYPE html><html><head>
-  <title>Anchor</title>
+  <title>Anchor 2.0</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1e3a5f">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Anchor">
+  <meta name="apple-mobile-web-app-title" content="Anchor 2.0">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
@@ -96,15 +104,16 @@ router.get('/', (req, res) => {
     .hdr{background:linear-gradient(135deg,#1e3a5f,#1a1f35);border-bottom:1px solid #2d4a7a;padding:16px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
     .hdr-icon{width:56px;height:56px;flex-shrink:0;object-fit:contain}
     .hdr-text{flex:1}.hdr-text h1{font-size:1.8rem;font-weight:700;color:#93c5fd}.hdr-text p{font-size:.85rem;color:#64748b}
-    .hdr-right{display:flex;flex-direction:row;align-items:center;gap:24px}
+    .hdr-right{display:flex;flex-direction:row;align-items:center;gap:20px}
     .hdr-time{font-size:.85rem;color:#e2e8f0;white-space:nowrap}
-    .usage-w{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-    .usage-lbl{font-size:.72rem;color:#94a3b8}
-    .usage-bar-w{width:140px;height:6px;background:#1e2d45;border-radius:3px;overflow:hidden}
-    .usage-bar{height:100%;border-radius:3px;background:${uc};width:${usage.pct}%}
-    .usage-num{font-size:.72rem;color:${uc};font-weight:600}
-    .renew-lbl{font-size:.7rem;color:#475569}
-    .engine-lbl{font-size:.7rem;color:#64748b}
+    .widget-group{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+    .widget-row{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+    .usage-lbl{font-size:.7rem;color:#94a3b8}
+    .usage-bar-w{width:120px;height:5px;background:#1e2d45;border-radius:3px;overflow:hidden}
+    .usage-bar{height:100%;border-radius:3px}
+    .usage-num{font-size:.7rem;font-weight:600}
+    .engine-lbl{font-size:.68rem;color:#64748b}
+    .renew-lbl{font-size:.68rem;color:#475569}
     .btn-logout{font-size:.78rem;color:#475569;text-decoration:none;padding:5px 10px;border:1px solid #1e2d45;border-radius:6px}
     .main{padding:24px 32px;max-width:1400px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:24px}
     @media(max-width:900px){.main{grid-template-columns:1fr}}
@@ -182,16 +191,22 @@ router.get('/', (req, res) => {
     .empty{color:#334155;font-size:.9rem;padding:20px;text-align:center}
   </style></head><body>
   <div class="hdr">
-    <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor">
-    <div class="hdr-text"><h1>Anchor</h1><p>Dan's memory, context, and second brain</p></div>
+    <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
+    <div class="hdr-text"><h1>Anchor <span style="font-size:1rem;color:#fcd34d;font-weight:500">2.0</span></h1><p>Dan's memory, context, and second brain</p></div>
     <div class="hdr-right">
       <div class="hdr-time" id="hdrTime"></div>
-      <div class="usage-w">
-        <div class="usage-lbl">Anthropic API spend</div>
-        <div class="usage-bar-w"><div class="usage-bar"></div></div>
-        <div class="usage-num">$${usage.cost} / $${usage.limit} (${usage.pct}%)</div>
-        <div class="engine-lbl">${engineLabel}</div>
-        ${rs?'<div class="renew-lbl">'+rs+'</div>':''}
+      <div class="widget-group">
+        <div class="widget-row">
+          <div class="usage-lbl">Claude.ai weekly</div>
+          <div class="usage-bar-w"><div class="usage-bar" style="background:${claudeColor};width:${claudePct}%"></div></div>
+          <div class="usage-num" style="color:${claudeColor}">${claudePct}% used</div>
+        </div>
+        <div class="widget-row">
+          <div class="usage-lbl">Anchor API ($${usage.limit} limit)</div>
+          <div class="usage-bar-w"><div class="usage-bar" style="background:${uc};width:${usage.pct}%"></div></div>
+          <div class="usage-num" style="color:${uc}">$${usage.cost} (${usage.pct}%)</div>
+        </div>
+        <div class="engine-lbl">${engineLabel}${rs?' · <span class="renew-lbl">'+rs+'</span>':''}</div>
       </div>
       ${req.headers['cf-access-authenticated-user-email']?'<a href="/cdn-cgi/access/logout" class="btn-logout">Sign out</a>':''}
     </div>
@@ -282,10 +297,8 @@ router.get('/', (req, res) => {
     });
     function clock(){const el=document.getElementById('hdrTime');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}
     clock();setInterval(clock,30000);
-
     function fileSelected(i){const n=i.files[0]?i.files[0].name:'';document.getElementById('fn').textContent=n;document.getElementById('cfi').style.display=n?'inline':'none';}
     function clearFile(){document.getElementById('fi').value='';document.getElementById('fn').textContent='';document.getElementById('cfi').style.display='none';}
-
     async function submitNote(){
       const v=document.getElementById('inp').value.trim(),f=document.getElementById('fi').files[0];
       if(!v&&!f)return;
@@ -296,7 +309,6 @@ router.get('/', (req, res) => {
         else{document.getElementById('ns').textContent='✗ '+(d.error||'Failed');}
       }catch(e){document.getElementById('ns').textContent='✗ Failed';}
     }
-
     async function runSync(){
       const btn=document.getElementById('syncBtn');btn.disabled=true;
       document.getElementById('sl').style.display='block';document.getElementById('ss').textContent='';
@@ -307,19 +319,16 @@ router.get('/', (req, res) => {
       }catch(e){document.getElementById('ss').textContent='✗ Sync failed';btn.disabled=false;}
       document.getElementById('sl').style.display='none';
     }
-
     async function pullBridge(){
       const s=document.getElementById('bs');s.textContent='⏳ Pulling...';
       try{const r=await fetch('/pull-bridge',{method:'POST'});const d=await r.json();if(d.ok){s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped';if(d.ingested>0)setTimeout(()=>location.reload(),1200);}else{s.textContent='✗ '+(d.error||'Failed');}}
       catch(e){s.textContent='✗ Failed';}
     }
-
     async function sendAlert(){
       const s=document.getElementById('bs');s.textContent='⏳ Sending...';
       try{const r=await fetch('/alert',{method:'POST'});const d=await r.json();s.textContent=d.ok?'✓ Sent':'✗ '+(d.error||'Failed');}
       catch(e){s.textContent='✗ Failed';}
     }
-
     let rec=null;
     function toggleMic(){
       if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){alert('Use Chrome.');return;}
@@ -331,14 +340,12 @@ router.get('/', (req, res) => {
       rec.onend=()=>{btn.classList.remove('listening');btn.textContent='🎤 Mic';rec=null;};
       rec.start();btn.classList.add('listening');btn.textContent='🔴 Listening...';
     }
-
     function doSearch(){
       const q=document.getElementById('sq').value,t=document.getElementById('st').value,s=document.getElementById('so').value;
       const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);
       window.location.href='/?'+p.toString();
     }
     document.getElementById('sq').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
-
     async function chat(model){
       const v=document.getElementById('ci').value.trim();if(!v)return;
       const msgs=document.getElementById('cm');
@@ -358,11 +365,9 @@ router.get('/', (req, res) => {
       msgs.scrollTop=msgs.scrollHeight;
     }
     document.getElementById('ci').addEventListener('keydown',e=>{if(e.key==='Enter')chat('haiku');});
-
     function isLocal(){const h=window.location.hostname;return h==='localhost'||h.startsWith('192.168.')||h.startsWith('10.')||h.startsWith('172.');}
     function tp(bid,cid){const b=document.getElementById(bid),c=document.getElementById(cid),col=b.classList.contains('collapsed');b.classList.toggle('collapsed',!col);c.classList.toggle('open',col);}
     if(isLocal()){['sb','nb','cb'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('collapsed');});['sc','nc','cc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('open');});}
-
     async function reclassify(id,type){
       if(!type)return;const s=document.getElementById('rcs-'+id);s.textContent='...';
       try{const r=await fetch('/reclassify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,type})});const d=await r.json();if(d.ok){s.textContent='✓';setTimeout(()=>location.reload(),600);}else s.textContent='✗';}
