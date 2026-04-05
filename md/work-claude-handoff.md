@@ -1,87 +1,119 @@
 # Casmas Bridge — Work Claude Handoff
-**Last updated:** Saturday April 5, 2026
-**Written by:** Personal Claude
+**Last updated:** April 6, 2026
+**Written by:** Personal Claude (synced from Anchor)
 
 ---
 
-## IMPORTANT — How Work Claude Connects
+## How to Connect
 
-**Work Claude CANNOT use the Casmas MCP server.** The employer blocks custom MCP connectors.
-
-Work Claude connects via the **standard GitHub MCP connector** instead. This is policy-safe — it's a standard Anthropic connector, not a custom one.
+Work Claude connects via the **standard GitHub MCP connector** — NOT the Casmas custom MCP. Employer blocks custom connectors.
 
 **Repo:** `github.com/dcazman/casmas-bridge` (private)
 
-Add GitHub MCP in Claude.ai → Settings → Connectors → GitHub. Then browse or read files from this repo.
+Add in Claude.ai → Settings → Connectors → GitHub. Then read this file and `md/session-latest.md` if it exists.
 
 ---
 
-## Session Start Flow
+## Dan — Who He Is
 
-```
-1. Read md/work-claude-handoff.md   — this file, full context
-2. Read md/session-latest.md        — most recent Personal Claude session summary (if exists)
-```
-
----
-
-## What casmas-bridge is
-
-Private GitHub repo. This is the shared file layer between Personal Claude and Work Claude.
-
-- Personal Claude writes session summaries and context files here
-- Work Claude reads them via GitHub MCP to get up to speed
-- Work Claude can write files back (task updates, session notes, responses)
-
-Personal data (home, kids, health, finance, Anchor DB) never goes here. Work context only.
+- **Employer:** Sonos | **Title:** Senior Messaging Engineer | **Manager:** Paul Henry | **Since:** Sept 20, 2021
+- **Daily driver:** M4 Mac mini, 16GB unified memory, Apple M4 chip (10-core)
+- **Home:** Lincolnton, NC | Partner Kathie | Two boys: Ethan (turning 7 Oct 20) and Zach (turning 3 Aug 22)
+- **Home server:** OMV NAS at 192.168.50.23
 
 ---
 
-## Key Facts About Dan
+## Current Infrastructure (April 2026)
 
-| Item | Value |
-|------|-------|
-| Employer | Sonos |
-| Title | Senior Messaging Engineer |
-| Manager | Paul Henry |
-| Start date | September 20, 2021 |
-| Daily driver | M4 Mac mini, 16GB |
-| Home server | OMV at 192.168.50.23 |
+### OMV Server (192.168.50.23)
+| Service | URL | Notes |
+|---|---|---|
+| Anchor 2.0 | anchor.thecasmas.com | Personal AI memory app |
+| anchor-mcp | mcp.thecasmas.com:8000 | MCP gateway, 11 tools |
+| GMR | gmr.thecasmas.com | DNS mail lookup tool |
+| Mealie, Dozzle, Seerr | local only | Home services |
+| Cloudflared, Watchtower | — | Tunnel + auto-updates |
+
+### M4 Mac mini (192.168.50.50)
+| Service | Notes |
+|---|---|
+| Plex | Media server |
+| Sonarr / Radarr / Profilarr | Media management |
+| **Ollama** | **LIVE** — llama3.2:3b at 192.168.50.50:11434, Metal GPU, persistent via LaunchAgent |
+| FileFlows | Media transcoding, nights only |
+
+### Anchor 2.0 — Current State
+- Stack: Node/Express + SQLite (better-sqlite3), AES-256-GCM encrypted
+- Modular codebase: `routes/` (notes, sync, chat, bridge, mcp, ui) + `lib/` (db, crypto, usage, email, helpers)
+- **Ollama connected** — Ask button = local llama3.2:3b (free). Ask Claude ($) = Anthropic Opus (paid)
+- Data: `/srv/mergerfs/warehouse/anchor/data/notes.db`
+- Config: `/srv/mergerfs/warehouse/anchor/.env`
+- New logo: anchor on book with seaweed (Anchor 2.0 branding)
+- Runs outside OMV GUI via plain docker compose
+
+### casmas-bridge Repo
+- Server path: `/srv/mergerfs/warehouse/casmas-bridge/`
+- Mounted into anchor-mcp at `/repo/casmas-bridge`
+- Personal Claude writes here via MCP tools (write_file, git_commit_push)
+- Work Claude reads via GitHub MCP
 
 ---
 
 ## What Personal Claude Manages (not Work Claude's concern)
 
-- anchor-mcp MCP server at mcp.thecasmas.com
-- Anchor notes app at anchor.thecasmas.com
-- All Docker services on OMV server
-- casmas-bridge repo (Personal Claude writes here, Work Claude reads)
+All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-bridge repo, Ollama. Work Claude stays in its lane — Sonos work, Jira, Slack, GitLab, GCP only.
 
 ---
 
-## What Was Built April 4-5, 2026
+## anchor-mcp Tools (11 total)
 
-- Personal Claude can now write files, commit, and push to casmas-bridge end to end via MCP tools
-- anchor-mcp extended with: write_file, read_file, git_commit_push, rebuild_service
-- SSH deploy key on server handles all git auth
-- anchor-mcp moved out of OMV Compose GUI — runs via plain docker compose
+`add_note`, `get_notes`, `search_notes`, `get_open_loops`, `get_summary`, `get_pi`, `reclassify_note`, `delete_note`, `write_file`, `read_file`, `git_commit_push`, `rebuild_service`
+
+**Work scope filter:** Work token only returns `work`, `work-task`, `work-decision`, `work-idea`, `meeting`, `calendar`, `email` — personal data never surfaces.
 
 ---
 
-## Open Tasks Carry Forward
+## Open Work Tasks (as of April 6, 2026)
 
-### Immediate
-- Mac baseline done (M4 Mac mini, 16GB) — install Ollama next session
-- Fix DST timestamp bug in anchor/server.js
-- Add DELETE /notes/:id endpoint + delete_note MCP tool
-- Hard delete notes 15, 27, 28 (dupes/stale)
+### Anchor — Next Build Session
+- Remove Claude.ai weekly usage widget from header (CLAUDE_USAGE_PCT approach too manual)
+- DST timestamp fix: replace SQLite `datetime('now')` with `new Date().toLocaleString('sv-SE', {timeZone: 'America/New_York'})` in db.js inserts
+- Wire Ollama system prompt MD (`md/ollama-system-prompt.md`) to load at runtime in routes/sync.js and routes/chat.js instead of hardcoded string
+- Date grouping headers in notes list (Today / Yesterday / This Week)
+- Weekly Anchor DB groom pass (recurring)
 
-### Anchor Features
-- Token usage widget in Anchor UI
-- Date grouping headers in notes list
-- Anchor notification/alert system
-- Weekly DB groom pass
+### Infrastructure / Future
+- Casmas Core hardware spec — NVIDIA mini PC $500-700 for dedicated local LLM (current Ollama on M4 Mac is interim)
+- Skylight → Anchor sync service (parked, idea note logged)
+- Hey Anchor Pi listener (Pi 5 hardware broken, parked)
+- Obsidian export target (future)
+- Multer upgrade to 2.x (security, non-breaking, low priority)
 
-### Infrastructure
-- Ollama install on M4 Mac mini (brew install ollama, pull llama3.2 or mistral)
-- Casmas Core hardware spec (NVIDIA mini PC $500-700)
+---
+
+## Decisions Made (permanent record)
+
+- **Ollama on Mac** — nothing moves to OMV. FileFlows runs nights only to free headroom. M4 handles Plex, arrs, Ollama daytime fine.
+- **Anchor not on Docker Hub** — local/private build only, no Watchtower for anchor or anchor-mcp
+- **anchor-mcp runs outside OMV GUI** — plain docker compose, env vars baked into compose file on disk
+- **No background GitHub polling** — only Anchor or Claude triggers a bridge sync (intent-driven)
+- **Work Claude uses GitHub MCP** — employer blocks custom connectors, GitHub MCP is policy-safe
+
+---
+
+## Sonos Work Context
+
+Dan's employer is Sonos. He's a Senior Messaging Engineer. Manager is Paul Henry.
+
+Recent work activity (April 3, 2026):
+- Jeff Williams: ExternalSecret namespace targeting (argocd vs drive-copy). File moved, namespace Jeff's domain. PR rebased, logs visible.
+- Sharif Kadri (Director of Revenue Systems): AI/Kit conversation. Dan keeping eye on inspiration for Kit project.
+- Paul Henry: loose conversation noted.
+
+Work Claude should check `md/session-latest.md` for any more recent work context if it exists.
+
+---
+
+## Personal Data Boundary
+
+**Never** include in casmas-bridge: home details, kids info, health, finance, personal relationships, Anchor DB contents, or anything from the personal scope of Anchor notes. Work context only in this repo.
