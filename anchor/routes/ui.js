@@ -7,7 +7,6 @@ const { db, decryptNote, getPending, getLastSync, shouldSync } = require('../lib
 const { esc, typeColor, ALL_TYPES } = require('../lib/helpers');
 const { emailEnabled } = require('./bridge');
 
-// Anchor 2.0 icon
 const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
 
@@ -119,6 +118,7 @@ router.get('/', (req, res) => {
     .btn-opus{background:#1e1a35;color:#a78bfa;border:1px solid #a78bfa40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-bridge{background:#1e2d45;color:#4ade80;border:1px solid #4ade8040;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-alert{background:#1e2d45;color:#fb923c;border:1px solid #fb923c40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn-groom{background:#1e2d45;color:#c084fc;border:1px solid #c084fc40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-icon{background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 5px;opacity:.4;transition:opacity .15s}
     .btn-icon:hover{opacity:1}.btn-delete:hover{color:#f87171}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
@@ -163,6 +163,7 @@ router.get('/', (req, res) => {
     .chat-in{display:flex;gap:8px}.chat-in input{flex:1}
     .chat-mr{display:flex;align-items:center;gap:8px;margin-top:8px}
     .model-lbl{font-size:.75rem;color:#475569}
+    .groom-report{margin-top:8px;padding:10px 12px;background:#0d1117;border:1px solid #c084fc30;border-radius:8px;font-size:.82rem;color:#c4b5fd;white-space:pre-wrap;display:none}
     .otd-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:14px}
     .empty{color:#334155;font-size:.9rem;padding:20px;text-align:center}
   </style></head><body>
@@ -203,9 +204,11 @@ router.get('/', (req, res) => {
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
             <button class="btn-bridge" onclick="pullBridge()">⇄ Sync Bridge</button>
+            <button class="btn-groom" onclick="runGroom()">🧹 Groom</button>
             ${emailEnabled?'<button class="btn-alert" onclick="sendAlert()">📧 Alert</button>':''}
             <span class="status" id="bs" style="margin:0"></span>
           </div>
+          <div class="groom-report" id="groomReport"></div>
           <div class="status" id="ss"></div>
           <div class="loading" id="sl">⏳ Classifying...</div>
         </div>
@@ -293,9 +296,18 @@ router.get('/', (req, res) => {
       document.getElementById('sl').style.display='none';
     }
     async function pullBridge(){
-      const s=document.getElementById('bs');s.textContent='⏳ Pulling...';
+      const s=document.getElementById('bs');s.textContent='⏳ Syncing...';
       try{const r=await fetch('/pull-bridge',{method:'POST'});const d=await r.json();if(d.ok){s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped';if(d.ingested>0)setTimeout(()=>location.reload(),1200);}else{s.textContent='✗ '+(d.error||'Failed');}}
       catch(e){s.textContent='✗ Failed';}
+    }
+    async function runGroom(){
+      const s=document.getElementById('bs');const r=document.getElementById('groomReport');
+      s.textContent='⏳ Grooming...';r.style.display='none';
+      try{
+        const res=await fetch('/groom',{method:'POST'});const d=await res.json();
+        if(d.ok){s.textContent='✓ Groom complete';r.textContent=d.report;r.style.display='block';}
+        else{s.textContent='✗ '+(d.error||'Groom failed');}
+      }catch(e){s.textContent='✗ Failed';}
     }
     async function sendAlert(){
       const s=document.getElementById('bs');s.textContent='⏳ Sending...';
