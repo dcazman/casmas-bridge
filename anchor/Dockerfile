@@ -9,6 +9,9 @@ RUN npm install
 
 COPY server.js .
 COPY start.sh .
+COPY lib/ ./lib/
+COPY routes/ ./routes/
+COPY assets/ ./assets/
 
 RUN chmod +x start.sh
 
