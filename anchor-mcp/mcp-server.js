@@ -23,9 +23,7 @@ MCP_TOKEN.split(',').forEach(entry => {
   if (caller && secret) TOKENS[secret] = caller;
 });
 
-function identifyCaller(token) {
-  return TOKENS[token] || null;
-}
+function identifyCaller(token) { return TOKENS[token] || null; }
 
 function authCheck(req, res, next) {
   const token = req.headers['x-anchor-token'] || req.headers['authorization']?.replace('Bearer ', '') || req.query.token;
@@ -45,11 +43,17 @@ async function anchorPost(path, body, caller) {
   return res.json();
 }
 
+async function anchorDelete(path, caller) {
+  const res = await fetch(ANCHOR_URL + path, {
+    method: 'DELETE',
+    headers: { 'x-mcp-caller': caller }
+  });
+  if (!res.ok) throw new Error('Anchor returned ' + res.status);
+  return res.json();
+}
+
 function gitEnv() {
-  return {
-    ...process.env,
-    GIT_SSH_COMMAND: `ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no`
-  };
+  return { ...process.env, GIT_SSH_COMMAND: `ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no` };
 }
 
 function sh(cmd, opts = {}) {
@@ -57,7 +61,7 @@ function sh(cmd, opts = {}) {
 }
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.0.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.1.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -71,7 +75,7 @@ function createMcpServer(caller) {
   server.tool('get_notes',
     'Get notes from Anchor. Work callers only receive work-scoped notes.',
     {
-      type: z.string().optional().describe('Filter by category: work, personal, health, kids, finance, home, task, decision, idea, meeting, social, calendar, email, pi, random, brain-dump'),
+      type: z.string().optional().describe('Filter by category'),
       limit: z.number().optional().describe('Max notes to return (default 20)'),
       sort: z.enum(['newest', 'oldest', 'open-loops']).optional().describe('Sort order')
     },
@@ -109,7 +113,7 @@ function createMcpServer(caller) {
   );
 
   server.tool('get_pi',
-    'Get personal information facts about Dan (height, preferences, medical history etc).',
+    'Get personal information facts about Dan.',
     {},
     async () => {
       const data = await anchorPost('/mcp/notes', { type: 'pi', limit: 50, caller }, caller);
@@ -129,6 +133,19 @@ function createMcpServer(caller) {
     }
   );
 
+  server.tool('delete_note',
+    'Permanently delete a note from Anchor by ID.',
+    { id: z.number().describe('The note ID to delete') },
+    async ({ id }) => {
+      try {
+        const data = await anchorDelete('/mcp/notes/' + id, caller);
+        return { content: [{ type: 'text', text: data.ok ? 'Note ' + id + ' deleted.' : 'Failed: ' + (data.error || 'Unknown') }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: 'Delete error: ' + err.message }] };
+      }
+    }
+  );
+
   server.tool('write_file',
     'Write content to a file in the casmas-bridge repo.',
     {
@@ -145,13 +162,10 @@ function createMcpServer(caller) {
 
   server.tool('read_file',
     'Read a file from the casmas-bridge repo.',
-    {
-      path: z.string().describe('Relative path within the repo, e.g. "anchor/server.js"')
-    },
+    { path: z.string().describe('Relative path within the repo, e.g. "anchor/server.js"') },
     async ({ path: relPath }) => {
       try {
-        const fullPath = `${REPO_PATH}/${relPath}`;
-        const content = await readFile(fullPath, 'utf8');
+        const content = await readFile(`${REPO_PATH}/${relPath}`, 'utf8');
         return { content: [{ type: 'text', text: content }] };
       } catch (err) {
         return { content: [{ type: 'text', text: `Read error: ${err.message}` }] };
@@ -178,7 +192,7 @@ function createMcpServer(caller) {
 
   server.tool('rebuild_service',
     'Restart a running Docker container by name.',
-    { service: z.string().describe('Container name, e.g. "anchor-mcp", "gmr", "anchor"') },
+    { service: z.string().describe('Container name, e.g. "anchor", "gmr"') },
     async ({ service }) => {
       try {
         const { stdout } = await sh(`docker restart ${service}`);
@@ -202,8 +216,6 @@ app.post('/mcp', authCheck, async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
-app.get('/health', (req, res) => {
-  res.json({ ok: true, service: 'anchor-mcp', port: PORT });
-});
+app.get('/health', (req, res) => res.json({ ok: true, service: 'anchor-mcp', port: PORT }));
 
 app.listen(PORT, () => console.log('anchor-mcp running on port ' + PORT));

@@ -1,6 +1,6 @@
 {
   "name": "anchor",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Anchor — personal AI memory layer",
   "main": "server.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "better-sqlite3": "^9.4.3",
     "multer": "^2.0.0",
     "pdf-parse": "^1.1.1",
-    "mammoth": "^1.7.0"
+    "mammoth": "^1.7.0",
+    "nodemailer": "^6.9.13"
   }
 }

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const nodemailer = require('nodemailer');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -16,9 +17,43 @@ const BRIDGE_PATH = '/bridge';
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001';
 const MODEL_OPUS  = 'claude-opus-4-5';
 
+// Haiku pricing (per token)
+const COST_IN_PER_TOKEN  = 0.80  / 1_000_000; // $0.80/MTok input
+const COST_OUT_PER_TOKEN = 4.00  / 1_000_000; // $4.00/MTok output
+const API_SPEND_LIMIT    = parseFloat(process.env.API_SPEND_LIMIT  || '40');
+const PLAN_RENEWAL_DATE  = process.env.PLAN_RENEWAL_DATE || ''; // e.g. "2026-05-01"
+
 const SYNC_NOTE_THRESHOLD  = 20;
 const SYNC_TOKEN_THRESHOLD = 10000;
 const SYNC_AGE_HOURS       = 24;
+
+// ── Email config ───────────────────────────────────────────────
+const SMTP_HOST  = process.env.SMTP_HOST  || '';
+const SMTP_PORT  = parseInt(process.env.SMTP_PORT || '587');
+const SMTP_USER  = process.env.SMTP_USER  || '';
+const SMTP_PASS  = process.env.SMTP_PASS  || '';
+const ALERT_EMAIL = process.env.ALERT_EMAIL || SMTP_USER;
+const emailEnabled = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+
+let mailer = null;
+if (emailEnabled) {
+  mailer = nodemailer.createTransport({
+    host: SMTP_HOST, port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+}
+
+async function sendEmail(subject, body) {
+  if (!mailer) return { ok: false, error: 'Email not configured' };
+  try {
+    await mailer.sendMail({ from: SMTP_USER, to: ALERT_EMAIL, subject, text: body });
+    return { ok: true };
+  } catch(e) {
+    console.error('Email error:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -65,6 +100,14 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS usage_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    model TEXT,
+    operation TEXT
+  );
 `);
 try { db.exec(`ALTER TABLE notes ADD COLUMN status TEXT DEFAULT 'pending'`); } catch {}
 
@@ -87,6 +130,22 @@ function getApiKey() {
   return decrypt(row.value);
 }
 
+// ── Usage tracking ─────────────────────────────────────────────
+function logUsage(tokens_in, tokens_out, model, operation) {
+  try {
+    db.prepare('INSERT INTO usage_log (tokens_in, tokens_out, model, operation) VALUES (?,?,?,?)')
+      .run(tokens_in || 0, tokens_out || 0, model, operation);
+  } catch(e) { console.error('Usage log error:', e.message); }
+}
+
+function getUsageStats() {
+  const rows = db.prepare('SELECT tokens_in, tokens_out FROM usage_log').all();
+  const totalIn  = rows.reduce((s, r) => s + (r.tokens_in  || 0), 0);
+  const totalOut = rows.reduce((s, r) => s + (r.tokens_out || 0), 0);
+  const cost = (totalIn * COST_IN_PER_TOKEN) + (totalOut * COST_OUT_PER_TOKEN);
+  return { totalIn, totalOut, cost: cost.toFixed(4), limit: API_SPEND_LIMIT, pct: Math.min(100, (cost / API_SPEND_LIMIT * 100)).toFixed(1) };
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -94,7 +153,6 @@ function escapeHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── HTML stripper ──────────────────────────────────────────────
 function stripHtml(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -104,7 +162,6 @@ function stripHtml(html) {
     .replace(/\s{2,}/g, ' ').trim();
 }
 
-// ── URL fetch ──────────────────────────────────────────────────
 async function fetchUrl(url) {
   const res = await fetch(url, { headers: { 'User-Agent': 'Anchor/2.0 (personal note ingester)' } });
   if (!res.ok) throw new Error('Failed to fetch ' + url + ': ' + res.status);
@@ -113,7 +170,6 @@ async function fetchUrl(url) {
   return '[URL: ' + url + ']\n' + (ct.includes('text/html') ? stripHtml(text) : text);
 }
 
-// ── File text extraction ───────────────────────────────────────
 async function extractText(file) {
   const mime = file.mimetype;
   const name = file.originalname.toLowerCase();
@@ -134,7 +190,6 @@ async function extractText(file) {
   throw new Error('Unsupported file type: ' + file.originalname);
 }
 
-// ── Sync helpers ───────────────────────────────────────────────
 function getLastSyncTime() {
   const row = db.prepare("SELECT value FROM secrets WHERE key='last_sync'").get();
   return row ? new Date(decrypt(row.value)) : null;
@@ -161,7 +216,6 @@ function shouldAutoSync() {
   return false;
 }
 
-// ── Smart chat context ─────────────────────────────────────────
 function buildChatContext(question) {
   const allNotes = db.prepare("SELECT * FROM notes WHERE status='processed' ORDER BY created_at DESC LIMIT 200").all().map(decryptNote);
   const words = question.toLowerCase().split(/\W+/).filter(w => w.length > 3);
@@ -193,7 +247,6 @@ const ALL_TYPES = [
 
 const WORK_SCOPE_TYPES = ['work','work-task','work-decision','work-idea','meeting','calendar','email'];
 
-// ── Cat shorthand parser ───────────────────────────────────────
 const CAT_SHORTHAND = {
   'w':'work','wt':'work-task','wd':'work-decision','wi':'work-idea','m':'meeting',
   'p':'personal','pt':'personal-task','pd':'personal-decision',
@@ -265,26 +318,32 @@ function decryptNote(n) {
   };
 }
 
-// ── DTS fix: format stored UTC timestamp for display ──────────
-// created_at is stored as UTC in SQLite. We send it to the client
-// and let JS format it in the user's local timezone via toLocaleString().
-// The data-ts attribute holds the ISO string; JS formats on render.
 function renderNote(n) {
   n = decryptNote(n);
   const color = typeColor(n.type);
   const isPending = n.status === 'pending';
   const isReview = n.status === 'review';
   const typeOpts = ALL_TYPES.map(t => '<option value="' + t + '"' + (t === n.type ? ' selected' : '') + '>' + t + '</option>').join('');
-  // Pass raw UTC timestamp to client; JS will render in local time
   const tsAttr = 'data-ts="' + escapeHtml(n.created_at) + '"';
   return `
-  <div class="note${isPending ? ' note-pending' : isReview ? ' note-review' : ''}">
+  <div class="note${isPending ? ' note-pending' : isReview ? ' note-review' : ''}" id="note-${n.id}">
     <div class="note-meta">
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${escapeHtml(n.type)}</span>
       ${isPending ? '<span class="pending-badge">⏳ unsynced</span>' : isReview ? '<span class="review-badge">👁 needs review</span>' : ''}
       <span class="note-date" ${tsAttr}></span>
+      <span class="note-actions">
+        <button class="btn-icon" onclick="startEdit(${n.id})" title="Edit">✏️</button>
+        <button class="btn-icon btn-delete" onclick="deleteNote(${n.id})" title="Delete">🗑</button>
+      </span>
     </div>
-    <div class="formatted">${escapeHtml(n.formatted || n.raw_input)}</div>
+    <div class="formatted" id="fmt-${n.id}">${escapeHtml(n.formatted || n.raw_input)}</div>
+    <div class="note-edit" id="edit-${n.id}" style="display:none">
+      <textarea class="edit-textarea" id="etxt-${n.id}">${escapeHtml(n.formatted || n.raw_input)}</textarea>
+      <div class="edit-actions">
+        <button class="btn btn-primary" style="padding:5px 12px;font-size:0.85rem" onclick="saveEdit(${n.id})">Save</button>
+        <button class="btn btn-secondary" style="padding:5px 12px;font-size:0.85rem" onclick="cancelEdit(${n.id})">Cancel</button>
+      </div>
+    </div>
     ${n.tags && !isPending ? '<div class="note-tags">' + escapeHtml(n.tags).split(',').map(t => '<span class="tag">' + t.trim() + '</span>').join('') + '</div>' : ''}
     ${n.open_loops ? '<div class="note-loops">🔁 ' + escapeHtml(n.open_loops) + '</div>' : ''}
     <div class="note-reclassify">
@@ -297,32 +356,13 @@ function renderNote(n) {
   </div>`;
 }
 
-// ── PWA routes ─────────────────────────────────────────────────
-const ICON_BUF = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAADNElEQVR4nO3bzUkGQRRE0YnEtTGYjCZnkm4+ERRE8b+d6u46A3f/oOss5zgGfVc3txfpzEZt19i1TUYvPWf8qs/wpd9ASB8sjc74VZ/xqz4AVJ3xqz7jV30AqDoAVJ3xqz4AVB0Aqg4AVQeAqjN+VQeAqgNA1QGg6gBQdQCoOgBUHQCqDgBVB4CqA0DVAaDqlgNwd/9wrblLb2Q7AOkH1b4YpgaQfjztD2FaAOkHUwcCAATAbKUfSj0IABAAs5V+JAFg/KpAAIAAmKn04wgAAAQAAAIAAAEAgAAAQAAAIAAAEAAACAAABAAAAgAAAQCAAABAAAAgAAAQAAAIAAAEAAACAAABAEB76Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BGDAVz07wEAQHUAAFAdAABUB8MEADR56Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BEAdJXeGAACAAABAIAAyB8BQFfpjQEgAAAQAAAIgPwRgwGkfxhvCAAAqgMAgOoAAKA6ACYGoMlLbwwAAQCAAABAAOSPAKCr9MYAEAAACAAABED+CAC6Sm8MAAEAgAAAQADkjwCgq/TGABAAAAgAAARA/ggAukpvDAABAIAAAEAA5I8YDCD9w/gyP6cDAMDqxccMAAAAAAAAAADMAkCTl94YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BEAdJXeGAACAAABAIAAyB8BQFfpjQEgAAAQAAAIgPwRAHSV3hgAAgAAAQCAAMgfAUBX6Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAEwKAYO/S2wJAAAAgACYGAMGepTcFgABYBQAEe5Xe0pIAQFi/9Ha2AADDWqU3sjUAaWQAqDoAVB0Aqg4AVQeAqgNA1QGg6gBQdQCoOgBUHQCq7nj60kdIqQBQdQCoOgBUHQCq7nj50odIZ3e8/tLHSGcHgKo73n7pg6Szejd+CNTSh+MHQA19CgAC7dyX44dAu/bt8UOg3frx+EHQDv1p+BBo5YaNHwat0k+3/AhS9zTFq3XEhQAAAABJRU5ErkJggg==', 'base64');
+// ── PWA ────────────────────────────────────────────────────────
+const ICON_BUF = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAADNElEQVR4nO3bzUkGQRRE0YnEtTGYjCZnkm4+ERRE8b+d6u46A3f/oOss5zgGfVc3txfpzEZt19i1TUYvPWf8qs/wpd9ASB8sjc74VZ/xqz4AVJ3xqz7jV30AqDoAVJ3xqz4AVB0Aqg4AVQeAqjN+VQeAqgNA1QGg6gBQdQCoOgBUHQCqDgBVB4CqA0DVAaDqlgNwd/9wrblLb2Q7AOkH1b4YpgaQfjztD2FaAOkHUwcCAATAbKUfSj0IABAAs5V+JAFg/KpAAIAAmKn04wgAAAQAAAIAAAEAgAAAQAAAIAAAEAAACAAABAAAAgAAAQCAAABAAAAgAAAQAAAIAAAEAAACAAABAEB76Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BGDAVz07wEAQHUAAFAdAABUB8MEADR56Y0BIAAAEAAACID8EQB0ld4YAAIAAAEAgADIHwFAV+mNASAAABAAAAiA/BEAdJXeGAACAAABAIAAyB8BQFfpjQEgAAAQAAAIgPwRgwGkfxhvCAAAqgMAgOoAAKA6ACYGoMlLbwwAAQCAAABAAOSPAKCr9MYAEAAACAAABED+CAC6Sm8MAAEAgAAAQADkjwCgq/TGABAAAAgAAARA/ggAukpvDAABAIAAAEAA5I8Yjb8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYADh5g+UAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjYtMDQtMDVUMDA6MDA6MDBaUqgxAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDI2LTA0LTA1VDAwOjAwOjAwWiPzjQAAAABJRU5ErkJggg==', 'base64');
 
-app.get('/apple-touch-icon.png', (req, res) => {
-  res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  res.send(ICON_BUF);
-});
-
-app.get('/icon-192.png', (req, res) => {
-  res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  res.send(ICON_BUF);
-});
-
+app.get('/apple-touch-icon.png', (req, res) => { res.setHeader('Content-Type','image/png'); res.setHeader('Cache-Control','public,max-age=86400'); res.send(ICON_BUF); });
+app.get('/icon-192.png', (req, res) => { res.setHeader('Content-Type','image/png'); res.setHeader('Cache-Control','public,max-age=86400'); res.send(ICON_BUF); });
 app.get('/manifest.json', (req, res) => {
-  res.json({
-    name: "Anchor",
-    short_name: "Anchor",
-    description: "Dan's memory, context, and second brain",
-    start_url: "/",
-    display: "standalone",
-    background_color: "#0d1117",
-    theme_color: "#1e3a5f",
-    icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }]
-  });
+  res.json({ name:"Anchor", short_name:"Anchor", description:"Dan's memory, context, and second brain", start_url:"/", display:"standalone", background_color:"#0d1117", theme_color:"#1e3a5f", icons:[{src:"/icon-192.png",sizes:"192x192",type:"image/png"}] });
 });
 
 // ── GET / ──────────────────────────────────────────────────────
@@ -348,6 +388,7 @@ app.get('/', (req, res) => {
   const lastSync = getLastSyncTime();
   const lastSyncStr = lastSync ? lastSync.toLocaleString() : 'Never';
   const autoSyncFlag = shouldAutoSync();
+  const usage = getUsageStats();
 
   const now = new Date();
   const yearAgo  = new Date(now); yearAgo.setFullYear(now.getFullYear()-1);
@@ -370,9 +411,21 @@ app.get('/', (req, res) => {
     '<optgroup label="' + g.label + '">' +
     g.types.map(t => '<option value="' + t + '" ' + (type===t?'selected':'') + '>' + t + '</option>').join('') +
     '</optgroup>'
-  ).join('\n            ');
+  ).join('\n');
 
   const sortSelected = (val) => sort===val||(!sort&&val==='newest') ? 'selected' : '';
+
+  // Usage bar color
+  const usagePct = parseFloat(usage.pct);
+  const usageColor = usagePct >= 90 ? '#f87171' : usagePct >= 70 ? '#f59e0b' : '#4ade80';
+
+  // Plan renewal
+  let renewalStr = '';
+  if (PLAN_RENEWAL_DATE) {
+    const rd = new Date(PLAN_RENEWAL_DATE);
+    const daysLeft = Math.ceil((rd - now) / 86400000);
+    renewalStr = `Plan renews ${rd.toLocaleDateString()} (${daysLeft}d)`;
+  }
 
   res.send(`<!DOCTYPE html>
 <html>
@@ -389,52 +442,60 @@ app.get('/', (req, res) => {
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:system-ui,sans-serif; background:#0d1117; color:#e2e8f0; font-size:16px; line-height:1.6; }
-    .header { background:linear-gradient(135deg,#1e3a5f 0%,#1a1f35 100%); border-bottom:1px solid #2d4a7a; padding:20px 32px; display:flex; align-items:center; gap:16px; }
+    .header { background:linear-gradient(135deg,#1e3a5f 0%,#1a1f35 100%); border-bottom:1px solid #2d4a7a; padding:16px 32px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
     .header-icon { width:48px; height:48px; flex-shrink:0; }
     .header-text { flex:1; }
     .header-text h1 { font-size:1.8rem; font-weight:700; color:#93c5fd; letter-spacing:-0.5px; }
     .header-text p { font-size:0.85rem; color:#64748b; margin-top:2px; }
-    .header-time { font-size:0.85rem; color:#e2e8f0; text-align:right; }
-    .btn-logout { font-size:0.78rem; color:#475569; text-decoration:none; padding:5px 10px; border:1px solid #1e2d45; border-radius:6px; transition:all .15s; }
-    .btn-logout:hover { color:#f87171; border-color:#f87171; }
+    .header-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+    .usage-widget { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+    .usage-label { font-size:0.72rem; color:#94a3b8; }
+    .usage-bar-wrap { width:140px; height:6px; background:#1e2d45; border-radius:3px; overflow:hidden; }
+    .usage-bar { height:100%; border-radius:3px; transition:width .3s; background:${usageColor}; width:${usage.pct}%; }
+    .usage-numbers { font-size:0.72rem; color:${usageColor}; font-weight:600; }
+    .renewal-label { font-size:0.7rem; color:#475569; }
+    .btn-logout { font-size:0.78rem; color:#475569; text-decoration:none; padding:5px 10px; border:1px solid #1e2d45; border-radius:6px; }
     .main { padding:24px 32px; max-width:1400px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
     @media(max-width:900px){.main{grid-template-columns:1fr;}}
     .panel { background:#161b27; border:1px solid #1e2d45; border-radius:12px; padding:20px; }
-    .panel h2 { font-size:1rem; font-weight:600; color:#93c5fd; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .panel h2 { font-size:1rem; font-weight:600; color:#93c5fd; margin-bottom:14px; display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+    .panel h2:hover { color:#bfdbfe; }
     .panel h2 .dot { width:8px; height:8px; border-radius:50%; background:#3b82f6; flex-shrink:0; }
+    .panel h2 .chevron { margin-left:auto; font-size:0.75rem; color:#475569; transition:transform .2s; }
+    .panel h2 .chevron.open { transform:rotate(180deg); }
+    .panel-body.collapsed { display:none; }
     .sync-bar { display:flex; align-items:center; gap:12px; padding:10px 14px; background:#0d1117; border:1px solid #1e2d45; border-radius:8px; margin-bottom:14px; flex-wrap:wrap; }
     .sync-count { font-size:0.85rem; color:#94a3b8; }
     .sync-count strong { color:#f59e0b; }
     .sync-auto { font-size:0.75rem; color:#f59e0b; background:#292208; padding:2px 8px; border-radius:20px; border:1px solid #f59e0b40; }
     .sync-last { font-size:0.75rem; color:#475569; margin-left:auto; }
-    .btn-sync { background:#f59e0b; color:#0d1117; font-weight:700; font-size:0.85rem; padding:6px 16px; border:none; border-radius:6px; cursor:pointer; transition:all .15s; }
-    .btn-sync:hover { background:#fbbf24; }
+    .btn-sync { background:#f59e0b; color:#0d1117; font-weight:700; font-size:0.85rem; padding:6px 16px; border:none; border-radius:6px; cursor:pointer; }
     .btn-sync:disabled { opacity:.4; cursor:not-allowed; }
-    textarea { width:100%; height:130px; background:#0d1117; color:#e2e8f0; border:1px solid #2d4a7a; border-radius:8px; padding:12px; font-size:1rem; resize:vertical; font-family:inherit; transition:border .2s; }
+    textarea { width:100%; height:130px; background:#0d1117; color:#e2e8f0; border:1px solid #2d4a7a; border-radius:8px; padding:12px; font-size:1rem; resize:vertical; font-family:inherit; }
     textarea:focus { outline:none; border-color:#60a5fa; }
-    input[type=text] { background:#0d1117; color:#e2e8f0; border:1px solid #2d4a7a; border-radius:8px; padding:8px 12px; font-size:0.95rem; font-family:inherit; transition:border .2s; }
+    input[type=text] { background:#0d1117; color:#e2e8f0; border:1px solid #2d4a7a; border-radius:8px; padding:8px 12px; font-size:0.95rem; font-family:inherit; }
     input[type=text]:focus { outline:none; border-color:#60a5fa; }
     select { background:#0d1117; color:#e2e8f0; border:1px solid #2d4a7a; border-radius:8px; padding:8px 12px; font-size:0.95rem; }
-    .btn { padding:9px 20px; border:none; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; transition:all .15s; }
+    .btn { padding:9px 20px; border:none; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; }
     .btn-primary { background:#2563eb; color:#fff; }
     .btn-primary:hover { background:#3b82f6; }
-    .btn-mic { background:#1e2d45; color:#93c5fd; border:1px solid #2d4a7a; display:flex; align-items:center; gap:6px; font-size:0.9rem; }
-    .btn-mic:hover { background:#243447; }
-    .btn-mic.listening { background:#7c3aed; color:#fff; border-color:#7c3aed; animation:pulse 1.2s infinite; }
     .btn-secondary { background:#1e2d45; color:#93c5fd; border:1px solid #2d4a7a; }
     .btn-secondary:hover { background:#243447; }
-    .btn-opus { background:#1e1a35; color:#a78bfa; border:1px solid #a78bfa40; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; transition:all .15s; font-weight:600; }
-    .btn-opus:hover { background:#2d2550; }
-    .btn-bridge { background:#1e2d45; color:#4ade80; border:1px solid #4ade8040; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; transition:all .15s; font-weight:600; }
-    .btn-bridge:hover { background:#243447; }
+    .btn-mic { background:#1e2d45; color:#93c5fd; border:1px solid #2d4a7a; display:flex; align-items:center; gap:6px; font-size:0.9rem; }
+    .btn-mic.listening { background:#7c3aed; color:#fff; border-color:#7c3aed; animation:pulse 1.2s infinite; }
+    .btn-opus { background:#1e1a35; color:#a78bfa; border:1px solid #a78bfa40; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+    .btn-bridge { background:#1e2d45; color:#4ade80; border:1px solid #4ade8040; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+    .btn-alert { background:#1e2d45; color:#fb923c; border:1px solid #fb923c40; font-size:0.82rem; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+    .btn-icon { background:none; border:none; cursor:pointer; font-size:0.85rem; padding:2px 5px; opacity:0.4; transition:opacity .15s; }
+    .btn-icon:hover { opacity:1; }
+    .btn-delete:hover { color:#f87171; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
     .btn-row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
     .file-row { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
-    .file-label { display:inline-flex; align-items:center; gap:6px; background:#1e2d45; color:#93c5fd; border:1px dashed #2d4a7a; border-radius:8px; padding:7px 14px; font-size:0.88rem; cursor:pointer; transition:all .15s; }
+    .file-label { display:inline-flex; align-items:center; gap:6px; background:#1e2d45; color:#93c5fd; border:1px dashed #2d4a7a; border-radius:8px; padding:7px 14px; font-size:0.88rem; cursor:pointer; }
     .file-label:hover { background:#243447; border-color:#60a5fa; }
     .file-name { font-size:0.82rem; color:#4ade80; }
     .btn-clear-file { background:none; border:none; color:#475569; cursor:pointer; font-size:0.9rem; padding:2px 6px; }
-    .btn-clear-file:hover { color:#f87171; }
     .status { font-size:0.85rem; color:#4ade80; margin-top:6px; min-height:20px; }
     .loading { font-size:0.85rem; color:#60a5fa; display:none; }
     .search-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
@@ -443,7 +504,7 @@ app.get('/', (req, res) => {
     .notes-list::-webkit-scrollbar { width:4px; }
     .notes-list::-webkit-scrollbar-track { background:#0d1117; }
     .notes-list::-webkit-scrollbar-thumb { background:#2d4a7a; border-radius:4px; }
-    .note { background:#0d1117; border:1px solid #1e2d45; border-radius:10px; padding:16px; margin-bottom:12px; transition:border .15s; }
+    .note { background:#0d1117; border:1px solid #1e2d45; border-radius:10px; padding:16px; margin-bottom:12px; }
     .note:hover { border-color:#2d4a7a; }
     .note-pending { border-color:#f59e0b30; background:#1a1500; }
     .note-review { border-color:#f4723080; background:#1a0f00; }
@@ -452,7 +513,11 @@ app.get('/', (req, res) => {
     .note-type { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; padding:3px 8px; border-radius:20px; border:1px solid; }
     .pending-badge { font-size:0.7rem; color:#f59e0b; background:#292208; padding:2px 7px; border-radius:20px; border:1px solid #f59e0b30; }
     .note-date { font-size:0.78rem; color:#475569; }
+    .note-actions { margin-left:auto; display:flex; gap:2px; }
     .formatted { white-space:pre-wrap; font-size:0.95rem; line-height:1.7; color:#cbd5e1; }
+    .note-edit { margin-top:8px; }
+    .edit-textarea { width:100%; height:100px; background:#0d1117; color:#e2e8f0; border:1px solid #60a5fa; border-radius:8px; padding:10px; font-size:0.92rem; font-family:inherit; resize:vertical; }
+    .edit-actions { display:flex; gap:8px; margin-top:6px; }
     .note-tags { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
     .tag { font-size:0.75rem; background:#1e3a5f; color:#93c5fd; padding:2px 8px; border-radius:20px; }
     .note-loops { margin-top:8px; font-size:0.88rem; color:#fbbf24; background:#292208; padding:8px 12px; border-radius:6px; border-left:3px solid #fbbf24; }
@@ -471,11 +536,6 @@ app.get('/', (req, res) => {
     .model-label { font-size:0.75rem; color:#475569; }
     .otd-label { font-size:0.75rem; color:#475569; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; margin-top:14px; }
     .empty { color:#334155; font-size:0.9rem; padding:20px; text-align:center; }
-    .panel h2 { cursor:pointer; user-select:none; }
-    .panel h2:hover { color:#bfdbfe; }
-    .panel h2 .chevron { margin-left:auto; font-size:0.75rem; color:#475569; transition:transform .2s; }
-    .panel h2 .chevron.open { transform:rotate(180deg); }
-    .panel-body.collapsed { display:none; }
   </style>
 </head>
 <body>
@@ -495,8 +555,15 @@ app.get('/', (req, res) => {
       <h1>Anchor</h1>
       <p>Dan's memory, context, and second brain</p>
     </div>
-    <div class="header-time" id="headerTime"></div>
-${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/logout" class="btn-logout">Sign out</a>' : ""}
+    <div class="header-right">
+      <div class="usage-widget">
+        <div class="usage-label">Anthropic API spend</div>
+        <div class="usage-bar-wrap"><div class="usage-bar"></div></div>
+        <div class="usage-numbers">$${usage.cost} / $${usage.limit} (${usage.pct}%)</div>
+        ${renewalStr ? '<div class="renewal-label">' + renewalStr + '</div>' : ''}
+      </div>
+      ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/logout" class="btn-logout">Sign out</a>' : ''}
+    </div>
   </div>
 
   <div class="main">
@@ -529,8 +596,9 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
             <span class="sync-last">Last sync: ${lastSyncStr}</span>
             <button class="btn btn-sync" id="syncBtn" onclick="runSync()" ${pendingCount===0?'disabled':''}>Sync Now</button>
           </div>
-          <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+          <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <button class="btn-bridge" onclick="pullBridge()">⬇ Pull Bridge</button>
+            ${emailEnabled ? '<button class="btn-alert" onclick="sendAlert()">📧 Send Alert</button>' : ''}
             <span class="status" id="bridgeStatus" style="margin:0;"></span>
           </div>
           <div class="status" id="syncStatus"></div>
@@ -558,7 +626,7 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
             <button class="btn btn-secondary" onclick="applySearch()">Search</button>
           </div>
           <div class="notes-list">
-            ${notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet — add your first brain dump above.</div>'}
+            ${notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>'}
           </div>
         </div>
       </div>
@@ -594,18 +662,17 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
   </div>
 
   <script>
-    // ── DTS fix: render all note timestamps in local time ──────
     document.querySelectorAll('.note-date[data-ts]').forEach(el => {
       const ts = el.getAttribute('data-ts');
       if (ts) {
-        // SQLite stores as "YYYY-MM-DD HH:MM:SS" without Z — treat as UTC
         const utc = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
         el.textContent = new Date(utc).toLocaleString();
       }
     });
 
     function updateClock() {
-      document.getElementById('headerTime').textContent = new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
+      const el = document.getElementById('headerTime');
+      if (el) el.textContent = new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
     }
     updateClock(); setInterval(updateClock, 30000);
 
@@ -635,7 +702,7 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
         if (data.ok) {
           document.getElementById('input').value = '';
           clearFileInput();
-          const msg = data.split > 1 ? '✓ Split into ' + data.split + ' notes' : '✓ Saved — sync when ready';
+          const msg = data.split > 1 ? '✓ Split into ' + data.split + ' notes' : '✓ Saved';
           document.getElementById('noteStatus').textContent = msg;
           document.getElementById('pendingCount').textContent = data.pendingCount;
           if (data.pendingCount > 0) document.getElementById('syncBtn').disabled = false;
@@ -656,10 +723,10 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
         const res = await fetch('/sync', {method:'POST'});
         const data = await res.json();
         if (data.ok) {
-          let syncMsg = '✓ Synced ' + data.processed + ' notes';
-          if (data.splits > 0) syncMsg += ', split ' + data.splits;
-          if (data.flagged > 0) syncMsg += ', ' + data.flagged + ' flagged for review';
-          document.getElementById('syncStatus').textContent = syncMsg;
+          let msg = '✓ Synced ' + data.processed + ' notes';
+          if (data.splits > 0) msg += ', split ' + data.splits;
+          if (data.flagged > 0) msg += ', ' + data.flagged + ' flagged';
+          document.getElementById('syncStatus').textContent = msg;
           setTimeout(() => location.reload(), 1000);
         } else {
           document.getElementById('syncStatus').textContent = '✗ ' + (data.error || 'Sync failed');
@@ -681,6 +748,16 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
         } else {
           status.textContent = '✗ ' + (data.error || 'Failed');
         }
+      } catch(e) { status.textContent = '✗ Failed'; }
+    }
+
+    async function sendAlert() {
+      const status = document.getElementById('bridgeStatus');
+      status.textContent = '⏳ Sending...';
+      try {
+        const res = await fetch('/alert', { method: 'POST' });
+        const data = await res.json();
+        status.textContent = data.ok ? '✓ Alert sent' : '✗ ' + (data.error || 'Failed');
       } catch(e) { status.textContent = '✗ Failed'; }
     }
 
@@ -740,14 +817,8 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
     }
 
     if (isLocal()) {
-      ['syncBody','notesBody','chatBody'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.remove('collapsed');
-      });
-      ['syncChev','notesChev','chatChev'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('open');
-      });
+      ['syncBody','notesBody','chatBody'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('collapsed'); });
+      ['syncChev','notesChev','chatChev'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('open'); });
     }
 
     async function reclassify(id, type) {
@@ -760,6 +831,34 @@ ${req.headers["cf-access-authenticated-user-email"] ? '<a href="/cdn-cgi/access/
         if (data.ok) { status.textContent = '✓'; setTimeout(() => location.reload(), 600); }
         else { status.textContent = '✗'; }
       } catch(e) { status.textContent = '✗'; }
+    }
+
+    function startEdit(id) {
+      document.getElementById('fmt-' + id).style.display = 'none';
+      document.getElementById('edit-' + id).style.display = 'block';
+    }
+    function cancelEdit(id) {
+      document.getElementById('fmt-' + id).style.display = 'block';
+      document.getElementById('edit-' + id).style.display = 'none';
+    }
+    async function saveEdit(id) {
+      const content = document.getElementById('etxt-' + id).value.trim();
+      if (!content) return;
+      try {
+        const res = await fetch('/notes/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({formatted: content})});
+        const data = await res.json();
+        if (data.ok) { location.reload(); }
+        else { alert('Save failed: ' + (data.error || 'Unknown')); }
+      } catch(e) { alert('Save failed'); }
+    }
+    async function deleteNote(id) {
+      if (!confirm('Delete this note? This cannot be undone.')) return;
+      try {
+        const res = await fetch('/notes/' + id, {method:'DELETE'});
+        const data = await res.json();
+        if (data.ok) { document.getElementById('note-' + id).remove(); }
+        else { alert('Delete failed: ' + (data.error || 'Unknown')); }
+      } catch(e) { alert('Delete failed'); }
     }
   </script>
 </body>
@@ -776,9 +875,7 @@ app.post('/note', upload.single('file'), async (req, res) => {
       raw = raw ? raw + '\n\n' + fileNote : fileNote;
     }
     const urlMatch = raw.match(/^(https?:\/\/\S+)$/);
-    if (urlMatch) {
-      raw = await fetchUrl(urlMatch[1]);
-    }
+    if (urlMatch) raw = await fetchUrl(urlMatch[1]);
     if (!raw) return res.json({ ok:false, error:'No input' });
 
     const catSections = parseCatDump(raw);
@@ -804,49 +901,85 @@ app.post('/note', upload.single('file'), async (req, res) => {
   }
 });
 
+// ── DELETE /notes/:id ──────────────────────────────────────────
+app.delete('/notes/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.json({ ok:false, error:'Invalid id' });
+  try {
+    db.prepare('DELETE FROM notes WHERE id=?').run(id);
+    res.json({ ok:true });
+  } catch(e) {
+    res.json({ ok:false, error: e.message });
+  }
+});
+
+// ── PUT /notes/:id ─────────────────────────────────────────────
+app.put('/notes/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { formatted, type } = req.body;
+  if (!id) return res.json({ ok:false, error:'Invalid id' });
+  try {
+    if (formatted !== undefined) {
+      db.prepare('UPDATE notes SET formatted=? WHERE id=?').run(encrypt(formatted), id);
+    }
+    if (type && ALL_TYPES.includes(type)) {
+      db.prepare('UPDATE notes SET type=? WHERE id=?').run(type, id);
+    }
+    res.json({ ok:true });
+  } catch(e) {
+    res.json({ ok:false, error: e.message });
+  }
+});
+
 // ── POST /pull-bridge ──────────────────────────────────────────
-// Pulls latest from casmas-bridge repo and ingests new .md files from /bridge/md/
 app.post('/pull-bridge', async (req, res) => {
   try {
-    // git pull
     try {
       execSync('git -C ' + BRIDGE_PATH + ' pull', { timeout: 30000 });
     } catch(e) {
       return res.json({ ok: false, error: 'git pull failed: ' + e.message });
     }
-
     const mdDir = path.join(BRIDGE_PATH, 'md');
-    if (!fs.existsSync(mdDir)) {
-      return res.json({ ok: true, ingested: 0, skipped: 0, note: 'md/ folder not found in bridge' });
-    }
+    if (!fs.existsSync(mdDir)) return res.json({ ok: true, ingested: 0, skipped: 0, note: 'md/ folder not found' });
 
     const files = fs.readdirSync(mdDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
-    let ingested = 0;
-    let skipped = 0;
-
+    let ingested = 0, skipped = 0;
     for (const file of files) {
       const seenKey = 'bridge:file:' + file;
       const already = db.prepare('SELECT key FROM secrets WHERE key=?').get(seenKey);
       if (already) { skipped++; continue; }
-
-      const filePath = path.join(mdDir, file);
-      const content = fs.readFileSync(filePath, 'utf8').trim();
+      const content = fs.readFileSync(path.join(mdDir, file), 'utf8').trim();
       if (!content) { skipped++; continue; }
-
       const raw = '[Bridge: ' + file + ']\n' + content;
       db.prepare(`INSERT INTO notes (type,status,raw_input,formatted) VALUES ('pending','pending',?,?)`)
         .run(encrypt(raw), encrypt(raw));
-
-      // Mark as seen
       db.prepare('INSERT OR REPLACE INTO secrets (key,value) VALUES (?,?)').run(seenKey, '1');
       ingested++;
     }
-
     res.json({ ok: true, ingested, skipped });
   } catch(e) {
     console.error('pull-bridge error:', e);
     res.json({ ok: false, error: e.message });
   }
+});
+
+// ── POST /alert ────────────────────────────────────────────────
+app.post('/alert', async (req, res) => {
+  const { count: pendingCount } = getPendingStats();
+  const loops = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops != ''").get();
+  const usage = getUsageStats();
+  const subject = 'Anchor Alert — ' + pendingCount + ' pending, ' + loops.c + ' open loops';
+  const body = [
+    'Anchor Status Alert',
+    '',
+    'Pending notes: ' + pendingCount,
+    'Open loops: ' + loops.c,
+    'API spend: $' + usage.cost + ' / $' + usage.limit + ' (' + usage.pct + '%)',
+    '',
+    'Visit anchor.thecasmas.com to review.'
+  ].join('\n');
+  const result = await sendEmail(subject, body);
+  res.json(result);
 });
 
 // ── POST /sync ─────────────────────────────────────────────────
@@ -859,48 +992,41 @@ app.post('/sync', async (req, res) => {
   const guide = guideRow ? decrypt(guideRow.formatted) : '';
 
   const SYSTEM = `You are Anchor, a personal AI organizer for Dan Casmas.
-
 ${guide ? 'CLASSIFICATION GUIDE:\n' + guide : ''}
-
-Your job: classify and structure each note. If a note contains multiple distinct topics, SPLIT it into separate notes.
-
+Your job: classify and structure each note. If a note contains multiple distinct topics, SPLIT it.
 For each input note return one OR MORE result objects. Each object must have:
-- source_id: the original note id (integer, unchanged)
-- type: one of the valid categories from the guide above
-- formatted: clean plain text for this specific topic only
+- source_id: the original note id (integer)
+- type: one of the valid categories
+- formatted: clean plain text
 - tags: 3-5 comma-separated keywords
 - open_loops: unresolved actions or empty string
-- uncertain: true if you are not confident in the classification, false otherwise
-- proposed_type: if no existing category fits well, suggest a new one here (otherwise null)
-
-Return ONLY a valid JSON array of result objects. No markdown, no backticks, no explanation.`;
+- uncertain: true if not confident
+- proposed_type: if no category fits, suggest one (otherwise null)
+Return ONLY a valid JSON array. No markdown, no backticks, no explanation.`;
 
   try {
     const apiKey = getApiKey();
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01' },
-      body: JSON.stringify({
-        model: MODEL_HAIKU, max_tokens: 8192,
-        system: SYSTEM,
-        messages: [{ role:'user', content: 'Process these notes:\n' + JSON.stringify(decrypted) }]
-      })
+      body: JSON.stringify({ model: MODEL_HAIKU, max_tokens: 8192, system: SYSTEM, messages: [{ role:'user', content: 'Process these notes:\n' + JSON.stringify(decrypted) }] })
     });
     const data = await response.json();
+
+    // Track usage
+    if (data.usage) logUsage(data.usage.input_tokens, data.usage.output_tokens, MODEL_HAIKU, 'sync');
+
     const rawText = data.content[0].text.replace(/```json|```/g,'').trim();
     const results = JSON.parse(rawText);
 
     const insert = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
     const flag   = db.prepare("UPDATE notes SET status='review', type='brain-dump' WHERE id=?");
-
     const proposed = [];
 
     db.transaction((items) => {
       const seen = new Set();
       for (const item of items) {
-        if (item.proposed_type) {
-          proposed.push({ source_id: item.source_id, proposed_type: item.proposed_type, formatted: item.formatted });
-        }
+        if (item.proposed_type) proposed.push({ source_id: item.source_id, proposed_type: item.proposed_type });
         if (item.uncertain) {
           if (!seen.has(item.source_id)) { flag.run(item.source_id); seen.add(item.source_id); }
           continue;
@@ -916,11 +1042,9 @@ Return ONLY a valid JSON array of result objects. No markdown, no backticks, no 
     })(results);
 
     setLastSyncTime();
-
     const processed = results.filter(r => !r.uncertain).length;
     const flagged   = results.filter(r => r.uncertain).length;
     const splits    = results.length - pending.length;
-
     res.json({ ok:true, processed, flagged, splits: Math.max(0, splits), proposed });
   } catch(e) {
     console.error('Sync error:', e);
@@ -939,12 +1063,10 @@ app.post('/chat', async (req, res) => {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01' },
-      body: JSON.stringify({
-        model: selectedModel, max_tokens: 1000,
-        messages: [{ role:'user', content: 'You are Anchor, Dan\'s personal AI assistant. Answer directly. Flag anything vague or unresolved. Be honest if something needs attention.\n\nCurrent time: ' + (clientTime || new Date().toLocaleString()) + '\n\nNOTES:\n' + notesText + '\n\nQUESTION: ' + question }]
-      })
+      body: JSON.stringify({ model: selectedModel, max_tokens: 1000, messages: [{ role:'user', content: 'You are Anchor, Dan\'s personal AI assistant. Answer directly.\n\nCurrent time: ' + (clientTime||new Date().toLocaleString()) + '\n\nNOTES:\n' + notesText + '\n\nQUESTION: ' + question }] })
     });
     const data = await response.json();
+    if (data.usage) logUsage(data.usage.input_tokens, data.usage.output_tokens, selectedModel, 'chat');
     res.json({ answer: data.content[0].text });
   } catch(e) {
     console.error(e);
@@ -960,11 +1082,11 @@ app.post('/reclassify', (req, res) => {
   res.json({ ok:true });
 });
 
-// ── MCP internal routes ────────────────────────────────────────
-function isMcpRequest(req) {
-  return req.headers['x-mcp-caller'] !== undefined;
-}
+// ── GET /usage ─────────────────────────────────────────────────
+app.get('/usage', (req, res) => res.json(getUsageStats()));
 
+// ── MCP internal routes ────────────────────────────────────────
+function isMcpRequest(req) { return req.headers['x-mcp-caller'] !== undefined; }
 function filterForCaller(notes, caller) {
   if (caller === 'work') return notes.filter(n => WORK_SCOPE_TYPES.includes(n.type));
   return notes;
@@ -973,28 +1095,22 @@ function filterForCaller(notes, caller) {
 app.post('/mcp/notes', (req, res) => {
   if (!isMcpRequest(req)) return res.status(403).json({ error: 'Forbidden' });
   const { type, limit = 20, sort = 'newest', caller } = req.body;
-  const sortOrders = {
-    'newest': 'ORDER BY created_at DESC',
-    'oldest': 'ORDER BY created_at ASC',
-    'open-loops': "ORDER BY (open_loops IS NOT NULL AND open_loops != '') DESC, created_at DESC"
-  };
+  const sortOrders = { 'newest': 'ORDER BY created_at DESC', 'oldest': 'ORDER BY created_at ASC', 'open-loops': "ORDER BY (open_loops IS NOT NULL AND open_loops != '') DESC, created_at DESC" };
   let query = "SELECT * FROM notes WHERE status='processed'";
   const params = [];
   if (type) { query += ' AND type = ?'; params.push(type); }
   query += ' ' + (sortOrders[sort] || sortOrders['newest']) + ' LIMIT ?';
   params.push(limit);
   const notes = db.prepare(query).all(...params).map(decryptNote);
-  const filtered = filterForCaller(notes, caller);
-  res.json({ notes: filtered, count: filtered.length, caller });
+  res.json({ notes: filterForCaller(notes, caller), count: filterForCaller(notes, caller).length, caller });
 });
 
 app.post('/mcp/search', (req, res) => {
   if (!isMcpRequest(req)) return res.status(403).json({ error: 'Forbidden' });
   const { query, caller } = req.body;
   if (!query) return res.json({ notes: [], count: 0 });
-  const notes = db.prepare(
-    "SELECT * FROM notes WHERE status='processed' AND (formatted LIKE ? OR tags LIKE ? OR raw_input LIKE ?) ORDER BY created_at DESC LIMIT 30"
-  ).all('%'+query+'%','%'+query+'%','%'+query+'%').map(decryptNote);
+  const notes = db.prepare("SELECT * FROM notes WHERE status='processed' AND (formatted LIKE ? OR tags LIKE ? OR raw_input LIKE ?) ORDER BY created_at DESC LIMIT 30")
+    .all('%'+query+'%','%'+query+'%','%'+query+'%').map(decryptNote);
   const filtered = filterForCaller(notes, caller);
   res.json({ notes: filtered, count: filtered.length, query, caller });
 });
@@ -1002,9 +1118,7 @@ app.post('/mcp/search', (req, res) => {
 app.post('/mcp/open-loops', (req, res) => {
   if (!isMcpRequest(req)) return res.status(403).json({ error: 'Forbidden' });
   const { caller } = req.body;
-  const notes = db.prepare(
-    "SELECT * FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops != '' ORDER BY created_at DESC"
-  ).all().map(decryptNote);
+  const notes = db.prepare("SELECT * FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops != '' ORDER BY created_at DESC").all().map(decryptNote);
   const filtered = filterForCaller(notes, caller);
   res.json({ notes: filtered, count: filtered.length, caller });
 });
@@ -1012,17 +1126,21 @@ app.post('/mcp/open-loops', (req, res) => {
 app.post('/mcp/summary', (req, res) => {
   if (!isMcpRequest(req)) return res.status(403).json({ error: 'Forbidden' });
   const { days = 7, caller } = req.body;
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-  const notes = db.prepare(
-    "SELECT * FROM notes WHERE status='processed' AND created_at >= ? ORDER BY created_at DESC"
-  ).all(since.toISOString()).map(decryptNote);
+  const since = new Date(); since.setDate(since.getDate() - days);
+  const notes = db.prepare("SELECT * FROM notes WHERE status='processed' AND created_at >= ? ORDER BY created_at DESC").all(since.toISOString()).map(decryptNote);
   const filtered = filterForCaller(notes, caller);
   const byType = {};
-  for (const n of filtered) {
-    byType[n.type] = (byType[n.type] || 0) + 1;
-  }
+  for (const n of filtered) { byType[n.type] = (byType[n.type] || 0) + 1; }
   res.json({ notes: filtered, count: filtered.length, byType, days, caller });
+});
+
+// ── MCP delete endpoint ────────────────────────────────────────
+app.delete('/mcp/notes/:id', (req, res) => {
+  if (!req.headers['x-mcp-caller']) return res.status(403).json({ error: 'Forbidden' });
+  const id = parseInt(req.params.id);
+  if (!id) return res.json({ ok:false, error:'Invalid id' });
+  db.prepare('DELETE FROM notes WHERE id=?').run(id);
+  res.json({ ok:true });
 });
 
 app.listen(PORT, () => console.log(`anchor running on port ${PORT}`));
