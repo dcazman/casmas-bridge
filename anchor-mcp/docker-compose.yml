@@ -7,3 +7,9 @@ services:
     environment:
       - MCP_TOKEN=${MCP_TOKEN}
       - ANCHOR_URL=http://localhost:7778
+      - REPO_PATH=/repo/casmas-bridge
+      - SSH_KEY_PATH=/root/.ssh/deploy_key
+    volumes:
+      - /srv/mergerfs/warehouse/casmas-bridge:/repo/casmas-bridge
+      - /root/.ssh/deploy_key:/root/.ssh/deploy_key:ro
+      - /var/run/docker.sock:/var/run/docker.sock

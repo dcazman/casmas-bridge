@@ -2,17 +2,21 @@ import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { exec } from 'child_process';
+import { writeFile, mkdir } from 'fs/promises';
+import { dirname } from 'path';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const PORT = 8000;
 const ANCHOR_URL = process.env.ANCHOR_URL || 'http://192.168.50.23:7778';
 const MCP_TOKEN = process.env.MCP_TOKEN;
+const REPO_PATH = process.env.REPO_PATH || '/repo/casmas-bridge';
+const SSH_KEY_PATH = process.env.SSH_KEY_PATH || '/root/.ssh/deploy_key';
 
 if (!MCP_TOKEN) { console.error('FATAL: MCP_TOKEN not set'); process.exit(1); }
 
-// ── Caller identity from token ─────────────────────────────────
-// Tokens encode who the caller is so Anchor can filter accordingly
-// Format: <caller>:<secret>  e.g. "personal:abc123" or "work:xyz789"
-// Store multiple tokens as comma-separated: "personal:abc,work:xyz"
 const TOKENS = {};
 MCP_TOKEN.split(',').forEach(entry => {
   const [caller, secret] = entry.trim().split(':');
@@ -23,7 +27,6 @@ function identifyCaller(token) {
   return TOKENS[token] || null;
 }
 
-// ── Auth middleware ────────────────────────────────────────────
 function authCheck(req, res, next) {
   const token = req.headers['x-anchor-token'] || req.headers['authorization']?.replace('Bearer ', '') || req.query.token;
   const caller = identifyCaller(token);
@@ -32,7 +35,6 @@ function authCheck(req, res, next) {
   next();
 }
 
-// ── Anchor API calls ───────────────────────────────────────────
 async function anchorGet(path, caller) {
   const res = await fetch(ANCHOR_URL + path, {
     headers: { 'x-mcp-caller': caller }
@@ -51,14 +53,16 @@ async function anchorPost(path, body, caller) {
   return res.json();
 }
 
-// ── MCP Server factory ─────────────────────────────────────────
-function createMcpServer(caller) {
-  const server = new McpServer({
-    name: 'anchor',
-    version: '1.0.0'
-  });
+function gitEnv() {
+  return {
+    ...process.env,
+    GIT_SSH_COMMAND: `ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no`
+  };
+}
 
-  // ── INBOUND: add_note ────────────────────────────────────────
+function createMcpServer(caller) {
+  const server = new McpServer({ name: 'anchor', version: '1.0.0' });
+
   server.tool(
     'add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -76,7 +80,6 @@ function createMcpServer(caller) {
     }
   );
 
-  // ── OUTBOUND: get_notes ──────────────────────────────────────
   server.tool(
     'get_notes',
     'Get notes from Anchor. Work callers only receive work-scoped notes.',
@@ -91,7 +94,6 @@ function createMcpServer(caller) {
     }
   );
 
-  // ── OUTBOUND: search_notes ───────────────────────────────────
   server.tool(
     'search_notes',
     'Search Anchor notes by keyword.',
@@ -102,7 +104,6 @@ function createMcpServer(caller) {
     }
   );
 
-  // ── OUTBOUND: get_open_loops ─────────────────────────────────
   server.tool(
     'get_open_loops',
     'Get all notes with unresolved actions or open questions.',
@@ -113,7 +114,6 @@ function createMcpServer(caller) {
     }
   );
 
-  // ── OUTBOUND: get_summary ────────────────────────────────────
   server.tool(
     'get_summary',
     'Get a recent activity digest from Anchor.',
@@ -124,7 +124,6 @@ function createMcpServer(caller) {
     }
   );
 
-  // ── OUTBOUND: get_pi ─────────────────────────────────────────
   server.tool(
     'get_pi',
     'Get personal information facts about Dan (height, preferences, medical history etc).',
@@ -135,8 +134,6 @@ function createMcpServer(caller) {
     }
   );
 
-
-  // ── RECLASSIFY ───────────────────────────────────────────────
   server.tool(
     'reclassify_note',
     'Change the type/category of an existing note by ID.',
@@ -152,10 +149,64 @@ function createMcpServer(caller) {
     }
   );
 
+  server.tool(
+    'write_file',
+    'Write content to a file in the casmas-bridge repo.',
+    {
+      path: z.string().describe('Relative path within the repo, e.g. "anchor/server.js"'),
+      content: z.string().describe('Full file content to write')
+    },
+    async ({ path: relPath, content }) => {
+      const fullPath = `${REPO_PATH}/${relPath}`;
+      await mkdir(dirname(fullPath), { recursive: true });
+      await writeFile(fullPath, content, 'utf8');
+      return { content: [{ type: 'text', text: `Written: ${relPath}` }] };
+    }
+  );
+
+  server.tool(
+    'git_commit_push',
+    'Stage all changes, commit, and push the casmas-bridge repo to GitHub.',
+    {
+      message: z.string().describe('Commit message')
+    },
+    async ({ message }) => {
+      try {
+        const env = gitEnv();
+        const opts = { cwd: REPO_PATH, env };
+        await execAsync('git add -A', opts);
+        const { stdout: commitOut } = await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, opts);
+        const { stdout: pushOut } = await execAsync('git push', opts);
+        return { content: [{ type: 'text', text: `Committed & pushed.\n${commitOut}\n${pushOut}` }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: `Git error: ${err.message}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'rebuild_service',
+    'Pull latest Docker image and restart a service via docker compose.',
+    {
+      service: z.string().describe('Service name matching a folder under /srv/mergerfs/warehouse, e.g. "anchor"')
+    },
+    async ({ service }) => {
+      try {
+        const composePath = `/srv/mergerfs/warehouse/${service}`;
+        const { stdout } = await execAsync(
+          'docker compose pull && docker compose up -d --force-recreate',
+          { cwd: composePath }
+        );
+        return { content: [{ type: 'text', text: `Rebuilt ${service}.\n${stdout}` }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: `Rebuild error: ${err.message}` }] };
+      }
+    }
+  );
+
   return server;
 }
 
-// ── Express app ────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
 

@@ -1,5 +1,7 @@
 FROM node:20-alpine
 
+RUN apk add --no-cache git openssh docker-cli
+
 WORKDIR /app
 
 COPY package.json .
@@ -10,6 +12,6 @@ COPY start.sh .
 
 RUN chmod +x start.sh
 
-EXPOSE 8888
+EXPOSE 8000
 
 CMD ["./start.sh"]
