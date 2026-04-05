@@ -4,92 +4,84 @@
 
 ---
 
-## What This Repo Is
-Private shared file layer between Personal Claude and Work Claude. Personal Claude writes context here. Work Claude reads it to get up to speed without Dan having to re-explain everything.
+## IMPORTANT — How Work Claude Connects
+
+**Work Claude CANNOT use the Casmas MCP server.** The employer blocks custom MCP connectors.
+
+Work Claude connects via the **standard GitHub MCP connector** instead. This is policy-safe — it's a standard Anthropic connector, not a custom one.
+
+**Repo:** `github.com/dcazman/casmas-bridge` (private)
+
+Add GitHub MCP in Claude.ai → Settings → Connectors → GitHub. Then browse or read files from this repo.
 
 ---
 
-## How to Connect (Work Claude)
-
-Connect via the Casmas MCP server — NOT directly to GitHub.
-
-**MCP URL:** `https://mcp.thecasmas.com/mcp?token=fff6327e5fec20f2553ae6deb6e5ae7a`
-
-Add as a custom connector in Claude.ai → Settings → Connectors → Add custom connector. Name: `casmas-mcp`
-
-**Note:** Confirm this is allowed under your employer's policy before connecting.
-
----
-
-## MCP Tools Available to Work Claude
-
-| Tool | What It Does |
-|------|-------------|
-| `get_notes` | Fetch notes from Anchor (work-scoped only) |
-| `search_notes` | Search Anchor notes by keyword |
-| `get_open_loops` | Get all unresolved actions |
-| `get_summary` | Get recent activity digest |
-| `get_pi` | Get permanent facts about Dan |
-| `add_note` | Write a note to Anchor |
-| `read_file` | Read any file from this repo |
-| `write_file` | Write files to this repo |
-| `git_commit_push` | Commit and push changes to GitHub |
-| `rebuild_service` | Restart Docker containers on OMV server |
-
-**Work scope filter:** Work Claude only sees note types: `work`, `work-task`, `work-decision`, `work-idea`, `meeting`, `calendar`, `email`. Personal data never surfaces.
-
----
-
-## Recommended Session Start Flow
+## Session Start Flow
 
 ```
-1. get_summary(days=7)          — recent activity digest
-2. get_notes(type=work-task)    — open work tasks
-3. read_file(path=md/session-latest.md)  — latest personal Claude handoff if exists
+1. Read md/work-claude-handoff.md   — this file, full context
+2. Read md/session-latest.md        — most recent Personal Claude session summary (if exists)
 ```
 
 ---
 
-## Infrastructure Reference
+## What casmas-bridge is
+
+Private GitHub repo. This is the shared file layer between Personal Claude and Work Claude.
+
+- Personal Claude writes session summaries and context files here
+- Work Claude reads them via GitHub MCP to get up to speed
+- Work Claude can write files back (task updates, session notes, responses)
+
+Personal data (home, kids, health, finance, Anchor DB) never goes here. Work context only.
+
+---
+
+## Key Facts About Dan
 
 | Item | Value |
 |------|-------|
-| OMV server | 192.168.50.23 |
-| Anchor UI | anchor.thecasmas.com:7778 |
-| MCP gateway | mcp.thecasmas.com:8000 |
-| casmas-bridge repo | github.com/dcazman/casmas-bridge |
-| Repo on server | /srv/mergerfs/warehouse/casmas-bridge/ |
-| Dan's employer | Sonos |
-| Dan's title | Senior Messaging Engineer |
-| Dan's manager | Paul Henry |
+| Employer | Sonos |
+| Title | Senior Messaging Engineer |
+| Manager | Paul Henry |
+| Start date | September 20, 2021 |
+| Daily driver | M4 Mac mini, 16GB |
+| Home server | OMV at 192.168.50.23 |
 
 ---
 
-## What Was Built April 4-5, 2026 (Session 5)
+## What Personal Claude Manages (not Work Claude's concern)
 
-- Extended anchor-mcp with `write_file`, `read_file`, `git_commit_push`, `rebuild_service`
-- SSH deploy key added to casmas-bridge repo (`/root/.ssh/deploy_key` on server)
-- anchor-mcp moved out of OMV Compose GUI — now managed via plain docker compose
-- Claude can now make code changes and deploy end to end without Dan touching anything
-- Exception: anchor-mcp itself can't restart via MCP (kills connection) — manual `docker restart anchor-mcp` needed
+- anchor-mcp MCP server at mcp.thecasmas.com
+- Anchor notes app at anchor.thecasmas.com
+- All Docker services on OMV server
+- casmas-bridge repo (Personal Claude writes here, Work Claude reads)
 
 ---
 
-## Open Tasks (as of April 5, 2026)
+## What Was Built April 4-5, 2026
+
+- Personal Claude can now write files, commit, and push to casmas-bridge end to end via MCP tools
+- anchor-mcp extended with: write_file, read_file, git_commit_push, rebuild_service
+- SSH deploy key on server handles all git auth
+- anchor-mcp moved out of OMV Compose GUI — runs via plain docker compose
+
+---
+
+## Open Tasks Carry Forward
 
 ### Immediate
-- Mac baseline snapshot (CPU/RAM/thermals) → unblocks Ollama install
+- Mac baseline done (M4 Mac mini, 16GB) — install Ollama next session
 - Fix DST timestamp bug in anchor/server.js
 - Add DELETE /notes/:id endpoint + delete_note MCP tool
-- Hard delete note 15 (old Classification Guide v1.0)
-- Hard delete notes 27 and 28 (Sonos employment dupes)
+- Hard delete notes 15, 27, 28 (dupes/stale)
 
 ### Anchor Features
-- Weekly DB groom pass (dedup, stale loops, reclassify)
 - Token usage widget in Anchor UI
 - Date grouping headers in notes list
 - Anchor notification/alert system
+- Weekly DB groom pass
 
 ### Infrastructure
-- Mac baseline → Ollama install decision
+- Ollama install on M4 Mac mini (brew install ollama, pull llama3.2 or mistral)
 - Casmas Core hardware spec (NVIDIA mini PC $500-700)
