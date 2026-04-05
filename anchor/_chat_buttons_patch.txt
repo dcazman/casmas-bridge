@@ -1,0 +1,8 @@
+          <div class="chat-in">
+            <input type="text" id="ci" placeholder="What are my open loops?">
+            <button class="btn btn-primary" onclick="chat('local')">Ask</button>
+          </div>
+          <div class="chat-mr">
+            <span class="model-lbl">Need Claude's brain?</span>
+            <button class="btn btn-opus" onclick="chat('claude')">Ask Claude ($)</button>
+          </div>
