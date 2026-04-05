@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const router  = express.Router();
+const fs      = require('fs');
 const { db, getApiKey, setLastSync, getPending } = require('../lib/db');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { logUsage } = require('../lib/usage');
@@ -8,13 +9,20 @@ const { logUsage } = require('../lib/usage');
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001';
 const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://192.168.50.50:11434';
 const USE_OLLAMA  = process.env.USE_OLLAMA === 'true';
+const OLLAMA_PROMPT_PATH = '/bridge/md/ollama-system-prompt.md';
+
+function loadOllamaPrompt() {
+  try { return fs.readFileSync(OLLAMA_PROMPT_PATH, 'utf8').trim(); }
+  catch { return 'You are Anchor, Dan Casmas\'s personal AI organizer.'; }
+}
 
 async function callAI(system, userContent) {
   if (USE_OLLAMA) {
+    const ollamaSystem = loadOllamaPrompt() + '\n\n' + system;
     const resp = await fetch(OLLAMA_URL + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama3.2:3b', stream: false, messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'llama3.2:3b', stream: false, messages: [{ role: 'system', content: ollamaSystem }, { role: 'user', content: userContent }] })
     });
     const data = await resp.json();
     return { text: data.message?.content || '', usage: null };

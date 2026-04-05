@@ -4,12 +4,8 @@ const router  = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { db, decryptNote, getPending, getLastSync, shouldSync } = require('../lib/db');
-const { getUsageStats } = require('../lib/usage');
 const { esc, typeColor, ALL_TYPES } = require('../lib/helpers');
 const { emailEnabled } = require('./bridge');
-
-const PLAN_RENEWAL_DATE  = process.env.PLAN_RENEWAL_DATE  || '';
-const CLAUDE_USAGE_PCT   = parseFloat(process.env.CLAUDE_USAGE_PCT || '0');
 
 // Anchor 2.0 icon
 const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
@@ -63,32 +59,19 @@ router.get('/', (req, res) => {
   const { count: pc, estimatedTokens: pt } = getPending();
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
   const as  = shouldSync();
-  const usage = getUsageStats();
+  const useOllama = process.env.USE_OLLAMA === 'true';
+  const engineLabel = useOllama ? '🦙 Ollama (local)' : '🤖 Anthropic API';
   const now = new Date();
-
   const ya = new Date(now); ya.setFullYear(now.getFullYear()-1);
   const sa = new Date(now); sa.setMonth(now.getMonth()-6);
   const ma = new Date(now); ma.setMonth(now.getMonth()-1);
-  const otd = d => db.prepare('SELECT * FROM notes WHERE date(created_at)=? LIMIT 3').all(d.toISOString().split('T')[0]);
+  const otd = d => db.prepare("SELECT * FROM notes WHERE date(datetime(created_at,'localtime'))=? LIMIT 3").all(d.toLocaleDateString('en-CA'));
   const yn=otd(ya), sn=otd(sa), mn=otd(ma);
   const hasOTD = yn.length||sn.length||mn.length;
 
   const TG = [{l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},{l:'Personal',t:['personal','personal-task','personal-decision']},{l:'Home',t:['home','home-task','home-decision']},{l:'Kids',t:['kids','kids-task']},{l:'Health',t:['health','health-task']},{l:'Finance',t:['finance','finance-task']},{l:'Universal',t:['social','calendar','email','idea','pi','random','brain-dump']}];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
-
-  // Claude.ai weekly usage (set via CLAUDE_USAGE_PCT env var)
-  const claudePct = Math.min(100, CLAUDE_USAGE_PCT);
-  const claudeColor = claudePct >= 90 ? '#f87171' : claudePct >= 70 ? '#f59e0b' : '#4ade80';
-
-  // Anthropic API spend (tracked locally)
-  const uc = parseFloat(usage.pct)>=90?'#f87171':parseFloat(usage.pct)>=70?'#f59e0b':'#4ade80';
-
-  let rs = '';
-  if (PLAN_RENEWAL_DATE) { const rd=new Date(PLAN_RENEWAL_DATE); rs='Renews '+rd.toLocaleDateString()+' ('+(Math.ceil((rd-now)/86400000))+'d)'; }
-
-  const useOllama = process.env.USE_OLLAMA === 'true';
-  const engineLabel = useOllama ? '🦙 Ollama (local)' : '🤖 Anthropic API';
 
   res.send(`<!DOCTYPE html><html><head>
   <title>Anchor 2.0</title>
@@ -106,14 +89,7 @@ router.get('/', (req, res) => {
     .hdr-text{flex:1}.hdr-text h1{font-size:1.8rem;font-weight:700;color:#93c5fd}.hdr-text p{font-size:.85rem;color:#64748b}
     .hdr-right{display:flex;flex-direction:row;align-items:center;gap:20px}
     .hdr-time{font-size:.85rem;color:#e2e8f0;white-space:nowrap}
-    .widget-group{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
-    .widget-row{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-    .usage-lbl{font-size:.7rem;color:#94a3b8}
-    .usage-bar-w{width:120px;height:5px;background:#1e2d45;border-radius:3px;overflow:hidden}
-    .usage-bar{height:100%;border-radius:3px}
-    .usage-num{font-size:.7rem;font-weight:600}
-    .engine-lbl{font-size:.68rem;color:#64748b}
-    .renew-lbl{font-size:.68rem;color:#475569}
+    .engine-lbl{font-size:.68rem;color:#64748b;margin-top:2px}
     .btn-logout{font-size:.78rem;color:#475569;text-decoration:none;padding:5px 10px;border:1px solid #1e2d45;border-radius:6px}
     .main{padding:24px 32px;max-width:1400px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:24px}
     @media(max-width:900px){.main{grid-template-columns:1fr}}
@@ -195,19 +171,7 @@ router.get('/', (req, res) => {
     <div class="hdr-text"><h1>Anchor <span style="font-size:1rem;color:#fcd34d;font-weight:500">2.0</span></h1><p>Dan's memory, context, and second brain</p></div>
     <div class="hdr-right">
       <div class="hdr-time" id="hdrTime"></div>
-      <div class="widget-group">
-        <div class="widget-row">
-          <div class="usage-lbl">Claude.ai weekly</div>
-          <div class="usage-bar-w"><div class="usage-bar" style="background:${claudeColor};width:${claudePct}%"></div></div>
-          <div class="usage-num" style="color:${claudeColor}">${claudePct}% used</div>
-        </div>
-        <div class="widget-row">
-          <div class="usage-lbl">Anchor API ($${usage.limit} limit)</div>
-          <div class="usage-bar-w"><div class="usage-bar" style="background:${uc};width:${usage.pct}%"></div></div>
-          <div class="usage-num" style="color:${uc}">$${usage.cost} (${usage.pct}%)</div>
-        </div>
-        <div class="engine-lbl">${engineLabel}${rs?' · <span class="renew-lbl">'+rs+'</span>':''}</div>
-      </div>
+      <div class="engine-lbl">${engineLabel}</div>
       ${req.headers['cf-access-authenticated-user-email']?'<a href="/cdn-cgi/access/logout" class="btn-logout">Sign out</a>':''}
     </div>
   </div>
@@ -238,7 +202,7 @@ router.get('/', (req, res) => {
             <button class="btn-sync" id="syncBtn" onclick="runSync()" ${pc===0?'disabled':''}>Sync Now</button>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn-bridge" onclick="pullBridge()">⬇ Pull Bridge</button>
+            <button class="btn-bridge" onclick="pullBridge()">⇄ Sync Bridge</button>
             ${emailEnabled?'<button class="btn-alert" onclick="sendAlert()">📧 Alert</button>':''}
             <span class="status" id="bs" style="margin:0"></span>
           </div>
@@ -277,8 +241,17 @@ router.get('/', (req, res) => {
             <input type="text" id="ci" placeholder="What are my open loops?">
             <button class="btn btn-primary" onclick="chat('haiku')">Ask</button>
           </div>
-          ${!useOllama?`<div class="chat-mr"><span class="model-lbl">Deeper analysis?</span><button class="btn btn-opus" onclick="chat('opus')">⚡ Opus</button></div>`:''}
+          <div class="chat-mr"><span class="model-lbl">Need Claude's brain?</span><button class="btn btn-opus" onclick="chat('claude')">Ask Claude ($)</button></div>
           <div class="loading" id="cl" style="margin-top:8px">⏳ Reading notes...</div>
+          <div style="margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:#475569;font-size:.8rem" onclick="toggleHistory()">
+              <span>📜 Chat History</span><span id="histChev">▶</span>
+            </div>
+            <div id="histBox" style="display:none;margin-top:8px;max-height:300px;overflow-y:auto;border-top:1px solid #1e2d45;padding-top:8px"></div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button class="btn-bridge" onclick="clearHistory()" style="font-size:.72rem;padding:3px 8px">🗑 Clear History</button>
+            </div>
+          </div>
         </div>
       </div>
       ${hasOTD?`<div class="panel">
@@ -346,6 +319,37 @@ router.get('/', (req, res) => {
       window.location.href='/?'+p.toString();
     }
     document.getElementById('sq').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+    const HIST_KEY = 'anchor_chat_history';
+    const MAX_HIST = 30;
+    function loadHistory(){ try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch{return [];} }
+    function saveToHistory(q, a, engine){
+      const h=loadHistory();
+      h.push({ts:new Date().toLocaleString(),q,a,engine});
+      if(h.length>MAX_HIST)h.splice(0,h.length-MAX_HIST);
+      localStorage.setItem(HIST_KEY,JSON.stringify(h));
+      renderHistory();
+    }
+    function renderHistory(){
+      const box=document.getElementById('histBox');if(!box)return;
+      const h=loadHistory();
+      if(!h.length){box.innerHTML='<div style="color:#475569;font-size:.8rem">No history yet.</div>';return;}
+      box.innerHTML=[...h].reverse().map(e=>{
+        const eng=e.engine==='ollama'?'<span style="color:#4ade80;font-size:.65rem">🦙</span>':e.engine==='claude'?'<span style="color:#a78bfa;font-size:.65rem">⚡</span>':'';
+        return '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1e2d45">'
+          +'<div style="font-size:.7rem;color:#475569;margin-bottom:3px">'+e.ts+' '+eng+'</div>'
+          +'<div style="font-size:.82rem;color:#94a3b8;margin-bottom:3px">Q: '+e.q+'</div>'
+          +'<div style="font-size:.85rem;color:#e2e8f0">'+e.a+'</div>'
+          +'</div>';
+      }).join('');
+    }
+    function toggleHistory(){
+      const box=document.getElementById('histBox'),chev=document.getElementById('histChev');
+      const open=box.style.display!=='none';
+      box.style.display=open?'none':'block';
+      chev.textContent=open?'▶':'▼';
+      if(!open)renderHistory();
+    }
+    function clearHistory(){if(confirm('Clear chat history?')){localStorage.removeItem(HIST_KEY);renderHistory();}}
     async function chat(model){
       const v=document.getElementById('ci').value.trim();if(!v)return;
       const msgs=document.getElementById('cm');
@@ -357,9 +361,10 @@ router.get('/', (req, res) => {
         const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:v,model,clientTime:new Date().toString()})});
         const d=await r.json();
         const isOllama=d.engine==='ollama';
-        const cls=isOllama?'msg ai ollama':model==='opus'?'msg ai opus':'msg ai';
-        const lbl=isOllama?' <span style="font-size:.7rem;color:#4ade80">🦙 Local</span>':model==='opus'?' <span style="font-size:.7rem;color:#a78bfa">⚡ Opus</span>':'';
+        const cls=isOllama?'msg ai ollama':model==='claude'?'msg ai opus':'msg ai';
+        const lbl=isOllama?' <span style="font-size:.75rem;color:#4ade80;font-weight:600">🦙 Local</span>':model==='claude'?' <span style="font-size:.75rem;color:#a78bfa;font-weight:600">⚡ Claude</span>':'';
         msgs.innerHTML+='<div class="'+cls+'">'+d.answer+lbl+'</div>';
+        saveToHistory(v, d.answer, d.engine);
       }catch(e){msgs.innerHTML+='<div class="msg ai">Error.</div>';}
       document.getElementById('cl').style.display='none';
       msgs.scrollTop=msgs.scrollHeight;

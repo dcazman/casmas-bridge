@@ -8,7 +8,7 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - ANCHOR_URL=http://localhost:7778
       - API_SPEND_LIMIT=40
-      - PLAN_RENEWAL_DATE=2026-05-01
+      - TZ=America/New_York
       # SMTP optional — add these to enable email alerts
       # - SMTP_HOST=smtp.gmail.com
       # - SMTP_PORT=587
