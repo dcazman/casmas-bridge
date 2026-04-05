@@ -35,14 +35,6 @@ function authCheck(req, res, next) {
   next();
 }
 
-async function anchorGet(path, caller) {
-  const res = await fetch(ANCHOR_URL + path, {
-    headers: { 'x-mcp-caller': caller }
-  });
-  if (!res.ok) throw new Error('Anchor returned ' + res.status);
-  return res.json();
-}
-
 async function anchorPost(path, body, caller) {
   const res = await fetch(ANCHOR_URL + path, {
     method: 'POST',
@@ -58,6 +50,10 @@ function gitEnv() {
     ...process.env,
     GIT_SSH_COMMAND: `ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no`
   };
+}
+
+function sh(cmd, opts = {}) {
+  return execAsync(cmd, { shell: '/bin/sh', ...opts });
 }
 
 function createMcpServer(caller) {
@@ -167,16 +163,14 @@ function createMcpServer(caller) {
   server.tool(
     'git_commit_push',
     'Stage all changes, commit, and push the casmas-bridge repo to GitHub.',
-    {
-      message: z.string().describe('Commit message')
-    },
+    { message: z.string().describe('Commit message') },
     async ({ message }) => {
       try {
         const env = gitEnv();
         const opts = { cwd: REPO_PATH, env };
-        await execAsync('git add -A', opts);
-        const { stdout: commitOut } = await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, opts);
-        const { stdout: pushOut } = await execAsync('git push', opts);
+        await sh('git add -A', opts);
+        const { stdout: commitOut } = await sh(`git commit -m "${message.replace(/"/g, '\\"')}"`, opts);
+        const { stdout: pushOut } = await sh('git push', opts);
         return { content: [{ type: 'text', text: `Committed & pushed.\n${commitOut}\n${pushOut}` }] };
       } catch (err) {
         return { content: [{ type: 'text', text: `Git error: ${err.message}` }] };
@@ -187,14 +181,12 @@ function createMcpServer(caller) {
   server.tool(
     'rebuild_service',
     'Pull latest Docker image and restart a service via docker compose.',
-    {
-      service: z.string().describe('Service name matching a folder under /srv/mergerfs/warehouse, e.g. "anchor"')
-    },
+    { service: z.string().describe('Service name matching a folder under /srv/mergerfs/warehouse, e.g. "anchor-mcp"') },
     async ({ service }) => {
       try {
         const composePath = `/srv/mergerfs/warehouse/${service}`;
-        const { stdout } = await execAsync(
-          'docker compose pull && docker compose up -d --force-recreate',
+        const { stdout } = await sh(
+          'docker compose up -d --build',
           { cwd: composePath }
         );
         return { content: [{ type: 'text', text: `Rebuilt ${service}.\n${stdout}` }] };
