@@ -53,7 +53,6 @@ function gitEnv() {
 }
 
 function sh(cmd, opts = {}) {
-  console.log('[sh] cmd:', cmd, 'opts:', JSON.stringify(opts));
   return execAsync(cmd, { shell: true, ...opts });
 }
 
@@ -156,22 +155,20 @@ function createMcpServer(caller) {
         const { stdout: pushOut } = await sh('git push', opts);
         return { content: [{ type: 'text', text: `Committed & pushed.\n${commitOut}\n${pushOut}` }] };
       } catch (err) {
-        return { content: [{ type: 'text', text: `Git error: ${err.message}\n${err.stack}` }] };
+        return { content: [{ type: 'text', text: `Git error: ${err.message}` }] };
       }
     }
   );
 
   server.tool('rebuild_service',
-    'Pull latest Docker image and restart a service via docker compose.',
-    { service: z.string().describe('Service name matching a folder under /srv/mergerfs/warehouse, e.g. "anchor-mcp"') },
+    'Restart a running Docker container by name.',
+    { service: z.string().describe('Container name, e.g. "anchor-mcp", "gmr", "anchor"') },
     async ({ service }) => {
       try {
-        const composePath = `/srv/mergerfs/warehouse/${service}`;
-        console.log('[rebuild_service] composePath:', composePath);
-        const { stdout, stderr } = await sh('docker compose up -d --build', { cwd: composePath });
-        return { content: [{ type: 'text', text: `Rebuilt ${service}.\n${stdout}\n${stderr}` }] };
+        const { stdout } = await sh(`docker restart ${service}`);
+        return { content: [{ type: 'text', text: `Restarted ${service}.\n${stdout}` }] };
       } catch (err) {
-        return { content: [{ type: 'text', text: `Rebuild error: ${err.message}\n${err.stack}` }] };
+        return { content: [{ type: 'text', text: `Restart error: ${err.message}` }] };
       }
     }
   );
