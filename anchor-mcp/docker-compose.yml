@@ -5,7 +5,6 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - MCP_TOKEN=${MCP_TOKEN}
       - ANCHOR_URL=http://localhost:7778
       - REPO_PATH=/repo/casmas-bridge
       - SSH_KEY_PATH=/root/.ssh/deploy_key

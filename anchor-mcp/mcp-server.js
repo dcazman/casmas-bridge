@@ -59,25 +59,16 @@ function sh(cmd, opts = {}) {
 function createMcpServer(caller) {
   const server = new McpServer({ name: 'anchor', version: '1.0.0' });
 
-  server.tool(
-    'add_note',
+  server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
     { raw: z.string().describe('The note content. Supports cat markup for multi-category dumps.') },
     async ({ raw }) => {
       const data = await anchorPost('/note', { raw }, caller);
-      return {
-        content: [{
-          type: 'text',
-          text: data.ok
-            ? 'Note saved.' + (data.split ? ' Split into ' + data.split + ' notes.' : ' Pending sync.')
-            : 'Failed: ' + (data.error || 'Unknown error')
-        }]
-      };
+      return { content: [{ type: 'text', text: data.ok ? 'Note saved.' + (data.split ? ' Split into ' + data.split + ' notes.' : ' Pending sync.') : 'Failed: ' + (data.error || 'Unknown error') }] };
     }
   );
 
-  server.tool(
-    'get_notes',
+  server.tool('get_notes',
     'Get notes from Anchor. Work callers only receive work-scoped notes.',
     {
       type: z.string().optional().describe('Filter by category: work, personal, health, kids, finance, home, task, decision, idea, meeting, social, calendar, email, pi, random, brain-dump'),
@@ -90,8 +81,7 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'search_notes',
+  server.tool('search_notes',
     'Search Anchor notes by keyword.',
     { query: z.string().describe('Search keywords') },
     async ({ query }) => {
@@ -100,8 +90,7 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'get_open_loops',
+  server.tool('get_open_loops',
     'Get all notes with unresolved actions or open questions.',
     {},
     async () => {
@@ -110,8 +99,7 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'get_summary',
+  server.tool('get_summary',
     'Get a recent activity digest from Anchor.',
     { days: z.number().optional().describe('How many days back to summarize (default 7)') },
     async ({ days = 7 }) => {
@@ -120,8 +108,7 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'get_pi',
+  server.tool('get_pi',
     'Get personal information facts about Dan (height, preferences, medical history etc).',
     {},
     async () => {
@@ -130,8 +117,7 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'reclassify_note',
+  server.tool('reclassify_note',
     'Change the type/category of an existing note by ID.',
     {
       id: z.number().describe('The note ID to reclassify'),
@@ -139,14 +125,11 @@ function createMcpServer(caller) {
     },
     async ({ id, type }) => {
       const data = await anchorPost('/reclassify', { id, type }, caller);
-      return {
-        content: [{ type: 'text', text: data.ok ? 'Note ' + id + ' reclassified to ' + type : 'Failed: ' + (data.error || 'Unknown') }]
-      };
+      return { content: [{ type: 'text', text: data.ok ? 'Note ' + id + ' reclassified to ' + type : 'Failed: ' + (data.error || 'Unknown') }] };
     }
   );
 
-  server.tool(
-    'write_file',
+  server.tool('write_file',
     'Write content to a file in the casmas-bridge repo.',
     {
       path: z.string().describe('Relative path within the repo, e.g. "anchor/server.js"'),
@@ -160,8 +143,7 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'git_commit_push',
+  server.tool('git_commit_push',
     'Stage all changes, commit, and push the casmas-bridge repo to GitHub.',
     { message: z.string().describe('Commit message') },
     async ({ message }) => {
@@ -178,17 +160,13 @@ function createMcpServer(caller) {
     }
   );
 
-  server.tool(
-    'rebuild_service',
+  server.tool('rebuild_service',
     'Pull latest Docker image and restart a service via docker compose.',
     { service: z.string().describe('Service name matching a folder under /srv/mergerfs/warehouse, e.g. "anchor-mcp"') },
     async ({ service }) => {
       try {
         const composePath = `/srv/mergerfs/warehouse/${service}`;
-        const { stdout } = await sh(
-          'docker compose up -d --build',
-          { cwd: composePath }
-        );
+        const { stdout } = await sh('docker compose up -d --build', { cwd: composePath });
         return { content: [{ type: 'text', text: `Rebuilt ${service}.\n${stdout}` }] };
       } catch (err) {
         return { content: [{ type: 'text', text: `Rebuild error: ${err.message}` }] };
@@ -203,9 +181,7 @@ const app = express();
 app.use(express.json());
 
 app.post('/mcp', authCheck, async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined
-  });
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   const server = createMcpServer(req.caller);
   await server.connect(transport);
   await transport.handleRequest(req, res, req.body);
