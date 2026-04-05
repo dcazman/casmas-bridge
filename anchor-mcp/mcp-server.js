@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { exec } from 'child_process';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readFile } from 'fs/promises';
 import { dirname } from 'path';
 import { promisify } from 'util';
 
@@ -140,6 +140,22 @@ function createMcpServer(caller) {
       await mkdir(dirname(fullPath), { recursive: true });
       await writeFile(fullPath, content, 'utf8');
       return { content: [{ type: 'text', text: `Written: ${relPath}` }] };
+    }
+  );
+
+  server.tool('read_file',
+    'Read a file from the casmas-bridge repo.',
+    {
+      path: z.string().describe('Relative path within the repo, e.g. "anchor/server.js"')
+    },
+    async ({ path: relPath }) => {
+      try {
+        const fullPath = `${REPO_PATH}/${relPath}`;
+        const content = await readFile(fullPath, 'utf8');
+        return { content: [{ type: 'text', text: content }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: `Read error: ${err.message}` }] };
+      }
     }
   );
 
