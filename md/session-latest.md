@@ -1,11 +1,12 @@
 # Anchor — Session Context
-**Generated:** 4/6/2026, 6:31:10 PM
-**Pending notes:** 2 | **Last sync:** 4/6/2026, 6:27:09 PM
+**Generated:** 4/6/2026, 6:34:10 PM
+**Pending notes:** 0 | **Last sync:** 4/6/2026, 6:31:36 PM
 
 ## 🔔 Active Reminders
 None set yet.
 
 ## 🔁 Open Loops
+• [pi] 4889d77cf1d84772b96aa212:4df934bc20eb0e0ffa4707bf90b8364c:
 • [personal-decision] Preferred note structure TBD; Obsidian archive target decision pending; Slack/Jira pull stack choice (MCP vs direct API)
 • [work] Cloudflare tunnel setup pending; spec MD Phase 1 status update needed; Jeff's PR approval status unknown
 
