@@ -21,7 +21,14 @@ db.exec(`
     model TEXT, operation TEXT
   );
 `);
-try { db.exec(`ALTER TABLE notes ADD COLUMN status TEXT DEFAULT 'pending'`); } catch {}
+
+// Safe migrations — each is a no-op if column already exists
+[
+  `ALTER TABLE notes ADD COLUMN status TEXT DEFAULT 'pending'`,
+  `ALTER TABLE notes ADD COLUMN remind_at DATETIME DEFAULT NULL`,
+  `ALTER TABLE notes ADD COLUMN remind_sent INTEGER DEFAULT 0`,
+  `ALTER TABLE notes ADD COLUMN remind_num INTEGER DEFAULT NULL`,
+].forEach(sql => { try { db.exec(sql); } catch {} });
 
 // ── API key bootstrap ──────────────────────────────────────────
 (function bootstrap() {

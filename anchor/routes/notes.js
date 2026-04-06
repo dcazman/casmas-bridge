@@ -8,7 +8,7 @@ const { fetchUrl, extractText, parseCat } = require('../lib/helpers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10*1024*1024 } });
 
-// POST /note
+// POST /note  or  POST /notes
 router.post('/', upload.single('file'), async (req, res) => {
   try {
     let raw = (req.body.raw||'').trim();
@@ -51,15 +51,6 @@ router.put('/:id', (req, res) => {
     if (type && ALL_TYPES.includes(type)) db.prepare('UPDATE notes SET type=? WHERE id=?').run(type, id);
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
-});
-
-// POST /reclassify
-router.post('/reclassify', (req, res) => {
-  const { id, type } = req.body;
-  const { ALL_TYPES } = require('../lib/helpers');
-  if (!id || !ALL_TYPES.includes(type)) return res.json({ ok: false, error: 'Invalid' });
-  db.prepare('UPDATE notes SET type=? WHERE id=?').run(type, id);
-  res.json({ ok: true });
 });
 
 module.exports = router;

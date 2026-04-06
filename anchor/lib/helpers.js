@@ -26,9 +26,30 @@ async function extractText(file) {
   throw new Error('Unsupported: ' + file.originalname);
 }
 
-const ALL_TYPES = ['work','work-task','work-decision','work-idea','meeting','personal','personal-task','personal-decision','home','home-task','home-decision','kids','kids-task','health','health-task','finance','finance-task','social','calendar','email','pi','idea','random','brain-dump'];
+const ALL_TYPES = [
+  'work','work-task','work-decision','work-idea','meeting',
+  'personal','personal-task','personal-decision',
+  'home','home-task','home-decision',
+  'kids','kids-task',
+  'health','health-task',
+  'finance','finance-task',
+  'social','calendar','email','pi','idea','random','brain-dump',
+  'anchor','anchor-task',
+  'employment','work-claude-handoff','system-summary'
+];
+
 const WORK_TYPES = ['work','work-task','work-decision','work-idea','meeting','calendar','email'];
-const CAT = {'w':'work','wt':'work-task','wd':'work-decision','wi':'work-idea','m':'meeting','p':'personal','pt':'personal-task','pd':'personal-decision','ho':'home','ht':'home-task','hod':'home-decision','k':'kids','kt':'kids-task','h':'health','hat':'health-task','f':'finance','ft':'finance-task','s':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump'};
+
+const CAT = {
+  'w':'work','wt':'work-task','wd':'work-decision','wi':'work-idea','m':'meeting',
+  'p':'personal','pt':'personal-task','pd':'personal-decision',
+  'ho':'home','ht':'home-task','hod':'home-decision',
+  'k':'kids','kt':'kids-task',
+  'h':'health','hat':'health-task',
+  'f':'finance','ft':'finance-task',
+  's':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump',
+  'a':'anchor','at':'anchor-task'
+};
 
 function parseCat(raw) {
   const lines = raw.split('\n'); const secs = []; let cur = null;
@@ -41,7 +62,18 @@ function parseCat(raw) {
   return secs;
 }
 
-const COLORS = {'pending':'#475569','brain-dump':'#60a5fa','work':'#38bdf8','work-task':'#0ea5e9','work-decision':'#0284c7','work-idea':'#7dd3fc','meeting':'#fb923c','personal':'#e879f9','personal-task':'#d946ef','personal-decision':'#a21caf','home':'#fdba74','home-task':'#f97316','home-decision':'#ea580c','kids':'#fde68a','kids-task':'#fbbf24','health':'#f87171','health-task':'#ef4444','finance':'#4ade80','finance-task':'#16a34a','social':'#86efac','calendar':'#c084fc','email':'#67e8f9','idea':'#a78bfa','pi':'#fcd34d','random':'#94a3b8'};
+const COLORS = {
+  'pending':'#475569','brain-dump':'#60a5fa',
+  'work':'#38bdf8','work-task':'#0ea5e9','work-decision':'#0284c7','work-idea':'#7dd3fc','meeting':'#fb923c',
+  'personal':'#e879f9','personal-task':'#d946ef','personal-decision':'#a21caf',
+  'home':'#fdba74','home-task':'#f97316','home-decision':'#ea580c',
+  'kids':'#fde68a','kids-task':'#fbbf24',
+  'health':'#f87171','health-task':'#ef4444',
+  'finance':'#4ade80','finance-task':'#16a34a',
+  'social':'#86efac','calendar':'#c084fc','email':'#67e8f9','idea':'#a78bfa','pi':'#fcd34d','random':'#94a3b8',
+  'anchor':'#34d399','anchor-task':'#10b981',
+  'employment':'#94a3b8','work-claude-handoff':'#94a3b8','system-summary':'#94a3b8'
+};
 function typeColor(t) { return COLORS[t] || '#60a5fa'; }
 
 module.exports = { esc, stripHtml, fetchUrl, extractText, parseCat, typeColor, ALL_TYPES, WORK_TYPES };
