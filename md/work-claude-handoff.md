@@ -56,6 +56,11 @@ Add in Claude.ai → Settings → Connectors → GitHub. Then read this file and
 - Config: `/srv/mergerfs/warehouse/anchor/.env`
 - Runs outside OMV GUI via plain docker compose
 
+### Classification System
+- Guide lives in Anchor DB as a `pi` note, pulled on every sync
+- New category added April 5: `anchor` (cat a) and `anchor-task` (cat at) — for notes about Anchor itself
+- Anchor/system notes are **personal scope** — Work Claude never sees them
+
 ### casmas-bridge Repo
 - Server path: `/srv/mergerfs/warehouse/casmas-bridge/`
 - Mounted into anchor-mcp at `/repo/casmas-bridge`
@@ -80,11 +85,12 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 
 ## Open Work Tasks (as of April 5, 2026)
 
-### Anchor — Immediate (from April 5 build session)
+### Anchor — Immediate
 - [ ] Sync sanitized `anchor/docker-compose.yml` to casmas-bridge (live file has hardcoded SMTP password — use `${VAR}` placeholders in repo version)
 - [ ] Sync sanitized `anchor-mcp/docker-compose.yml` to casmas-bridge (MCP_TOKEN hardcoded in live file)
 - [ ] Deploy rebuild_service fix to anchor-mcp: `docker compose -f /srv/mergerfs/warehouse/anchor-mcp/docker-compose.yml up -d --build` (fix already in casmas-bridge/anchor-mcp/mcp-server.js)
 - [ ] Set up weekly groom cron: `0 9 * * 0 curl -s -X POST http://192.168.50.23:7778/groom`
+- [ ] Groom should fix as well as report — currently report-only, needs auto-remediation pass
 - [ ] Investigate Ollama crash pattern on M4 (LaunchAgent com.ollama.serve has KeepAlive=true but crashing)
 - [ ] casmas-bridge cleanup — delete `_chat_buttons_patch.txt` and `_pull_bridge_patch.js` (stale files)
 - [ ] Remove tokens from sync area in Anchor UI
