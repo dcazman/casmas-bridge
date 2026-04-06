@@ -3,7 +3,7 @@ const express = require('express');
 const multer  = require('multer');
 const router  = express.Router();
 const { db, getPending } = require('../lib/db');
-const { encrypt } = require('../lib/crypto');
+const { encrypt, decrypt } = require('../lib/crypto');
 const { fetchUrl, extractText, parseCat } = require('../lib/helpers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10*1024*1024 } });
@@ -24,10 +24,29 @@ router.post('/', upload.single('file'), async (req, res) => {
     const secs = parseCat(raw);
     if (secs.length > 0) {
       const ins = db.prepare('INSERT INTO notes (type,status,raw_input,formatted) VALUES (?,?,?,?)');
-      db.transaction(s => { for (const sec of s) { const t=sec.lines.join('\n').trim(); ins.run(sec.type,'processed',encrypt(t),encrypt(t)); } })(secs);
-      return res.json({ ok: true, pendingCount: getPending().count, split: secs.length });
+      let inserted = 0;
+      db.transaction(s => {
+        for (const sec of s) {
+          const t = sec.lines.join('\n').trim();
+          if (!t) continue;
+          // Dedup: skip if identical formatted content already exists
+          const enc = encrypt(t);
+          const existing = db.prepare("SELECT id FROM notes WHERE formatted=? LIMIT 1").get(enc);
+          if (!existing) {
+            ins.run(sec.type, 'processed', enc, enc);
+            inserted++;
+          }
+        }
+      })(secs);
+      return res.json({ ok: true, pendingCount: getPending().count, split: inserted });
     }
-    db.prepare("INSERT INTO notes (type,status,raw_input,formatted) VALUES ('pending','pending',?,?)").run(encrypt(raw), encrypt(raw));
+
+    // Dedup pending: skip if identical raw content already pending
+    const encRaw = encrypt(raw);
+    const existingPending = db.prepare("SELECT id FROM notes WHERE raw_input=? AND status='pending' LIMIT 1").get(encRaw);
+    if (!existingPending) {
+      db.prepare("INSERT INTO notes (type,status,raw_input,formatted) VALUES ('pending','pending',?,?)").run(encRaw, encRaw);
+    }
     res.json({ ok: true, pendingCount: getPending().count });
   } catch(e) { console.error(e); res.json({ ok: false, error: e.message }); }
 });
@@ -40,17 +59,22 @@ router.delete('/:id', (req, res) => {
   catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
-// PUT /notes/:id — reclassify and/or edit formatted content
-// Also clears review status so the 👁 badge goes away after manual review
+// PUT /notes/:id — edit formatted content and/or reclassify
+// Always clears review status so the 👁 badge disappears after any edit or reclassify
 router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (!id) return res.json({ ok: false, error: 'Invalid id' });
   const { formatted, type } = req.body;
   try {
-    if (formatted !== undefined) db.prepare('UPDATE notes SET formatted=? WHERE id=?').run(encrypt(formatted), id);
     const { ALL_TYPES } = require('../lib/helpers');
-    if (type && ALL_TYPES.includes(type)) {
-      // Update type and clear review status in one shot
+    if (formatted !== undefined && type && ALL_TYPES.includes(type)) {
+      // Both content edit + reclassify
+      db.prepare("UPDATE notes SET formatted=?, type=?, status='processed' WHERE id=?").run(encrypt(formatted), type, id);
+    } else if (formatted !== undefined) {
+      // Content edit only — also clear review status
+      db.prepare("UPDATE notes SET formatted=?, status='processed' WHERE id=?").run(encrypt(formatted), id);
+    } else if (type && ALL_TYPES.includes(type)) {
+      // Reclassify only
       db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
     }
     res.json({ ok: true });
