@@ -27,7 +27,8 @@ app.use('/alert',       bridgeRouter);
 app.use('/groom',       groomRouter);
 app.use('/mcp',         mcpRouter);
 
-// POST /reclassify — used by anchor-mcp reclassify_note tool
+// POST /reclassify — used by anchor-mcp reclassify_note tool and UI reclassify button
+// Also clears review status so the 👁 badge goes away after manual review
 app.post('/reclassify', (req, res) => {
   const { id, type } = req.body;
   const { ALL_TYPES } = require('./lib/helpers');
@@ -35,7 +36,7 @@ app.post('/reclassify', (req, res) => {
   if (!id || !type) return res.json({ ok: false, error: 'Missing id or type' });
   if (!ALL_TYPES.includes(type)) return res.json({ ok: false, error: 'Unknown type: ' + type });
   try {
-    db.prepare('UPDATE notes SET type=? WHERE id=?').run(type, id);
+    db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });

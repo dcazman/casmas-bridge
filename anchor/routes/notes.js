@@ -40,7 +40,8 @@ router.delete('/:id', (req, res) => {
   catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
-// PUT /notes/:id
+// PUT /notes/:id — reclassify and/or edit formatted content
+// Also clears review status so the 👁 badge goes away after manual review
 router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (!id) return res.json({ ok: false, error: 'Invalid id' });
@@ -48,7 +49,10 @@ router.put('/:id', (req, res) => {
   try {
     if (formatted !== undefined) db.prepare('UPDATE notes SET formatted=? WHERE id=?').run(encrypt(formatted), id);
     const { ALL_TYPES } = require('../lib/helpers');
-    if (type && ALL_TYPES.includes(type)) db.prepare('UPDATE notes SET type=? WHERE id=?').run(type, id);
+    if (type && ALL_TYPES.includes(type)) {
+      // Update type and clear review status in one shot
+      db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
+    }
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
