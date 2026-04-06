@@ -1,16 +1,9 @@
 # Anchor — Session Context
-**Generated:** 4/6/2026, 6:03:39 PM
-**Pending notes:** 0 | **Last sync:** 4/6/2026, 4:28:20 PM
+**Generated:** 4/6/2026, 6:20:22 PM
+**Pending notes:** 1 | **Last sync:** 4/6/2026, 4:28:20 PM
 
 ## 🔔 Active Reminders
 None set yet.
-
-## 🔁 Open Loops
-• [pi] b52d4bf81cca12f67ae72b69:7313642def0f7d5db8a2d710b1145794:
-• [personal-task] Type field encryption implementation; created_at field encryption; DB file-level encryption decision; date grouping UI d
-• [personal-task] New tagline text TBD; where tagline appears in UI (header, manifest, etc.)
-• [personal-task] Supported file types TBD; file parsing logic needed; UI design for attachment input
-• [personal-decision] Preferred note structure TBD; Obsidian archive target decision pending; Slack/Jira pull stack choice (MCP vs direct API)
 
 ## 💼 Recent Work Notes (7 days)
 • [work] 4/6/2026 — # Anchor Session Summary — April 6, 2026
