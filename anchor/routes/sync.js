@@ -17,16 +17,68 @@ function loadOllamaPrompt() {
   catch { return 'You are Anchor, Dan Casmas\'s personal AI organizer.'; }
 }
 
+// Strip markdown fences and extract the first JSON array or object from a string.
+// Handles: ```json ... ```, plain JSON, objects wrapping an array, extra text before/after.
+function extractJSON(raw) {
+  // 1. Strip markdown fences
+  let s = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  // 2. Try plain parse first
+  try { return JSON.parse(s); } catch {}
+
+  // 3. Find first [ or { and last ] or } and try that substring
+  const arrStart = s.indexOf('[');
+  const objStart = s.indexOf('{');
+  const start = (arrStart === -1) ? objStart : (objStart === -1) ? arrStart : Math.min(arrStart, objStart);
+  if (start === -1) throw new Error('No JSON structure found in AI response');
+
+  // prefer array
+  if (arrStart !== -1 && (objStart === -1 || arrStart <= objStart)) {
+    const end = s.lastIndexOf(']');
+    if (end !== -1) {
+      try { return JSON.parse(s.substring(arrStart, end + 1)); } catch {}
+    }
+  }
+
+  // fall back to object
+  const end = s.lastIndexOf('}');
+  if (end !== -1) {
+    try { return JSON.parse(s.substring(objStart, end + 1)); } catch {}
+  }
+
+  throw new Error('Could not parse JSON from AI response');
+}
+
+// Mark a list of note ids as review/brain-dump so they are no longer stuck as pending
+function flagStuck(ids, reason) {
+  const stmt = db.prepare("UPDATE notes SET status='review', type='brain-dump' WHERE id=?");
+  for (const id of ids) {
+    stmt.run(id);
+    console.warn(`[sync] flagged note ${id} as review — ${reason}`);
+  }
+}
+
 async function callAI(system, userContent) {
   if (USE_OLLAMA) {
     const ollamaSystem = loadOllamaPrompt() + '\n\n' + system;
     const resp = await fetch(OLLAMA_URL + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mistral', format: 'json', stream: false, messages: [{ role: 'system', content: ollamaSystem }, { role: 'user', content: userContent }] })
+      body: JSON.stringify({
+        model: 'mistral',
+        format: 'json',
+        stream: false,
+        messages: [
+          { role: 'system', content: ollamaSystem },
+          { role: 'user',   content: userContent }
+        ]
+      })
     });
+    if (!resp.ok) throw new Error('Ollama HTTP ' + resp.status);
     const data = await resp.json();
-    return { text: data.message?.content || '', usage: null };
+    const text = data.message?.content || data.response || '';
+    if (!text) throw new Error('Ollama returned empty content');
+    return { text, usage: null };
   } else {
     const key = getApiKey();
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -57,7 +109,7 @@ router.post('/', async (req, res) => {
     }
   }
 
-  // ── 2. Process reminder commands (done N, snooze N, change N) ─────────────
+  // ── 2. Process reminder commands ──────────────────────────────────────────
   let commandResults = [];
   for (const cmd of commands) {
     const results = processCommands(cmd.text);
@@ -80,20 +132,44 @@ router.post('/', async (req, res) => {
 ${guide ? 'GUIDE:\n' + guide : ''}
 Classify each note. Split multi-topic notes.
 
-REMINDERS: If a note contains reminder intent — phrases like "remind me", "remind dan", "don't forget", "remember to", "don't let me forget" — set remind_at to an ISO 8601 datetime string parsed from the note text (America/New_York timezone). Use today's date as the base for relative dates. If no specific time is given use null. Examples:
-  "remind dan take meds friday 3pm" → remind_at: "2026-04-10T15:00:00"
-  "remind me call vet tomorrow 10am" → remind_at: "2026-04-07T10:00:00"
-  "don't forget to buy dog food" → remind_at: null
+REMINDERS: If a note contains reminder intent — phrases like "remind me", "remind dan", "don't forget", "remember to", "don't let me forget" — set remind_at to an ISO 8601 datetime string parsed from the note text (America/New_York timezone). Use today's date as the base for relative dates. If no specific time is given use null.
 
-Return a JSON array. Each object must have: source_id, type, formatted, tags, open_loops, uncertain, proposed_type, remind_at (string or null).
-Only JSON. No markdown.`;
+Return ONLY a JSON array. Each object must have: source_id, type, formatted, tags, open_loops, uncertain, proposed_type, remind_at (string or null).
+No markdown. No explanation. Only the JSON array.`;
+
+  const regularIds = regular.map(n => n.id);
 
   try {
     const { text, usage } = await callAI(SYS, 'Today is ' + new Date().toISOString() + '\nProcess:\n' + JSON.stringify(dec));
     if (usage) logUsage(usage.input_tokens, usage.output_tokens, USE_OLLAMA ? 'ollama' : MODEL_HAIKU, 'sync');
 
-    const parsed  = JSON.parse(text.replace(/```json|```/g, '').trim());
+    let parsed;
+    try {
+      parsed = extractJSON(text);
+    } catch (parseErr) {
+      console.error('[sync] JSON parse failed:', parseErr.message);
+      console.error('[sync] raw AI response (first 500):', text.substring(0, 500));
+      // Don't leave notes stuck as pending — flag them for review
+      flagStuck(regularIds, 'AI returned unparseable response');
+      setLastSync();
+      return res.json({
+        ok: true,
+        processed: 0,
+        flagged: regularIds.length,
+        error: 'AI response could not be parsed — notes flagged for review',
+        engine: USE_OLLAMA ? 'ollama' : 'anthropic'
+      });
+    }
+
     const results = Array.isArray(parsed) ? parsed : (parsed.results || parsed.notes || [parsed]);
+
+    if (!results.length) {
+      console.warn('[sync] AI returned empty results array');
+      flagStuck(regularIds, 'AI returned empty results');
+      setLastSync();
+      return res.json({ ok: true, processed: 0, flagged: regularIds.length, engine: USE_OLLAMA ? 'ollama' : 'anthropic' });
+    }
+
     const ins     = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
     const flag    = db.prepare("UPDATE notes SET status='review',type='brain-dump' WHERE id=?");
 
@@ -102,7 +178,7 @@ Only JSON. No markdown.`;
     db.transaction(items => {
       const seen = new Set();
       for (const it of items) {
-        const sid = it.source_id ?? it.id;  // AI sometimes returns 'id' instead of 'source_id'
+        const sid = it.source_id ?? it.id;
         if (sid == null) { console.warn('[sync] item missing source_id and id — skipping:', JSON.stringify(it).substring(0, 80)); continue; }
         if (it.uncertain) {
           if (!seen.has(sid)) { flag.run(sid); seen.add(sid); }
@@ -111,38 +187,44 @@ Only JSON. No markdown.`;
         if (!seen.has(sid)) {
           const changes = db.prepare("UPDATE notes SET type=?,status='processed',formatted=?,tags=?,open_loops=? WHERE id=?")
             .run(it.type, encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || ''), sid).changes;
-          if (changes === 0) console.warn(`[sync] UPDATE matched 0 rows for source_id=${sid} — note may not exist`);
+          if (changes === 0) console.warn(`[sync] UPDATE matched 0 rows for source_id=${sid}`);
           seen.add(sid);
-          // Assign reminder number if AI detected intent
           if (it.remind_at) {
             const num = nextRemindNum();
-            db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?')
-              .run(it.remind_at, num, sid);
+            db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?').run(it.remind_at, num, sid);
             console.log(`[sync] reminder set — note ${sid}, num ${num}, at ${it.remind_at}`);
           }
         } else {
           const newId = ins.run(it.type, 'processed', encrypt(it.formatted), encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || '')).lastInsertRowid;
           if (it.remind_at) {
             const num = nextRemindNum();
-            db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?')
-              .run(it.remind_at, num, newId);
+            db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?').run(it.remind_at, num, newId);
           }
         }
       }
     })(results);
 
+    // Safety net: any regular notes still stuck as pending after the transaction should be flagged
+    const stillPending = db.prepare("SELECT id FROM notes WHERE id IN (" + regularIds.map(()=>'?').join(',') + ") AND status='pending'").all(...regularIds);
+    if (stillPending.length) {
+      flagStuck(stillPending.map(n => n.id), 'not matched by AI response');
+    }
+
     setLastSync();
     res.json({
       ok:        true,
       processed: results.filter(r => !r.uncertain).length,
-      flagged:   results.filter(r => r.uncertain).length,
+      flagged:   results.filter(r => r.uncertain).length + stillPending.length,
       reminders: results.filter(r => r.remind_at).length,
       splits:    Math.max(0, results.length - regular.length),
       commands:  commandResults.length,
       engine:    USE_OLLAMA ? 'ollama' : 'anthropic'
     });
   } catch(e) {
-    console.error(e);
+    console.error('[sync] unexpected error:', e);
+    // Flag stuck notes so they don't accumulate as pending forever
+    try { flagStuck(regularIds, 'unexpected error: ' + e.message); } catch {}
+    setLastSync();
     res.json({ ok: false, error: e.message });
   }
 });
