@@ -1,14 +1,15 @@
 # Anchor — Session Context
-**Generated:** 4/6/2026, 6:20:22 PM
-**Pending notes:** 1 | **Last sync:** 4/6/2026, 4:28:20 PM
+**Generated:** 4/6/2026, 6:30:49 PM
+**Pending notes:** 2 | **Last sync:** 4/6/2026, 6:27:09 PM
 
 ## 🔔 Active Reminders
 None set yet.
 
+## 🔁 Open Loops
+• [personal-decision] Preferred note structure TBD; Obsidian archive target decision pending; Slack/Jira pull stack choice (MCP vs direct API)
+• [work] Cloudflare tunnel setup pending; spec MD Phase 1 status update needed; Jeff's PR approval status unknown
+
 ## 💼 Recent Work Notes (7 days)
-• [work] 4/6/2026 — # Anchor Session Summary — April 6, 2026
-Personal Claude session. Anchor bug fixes and infrastructure improvements.
-## W
 • [work-decision] 4/4/2026 — GitHub ↔ Anchor integration — cron pull approach decided
 Goal: shared file layer between Personal Claude and Work Claude
 • [work] 4/4/2026 — # Session Summary — April 4, 2026 (Session 3)
@@ -18,11 +19,31 @@ No new WAF rule ne
 • [work] 4/4/2026 — # Anchor Session Summary — April 4, 2026
 Session 2 with Personal Claude. Continuation from April 3.
 ## What Was Built To
+• [work-task] 4/4/2026 — Pending items from April 3-4 full build:
+- Push dcazman/anchor and dcazman/anchor-mcp to Docker Hub
+- Remove ANTHROPIC_A
+• [work-task] 4/4/2026 — Pending items from April 3 status summary:
+- Cloudflare tunnel → anchor.thecasmas.com
+- Cloudflare Access auth layer
+- R
+• [work-task] 4/4/2026 — Phase 2 action items from April 3 session:
+- Build /sync POST endpoint — accepts markdown payload, stores as note
+- Set 
 • [work-decision] 4/4/2026 — Anchor sync approach decision — three options evaluated:
 1. Manual MD handoff — end of session, paste into Anchor. Works
+• [work-task] 4/4/2026 — Open loops from April 3 work session:
+- Cloudflare tunnel still needed for Anchor to go external
+- Update spec MD file w
 • [work-idea] 4/4/2026 — Anchor UI redesign idea: 
 - Input (Add Note) always visible and accessible — always on, no auth needed, dump anytime
 - N
+• [work] 4/4/2026 — # Anchor — Full Build Summary | April 3, 2026
+Built entirely in one session with Personal Claude.
+## What Anchor Is
+Pers
+• [work] 4/3/2026 — April 3, 2026 — Work Summary
+
+Built dan-notes from scratch with Claude. Live at 192.168.x.x:7778 on OMV. Node/Express, S
 
 ## 📋 Working With Anchor
 - anchor.thecasmas.com — main UI
