@@ -80,6 +80,7 @@ router.get('/', (req, res) => {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Anchor 2.0">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/apple-touch-icon.png">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,sans-serif;background:#0d1117;color:#e2e8f0;font-size:16px;line-height:1.6}
