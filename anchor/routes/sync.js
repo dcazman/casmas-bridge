@@ -41,6 +41,7 @@ async function callAI(system, userContent) {
 
 router.post('/', async (req, res) => {
   const pending = db.prepare("SELECT id,raw_input FROM notes WHERE status='pending'").all();
+  console.log(`[sync] POST received — ${pending.length} pending notes, ids: ${pending.map(n=>n.id).join(',')}`);
   if (!pending.length) return res.json({ ok: true, processed: 0 });
 
   // ── 1. Split: reminder commands vs regular notes ───────────────────────────
