@@ -96,23 +96,28 @@ Only JSON. No markdown.`;
     const ins     = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
     const flag    = db.prepare("UPDATE notes SET status='review',type='brain-dump' WHERE id=?");
 
+    console.log('[sync] AI returned', results.length, 'items, first:', JSON.stringify(results[0]).substring(0, 120));
+
     db.transaction(items => {
       const seen = new Set();
       for (const it of items) {
+        const sid = it.source_id ?? it.id;  // AI sometimes returns 'id' instead of 'source_id'
+        if (sid == null) { console.warn('[sync] item missing source_id and id — skipping:', JSON.stringify(it).substring(0, 80)); continue; }
         if (it.uncertain) {
-          if (!seen.has(it.source_id)) { flag.run(it.source_id); seen.add(it.source_id); }
+          if (!seen.has(sid)) { flag.run(sid); seen.add(sid); }
           continue;
         }
-        if (!seen.has(it.source_id)) {
-          db.prepare("UPDATE notes SET type=?,status='processed',formatted=?,tags=?,open_loops=? WHERE id=?")
-            .run(it.type, encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || ''), it.source_id);
-          seen.add(it.source_id);
+        if (!seen.has(sid)) {
+          const changes = db.prepare("UPDATE notes SET type=?,status='processed',formatted=?,tags=?,open_loops=? WHERE id=?")
+            .run(it.type, encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || ''), sid).changes;
+          if (changes === 0) console.warn(`[sync] UPDATE matched 0 rows for source_id=${sid} — note may not exist`);
+          seen.add(sid);
           // Assign reminder number if AI detected intent
           if (it.remind_at) {
             const num = nextRemindNum();
             db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?')
-              .run(it.remind_at, num, it.source_id);
-            console.log(`[sync] reminder set — note ${it.source_id}, num ${num}, at ${it.remind_at}`);
+              .run(it.remind_at, num, sid);
+            console.log(`[sync] reminder set — note ${sid}, num ${num}, at ${it.remind_at}`);
           }
         } else {
           const newId = ins.run(it.type, 'processed', encrypt(it.formatted), encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || '')).lastInsertRowid;
