@@ -165,8 +165,6 @@ router.get('/', (req, res) => {
     .groom-report{margin-top:8px;padding:10px 12px;background:#0d1117;border:1px solid #c084fc30;border-radius:8px;font-size:.82rem;color:#c4b5fd;white-space:pre-wrap;display:none}
     .otd-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:14px}
     .empty{color:#334155;font-size:.9rem;padding:20px;text-align:center}
-    .save-confirm{font-size:.78rem;color:#4ade80;margin-left:8px;opacity:0;transition:opacity .3s}
-    .save-confirm.show{opacity:1}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -298,8 +296,16 @@ router.get('/', (req, res) => {
     }
     async function pullBridge(){
       const s=document.getElementById('bs');s.textContent='⏳ Syncing...';
-      try{const r=await fetch('/pull-bridge',{method:'POST'});const d=await r.json();if(d.ok){s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped'+(d.anchorFilesChanged&&d.anchorFilesChanged.length?' — code updated, restarting…':'');if(d.ingested>0||d.anchorFilesChanged&&d.anchorFilesChanged.length)setTimeout(()=>location.reload(),2500);}else{s.textContent='✗ '+(d.error||'Failed');}}
-      catch(e){s.textContent='✗ Failed';}
+      try{
+        // Always force-apply latest source files from casmas-bridge
+        const r=await fetch('/pull-bridge?force=1',{method:'POST'});
+        const d=await r.json();
+        if(d.ok){
+          const applied = d.applyLog && d.applyLog.length ? ' — code applied, restarting…' : '';
+          s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped'+applied;
+          setTimeout(()=>location.reload(),2500);
+        }else{s.textContent='✗ '+(d.error||'Failed');}
+      }catch(e){s.textContent='✗ Failed';}
     }
     async function runGroom(){
       const s=document.getElementById('bs');const r=document.getElementById('groomReport');
@@ -332,36 +338,19 @@ router.get('/', (req, res) => {
       window.location.href='/?'+p.toString();
     }
     document.getElementById('sq').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
-    const HIST_KEY = 'anchor_chat_history';
-    const MAX_HIST = 30;
-    function loadHistory(){ try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch{return [];} }
-    function saveToHistory(q, a, engine){
-      const h=loadHistory();
-      h.push({ts:new Date().toLocaleString(),q,a,engine});
-      if(h.length>MAX_HIST)h.splice(0,h.length-MAX_HIST);
-      localStorage.setItem(HIST_KEY,JSON.stringify(h));
-      renderHistory();
-    }
+    const HIST_KEY='anchor_chat_history';const MAX_HIST=30;
+    function loadHistory(){try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch{return[];}}
+    function saveToHistory(q,a,engine){const h=loadHistory();h.push({ts:new Date().toLocaleString(),q,a,engine});if(h.length>MAX_HIST)h.splice(0,h.length-MAX_HIST);localStorage.setItem(HIST_KEY,JSON.stringify(h));renderHistory();}
     function renderHistory(){
       const box=document.getElementById('histBox');if(!box)return;
       const h=loadHistory();
       if(!h.length){box.innerHTML='<div style="color:#475569;font-size:.8rem">No history yet.</div>';return;}
       box.innerHTML=[...h].reverse().map(e=>{
         const eng=e.engine==='ollama'?'<span style="color:#4ade80;font-size:.65rem">🦙</span>':e.engine==='claude'?'<span style="color:#a78bfa;font-size:.65rem">⚡</span>':'';
-        return '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1e2d45">'
-          +'<div style="font-size:.7rem;color:#475569;margin-bottom:3px">'+e.ts+' '+eng+'</div>'
-          +'<div style="font-size:.82rem;color:#94a3b8;margin-bottom:3px">Q: '+e.q+'</div>'
-          +'<div style="font-size:.85rem;color:#e2e8f0">'+e.a+'</div>'
-          +'</div>';
+        return '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1e2d45"><div style="font-size:.7rem;color:#475569;margin-bottom:3px">'+e.ts+' '+eng+'</div><div style="font-size:.82rem;color:#94a3b8;margin-bottom:3px">Q: '+e.q+'</div><div style="font-size:.85rem;color:#e2e8f0">'+e.a+'</div></div>';
       }).join('');
     }
-    function toggleHistory(){
-      const box=document.getElementById('histBox'),chev=document.getElementById('histChev');
-      const open=box.style.display!=='none';
-      box.style.display=open?'none':'block';
-      chev.textContent=open?'▶':'▼';
-      if(!open)renderHistory();
-    }
+    function toggleHistory(){const box=document.getElementById('histBox'),chev=document.getElementById('histChev');const open=box.style.display!=='none';box.style.display=open?'none':'block';chev.textContent=open?'▶':'▼';if(!open)renderHistory();}
     function clearHistory(){if(confirm('Clear chat history?')){localStorage.removeItem(HIST_KEY);renderHistory();}}
     async function chat(model){
       const v=document.getElementById('ci').value.trim();if(!v)return;
@@ -377,7 +366,7 @@ router.get('/', (req, res) => {
         const cls=isOllama?'msg ai ollama':model==='claude'?'msg ai opus':'msg ai';
         const lbl=isOllama?' <span style="font-size:.75rem;color:#4ade80;font-weight:600">🦙 Local</span>':model==='claude'?' <span style="font-size:.75rem;color:#a78bfa;font-weight:600">⚡ Claude</span>':'';
         msgs.innerHTML+='<div class="'+cls+'">'+d.answer+lbl+'</div>';
-        saveToHistory(v, d.answer, d.engine);
+        saveToHistory(v,d.answer,d.engine);
       }catch(e){msgs.innerHTML+='<div class="msg ai">Error.</div>';}
       document.getElementById('cl').style.display='none';
       msgs.scrollTop=msgs.scrollHeight;
@@ -391,16 +380,9 @@ router.get('/', (req, res) => {
       try{
         const r=await fetch('/reclassify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,type})});
         const d=await r.json();
-        if(d.ok){
-          s.textContent='✓';
-          const noteEl=document.getElementById('note-'+id);
-          if(noteEl){
-            const badge=noteEl.querySelector('.note-type');
-            if(badge)badge.textContent=type;
-          }
-        } else s.textContent='✗';
-      }
-      catch(e){s.textContent='✗';}
+        if(d.ok){s.textContent='✓';const noteEl=document.getElementById('note-'+id);if(noteEl){const badge=noteEl.querySelector('.note-type');if(badge)badge.textContent=type;}}
+        else s.textContent='✗';
+      }catch(e){s.textContent='✗';}
     }
     function startEdit(id){document.getElementById('fmt-'+id).style.display='none';document.getElementById('edit-'+id).style.display='block';}
     function cancelEdit(id){document.getElementById('fmt-'+id).style.display='block';document.getElementById('edit-'+id).style.display='none';}
@@ -409,14 +391,8 @@ router.get('/', (req, res) => {
       try{
         const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});
         const d=await r.json();
-        if(d.ok){
-          const fmt=document.getElementById('fmt-'+id);
-          fmt.textContent=c;
-          fmt.style.display='block';
-          document.getElementById('edit-'+id).style.display='none';
-          const editBtn=document.querySelector('#note-'+id+' .btn-icon');
-          if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}
-        } else alert('Save failed');
+        if(d.ok){const fmt=document.getElementById('fmt-'+id);fmt.textContent=c;fmt.style.display='block';document.getElementById('edit-'+id).style.display='none';const editBtn=document.querySelector('#note-'+id+' .btn-icon');if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}}
+        else alert('Save failed');
       }catch(e){alert('Save failed');}
     }
     async function deleteNote(id){

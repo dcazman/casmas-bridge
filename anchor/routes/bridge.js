@@ -12,36 +12,56 @@ const { getUsageStats } = require('../lib/usage');
 const { pullBridge, pushSessionMd } = require('../lib/session');
 
 const BRIDGE_PATH  = '/bridge';
-const ANCHOR_SRC   = BRIDGE_PATH + '/anchor';          // casmas-bridge/anchor/
-const ANCHOR_LIVE  = '/srv/mergerfs/warehouse/anchor'; // running service
+const ANCHOR_SRC   = BRIDGE_PATH + '/anchor';
+const ANCHOR_LIVE  = '/srv/mergerfs/warehouse/anchor';
 
-// Files that require a full docker rebuild (not just restart)
 const REBUILD_TRIGGERS = ['Dockerfile', 'package.json', 'package-lock.json'];
 
-// Copy changed anchor source files into the live service directory and restart
+// Walk a directory recursively, returning relative paths
+function walkDir(dir, base) {
+  base = base || dir;
+  let results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results = results.concat(walkDir(full, base));
+    } else {
+      results.push(path.relative(base, full));
+    }
+  }
+  return results;
+}
+
+// Copy anchor source files into the live service directory and restart
+// changedFiles: array of paths relative to casmas-bridge root (e.g. "anchor/routes/sync.js")
+// If changedFiles is null, copy ALL files from anchor/
 function applyAnchorUpdate(changedFiles) {
   const log = [];
   let needsRebuild = false;
+  let files = changedFiles;
 
-  for (const relPath of changedFiles) {
-    // relPath is like "anchor/routes/sync.js" — strip the "anchor/" prefix
+  if (!files) {
+    // Force mode — copy everything in anchor/
+    if (!fs.existsSync(ANCHOR_SRC)) { return { needsRebuild: false, log: ['anchor/ dir not found in bridge'] }; }
+    const all = walkDir(ANCHOR_SRC);
+    files = all.map(f => 'anchor/' + f);
+    log.push('force mode — copying all ' + files.length + ' anchor source files');
+  }
+
+  for (const relPath of files) {
     const filePart = relPath.replace(/^anchor\//, '');
     const src  = path.join(ANCHOR_SRC, filePart);
     const dest = path.join(ANCHOR_LIVE, filePart);
-
     if (!fs.existsSync(src)) { log.push('skip (not found): ' + relPath); continue; }
-
-    // Ensure destination directory exists
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(src, dest);
-    log.push('copied: ' + relPath);
-
+    log.push('copied: ' + filePart);
     if (REBUILD_TRIGGERS.some(t => filePart.endsWith(t))) needsRebuild = true;
   }
 
   try {
     if (needsRebuild) {
-      log.push('rebuild triggered (Dockerfile or package.json changed)');
+      log.push('rebuild triggered');
       execSync(
         'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml down && ' +
         'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml build --no-cache && ' +
@@ -51,7 +71,7 @@ function applyAnchorUpdate(changedFiles) {
       log.push('full rebuild + restart done');
     } else {
       execSync('docker restart anchor', { timeout: 30000 });
-      log.push('docker restart anchor done');
+      log.push('docker restart done');
     }
   } catch (e) {
     log.push('restart failed: ' + e.message);
@@ -61,38 +81,34 @@ function applyAnchorUpdate(changedFiles) {
 }
 
 // POST /pull-bridge
-// Two-way sync: pull latest from git, auto-apply anchor source changes, ingest new md files, push session-latest.md
+// ?force=1 — always copy all anchor/ source files even if git reports no changes
 router.post('/', async (req, res) => {
   try {
-    const result = { ok: true, ingested: 0, skipped: 0, session: null, anchorFilesChanged: [], applyLog: [] };
+    const force = req.query.force === '1' || req.body.force === true || req.body.force === '1';
+    const result = { ok: true, ingested: 0, skipped: 0, session: null, anchorFilesChanged: [], applyLog: [], forced: force };
 
-    // ── 1. Pull latest from casmas-bridge ─────────────────────────────────────
+    // ── 1. Pull latest from git ────────────────────────────────────────────────
     const pull = pullBridge();
-    if (!pull.ok) {
-      return res.json({ ok: false, error: 'git pull failed: ' + pull.error });
-    }
+    if (!pull.ok) return res.json({ ok: false, error: 'git pull failed: ' + pull.error });
 
-    // ── 2. Auto-apply anchor source changes ───────────────────────────────────
-    if (pull.anchorFiles && pull.anchorFiles.length) {
-      result.anchorFilesChanged = pull.anchorFiles;
-      console.log('[bridge] anchor source files changed:', pull.anchorFiles.join(', '));
-
-      const apply = applyAnchorUpdate(pull.anchorFiles);
+    // ── 2. Apply anchor source files ──────────────────────────────────────────
+    const hasNewFiles = pull.anchorFiles && pull.anchorFiles.length > 0;
+    if (hasNewFiles || force) {
+      const filesToApply = force ? null : pull.anchorFiles; // null = force all
+      result.anchorFilesChanged = force ? ['(force — all files)'] : pull.anchorFiles;
+      const apply = applyAnchorUpdate(filesToApply);
       result.applyLog = apply.log;
       console.log('[bridge] apply result:', apply.log.join('; '));
-
-      // NOTE: if docker restart was called, this response may still complete
-      // because the restart is async from Node's perspective for a moment.
-      // Email for awareness.
-      const fileList = pull.anchorFiles.map(f => '  • ' + f).join('\n');
-      const applyDetail = apply.log.map(l => '  ' + l).join('\n');
-      await sendEmail(
-        '⚓ Anchor — Source Updated & Applied',
-        `Changed files pulled and applied automatically.\n\nFiles:\n${fileList}\n\nApply log:\n${applyDetail}`
-      ).catch(e => console.error('[bridge] email failed:', e.message));
+      if (hasNewFiles && !force) {
+        const fileList = pull.anchorFiles.map(f => '  • ' + f).join('\n');
+        await sendEmail(
+          '⚓ Anchor — Source Updated & Applied',
+          `Files:\n${fileList}\n\nApply log:\n${apply.log.map(l => '  ' + l).join('\n')}`
+        ).catch(() => {});
+      }
     }
 
-    // ── 3. Ingest new md/ files from bridge ────────────────────────────────────
+    // ── 3. Ingest new md/ files ────────────────────────────────────────────────
     const mdDir = path.join(BRIDGE_PATH, 'md');
     if (fs.existsSync(mdDir)) {
       const files = fs.readdirSync(mdDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
@@ -109,7 +125,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // ── 4. Push fresh session-latest.md ───────────────────────────────────────
+    // ── 4. Push session-latest.md ─────────────────────────────────────────────
     const session = pushSessionMd();
     result.session = session;
 
@@ -120,7 +136,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// POST /alert — ad-hoc status email
+// POST /alert
 router.post('/alert', async (req, res) => {
   const { count: pc } = getPending();
   const loops = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops!=''").get();
