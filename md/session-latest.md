@@ -1,13 +1,11 @@
 # Anchor — Session Context
-**Generated:** 4/6/2026, 2:46:24 PM
-**Pending notes:** 0 | **Last sync:** 4/5/2026, 7:45:12 PM
+**Generated:** 4/6/2026, 3:23:28 PM
+**Pending notes:** 5 | **Last sync:** 4/3/2026, 8:49:02 PM
 
 ## 🔔 Active Reminders
 None set yet.
 
 ## 🔁 Open Loops
-• [idea] 4983beb464f014f93e46f183:637de2851b938c8dc3bb81f78ab102f3:
-• [employment] b17fda6aa49d4f916ae2413e:09e6331e9cd2b03c709ebcf112f272c1:
 • [work] Cloudflare tunnel setup; Cloudflare Access auth; Docker Hub push; /sync endpoint; type/created_at encryption; date group
 • [personal-task] Type field encryption implementation; created_at field encryption; DB file-level encryption decision; date grouping UI d
 • [personal-task] New tagline text TBD; where tagline appears in UI (header, manifest, etc.)
@@ -18,7 +16,6 @@ None set yet.
 • [work] Cloudflare tunnel setup pending; spec MD Phase 1 status update needed; Jeff's PR approval status unknown
 
 ## 💼 Recent Work Notes (7 days)
-• [work] 4/5/2026 — Thursday 4 h off starting 11
 • [work-decision] 4/4/2026 — GitHub ↔ Anchor integration — cron pull approach decided
 Goal: shared file layer between Personal Claude and Work Claude
 • [work] 4/4/2026 — # Session Summary — April 4, 2026 (Session 3)
