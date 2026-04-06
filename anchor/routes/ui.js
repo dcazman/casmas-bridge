@@ -12,12 +12,12 @@ const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer
 
 function renderNote(n) {
   n = decryptNote(n);
-  const color = typeColor(n.type), ip = n.status==='pending', ir = n.status==='review';
+  const color = typeColor(n.type), ip = n.status==='pending';
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
-  return `<div class="note${ip?' note-pending':ir?' note-review':''}" id="note-${n.id}">
+  return `<div class="note${ip?' note-pending':''}" id="note-${n.id}">
     <div class="note-meta">
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
-      ${ip?'<span class="pending-badge">⏳ unsynced</span>':ir?'<span class="review-badge">👁 review</span>':''}
+      ${ip?'<span class="pending-badge">⏳ unsynced</span>':''}
       <span class="note-date" data-ts="${esc(n.created_at)}"></span>
       <span class="note-actions">
         <button class="btn-icon" onclick="startEdit(${n.id})">✏️</button>
@@ -139,8 +139,6 @@ router.get('/', (req, res) => {
     .note{background:#0d1117;border:1px solid #1e2d45;border-radius:10px;padding:16px;margin-bottom:12px}
     .note:hover{border-color:#2d4a7a}
     .note-pending{border-color:#f59e0b30;background:#1a1500}
-    .note-review{border-color:#f4723080;background:#1a0f00}
-    .review-badge{font-size:.7rem;color:#f97316;background:#1f1100;padding:2px 7px;border-radius:20px;border:1px solid #f9731630}
     .note-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
     .note-type{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:20px;border:1px solid}
     .pending-badge{font-size:.7rem;color:#f59e0b;background:#292208;padding:2px 7px;border-radius:20px;border:1px solid #f59e0b30}
@@ -308,7 +306,7 @@ router.get('/', (req, res) => {
       s.textContent='⏳ Grooming...';r.style.display='none';
       try{
         const res=await fetch('/groom',{method:'POST'});const d=await res.json();
-        if(d.ok){s.textContent='✓ Groom complete';r.textContent=d.report;r.style.display='block';}
+        if(d.ok){s.textContent='✓ Groom complete'+(d.fixed>0?' — fixed '+d.fixed:'');r.textContent=d.report;r.style.display='block';}
         else{s.textContent='✗ '+(d.error||'Groom failed');}
       }catch(e){s.textContent='✗ Failed';}
     }
@@ -395,14 +393,10 @@ router.get('/', (req, res) => {
         const d=await r.json();
         if(d.ok){
           s.textContent='✓';
-          // Update type badge in place — no page reload
           const noteEl=document.getElementById('note-'+id);
           if(noteEl){
             const badge=noteEl.querySelector('.note-type');
             if(badge)badge.textContent=type;
-            const rb=noteEl.querySelector('.review-badge');
-            if(rb)rb.remove();
-            noteEl.classList.remove('note-review');
           }
         } else s.textContent='✗';
       }
@@ -416,12 +410,10 @@ router.get('/', (req, res) => {
         const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});
         const d=await r.json();
         if(d.ok){
-          // Update the displayed text in place — no page reload, no flash
           const fmt=document.getElementById('fmt-'+id);
           fmt.textContent=c;
           fmt.style.display='block';
           document.getElementById('edit-'+id).style.display='none';
-          // Brief ✓ confirmation on the edit button
           const editBtn=document.querySelector('#note-'+id+' .btn-icon');
           if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}
         } else alert('Save failed');
