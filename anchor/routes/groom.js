@@ -1,84 +1,127 @@
 'use strict';
 const express = require('express');
 const router  = express.Router();
-const { db, decryptNote } = require('../lib/db');
+const { execSync } = require('child_process');
+const { db, decryptNote, encrypt } = require('../lib/db');
 const { sendEmail, emailEnabled } = require('../lib/email');
 
-// POST /groom
-// Runs a maintenance pass on the notes DB:
-// - Finds duplicate notes (same formatted content)
-// - Surfaces open loops older than 14 days with no update
-// - Counts notes by type/status for a health report
-// - Optionally emails the report
+// Regex to detect junk open_loops values — hash-like strings, UUIDs, colons-only
+const JUNK_LOOPS_RE = /^[a-f0-9:]{20,}$/i;
+
+function isJunkLoops(val) {
+  if (!val || !val.trim()) return false;
+  // Pure hash/uuid garbage: long hex strings separated by colons, no spaces or real words
+  const trimmed = val.trim();
+  if (JUNK_LOOPS_RE.test(trimmed)) return true;
+  // Segments separated by colons that are all hex (e.g. "abc123:def456:")
+  const segs = trimmed.split(':').filter(Boolean);
+  if (segs.length >= 2 && segs.every(s => /^[a-f0-9]{8,}$/i.test(s))) return true;
+  return false;
+}
+
 router.post('/', async (req, res) => {
   try {
     const report = [];
-    const now = Date.now();
-    const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+    let fixed = 0;
 
-    // ── 1. Pending notes older than 24hrs (forgot to sync) ────
+    // ── 1. Clear junk open_loops (hash garbage) ───────────────────────────────
+    const allLoops = db.prepare(
+      "SELECT id, open_loops FROM notes WHERE open_loops IS NOT NULL AND open_loops!=''"
+    ).all().map(n => ({ id: n.id, open_loops: (() => { try { const { decrypt } = require('../lib/crypto'); return decrypt(n.open_loops); } catch { return n.open_loops; } })() }));
+
+    const junkIds = allLoops.filter(n => isJunkLoops(n.open_loops)).map(n => n.id);
+    if (junkIds.length) {
+      const stmt = db.prepare("UPDATE notes SET open_loops='' WHERE id=?");
+      for (const id of junkIds) stmt.run(id);
+      report.push(`🧹 Cleared junk open_loops on ${junkIds.length} note(s) (IDs: ${junkIds.join(', ')})`);
+      fixed += junkIds.length;
+    }
+
+    // ── 2. Delete duplicate notes (same formatted content, keep oldest) ───────
+    const allNotes = db.prepare(
+      "SELECT id, formatted, created_at FROM notes WHERE status='processed' ORDER BY created_at ASC"
+    ).all().map(n => {
+      let fmt = n.formatted || '';
+      try { const { decrypt } = require('../lib/crypto'); fmt = decrypt(n.formatted) || ''; } catch {}
+      return { id: n.id, fmt: fmt.trim().toLowerCase().substring(0, 150), created_at: n.created_at };
+    });
+
+    const seen = new Map();
+    const dupeIds = [];
+    for (const n of allNotes) {
+      if (n.fmt.length < 30) continue; // too short to reliably dedupe
+      if (seen.has(n.fmt)) {
+        dupeIds.push(n.id); // keep oldest (first seen), delete newer
+      } else {
+        seen.set(n.fmt, n.id);
+      }
+    }
+    if (dupeIds.length) {
+      const del = db.prepare('DELETE FROM notes WHERE id=?');
+      for (const id of dupeIds) del.run(id);
+      report.push(`🗑  Deleted ${dupeIds.length} duplicate note(s) (IDs: ${dupeIds.join(', ')})`);
+      fixed += dupeIds.length;
+    }
+
+    // ── 3. Resolve open_loops on old personal/home tasks (30+ days, no remind) ─
+    const staleTaskTypes = ['personal-task','home-task','kids-task','health-task','finance-task'];
+    const staleTasks = db.prepare(
+      "SELECT id, open_loops FROM notes WHERE status='processed' AND type IN (" +
+      staleTaskTypes.map(()=>'?').join(',') +
+      ") AND open_loops IS NOT NULL AND open_loops!='' AND remind_at IS NULL AND created_at < datetime('now','-30 days')"
+    ).all(...staleTaskTypes);
+
+    if (staleTasks.length) {
+      const stmt = db.prepare("UPDATE notes SET open_loops='' WHERE id=?");
+      for (const n of staleTasks) stmt.run(n.id);
+      report.push(`✅ Cleared open_loops on ${staleTasks.length} stale task note(s) older than 30 days (no reminder set)`);
+      fixed += staleTasks.length;
+    }
+
+    // ── 4. Flag stale pending notes (>24hrs) ──────────────────────────────────
     const stalePending = db.prepare(
-      "SELECT id, created_at FROM notes WHERE status='pending' AND created_at < datetime('now','-1 day')"
+      "SELECT id FROM notes WHERE status='pending' AND created_at < datetime('now','-1 day')"
     ).all();
     if (stalePending.length) {
-      report.push(`⏳ ${stalePending.length} pending notes older than 24hrs — run Sync Now`);
+      const stmt = db.prepare("UPDATE notes SET status='review', type='brain-dump' WHERE id=?");
+      for (const n of stalePending) stmt.run(n.id);
+      report.push(`⏳ Flagged ${stalePending.length} pending note(s) stuck >24hrs → brain-dump/review`);
+      fixed += stalePending.length;
     }
 
-    // ── 2. Open loops older than 14 days ─────────────────────
-    const staleLoops = db.prepare(
-      "SELECT id, type, created_at, open_loops FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops!='' AND created_at < datetime('now','-14 days')"
-    ).all().map(decryptNote);
-    if (staleLoops.length) {
-      report.push(`🔁 ${staleLoops.length} open loops older than 14 days:`);
-      staleLoops.slice(0, 5).forEach(n => {
-        report.push(`  [${n.type}] ${(n.open_loops||'').substring(0, 80)}...`);
-      });
-      if (staleLoops.length > 5) report.push(`  ...and ${staleLoops.length - 5} more`);
+    // ── 5. VACUUM the SQLite DB ───────────────────────────────────────────────
+    try {
+      db.exec('VACUUM');
+      report.push(`💾 VACUUM complete — DB compacted`);
+    } catch (e) {
+      report.push(`⚠️  VACUUM failed: ${e.message}`);
     }
 
-    // ── 3. Notes needing review ───────────────────────────────
-    const reviewNotes = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='review'").get();
-    if (reviewNotes.c > 0) {
-      report.push(`👁 ${reviewNotes.c} notes flagged for review — check Anchor UI`);
-    }
-
-    // ── 4. DB health stats ────────────────────────────────────
-    const total = db.prepare("SELECT COUNT(*) as c FROM notes").get().c;
+    // ── 6. DB health stats ────────────────────────────────────────────────────
+    const total     = db.prepare("SELECT COUNT(*) as c FROM notes").get().c;
     const processed = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='processed'").get().c;
-    const pending = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='pending'").get().c;
-    const byType = db.prepare(
-      "SELECT type, COUNT(*) as c FROM notes WHERE status='processed' GROUP BY type ORDER BY c DESC LIMIT 8"
+    const pending   = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='pending'").get().c;
+    const review    = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='review'").get().c;
+    const withLoops = db.prepare("SELECT COUNT(*) as c FROM notes WHERE open_loops IS NOT NULL AND open_loops!=''").get().c;
+    const byType    = db.prepare(
+      "SELECT type, COUNT(*) as c FROM notes WHERE status='processed' GROUP BY type ORDER BY c DESC LIMIT 10"
     ).all();
 
-    report.push(`\n📊 DB Health: ${total} total, ${processed} processed, ${pending} pending, ${reviewNotes.c} review`);
-    report.push(`Top categories: ${byType.map(r => r.type + '(' + r.c + ')').join(', ')}`);
+    report.push(`\n📊 DB Health: ${total} total | ${processed} processed | ${pending} pending | ${review} review`);
+    report.push(`🔁 Open loops: ${withLoops} note(s)`);
+    report.push(`📂 By type: ${byType.map(r => r.type + '(' + r.c + ')').join(', ')}`);
 
-    // ── 5. Duplicate detection (same formatted content) ──────
-    const allNotes = db.prepare("SELECT id, formatted FROM notes WHERE status='processed'").all().map(decryptNote);
-    const seen = new Map();
-    const dupes = [];
-    for (const n of allNotes) {
-      const key = (n.formatted || '').trim().toLowerCase().substring(0, 100);
-      if (key.length < 20) continue;
-      if (seen.has(key)) { dupes.push({ id: n.id, dupe_of: seen.get(key) }); }
-      else seen.set(key, n.id);
-    }
-    if (dupes.length) {
-      report.push(`\n🗑 ${dupes.length} likely duplicate notes found (IDs: ${dupes.map(d => d.id).join(', ')})`);
-    }
+    const summary = fixed > 0
+      ? `Fixed ${fixed} issue(s):\n\n` + report.join('\n')
+      : '✅ Nothing to fix.\n\n' + report.join('\n');
 
-    const summary = report.length
-      ? report.join('\n')
-      : '✅ DB looks clean — no issues found';
-
-    // ── Email if configured ───────────────────────────────────
     if (emailEnabled) {
-      await sendEmail('Anchor Weekly Groom Report', summary);
+      await sendEmail('⚓ Anchor Groom Report', summary).catch(() => {});
     }
 
-    res.json({ ok: true, report: summary, dupeIds: dupes.map(d => d.id) });
-  } catch(e) {
-    console.error('groom error:', e);
+    res.json({ ok: true, report: summary, fixed });
+  } catch (e) {
+    console.error('[groom] error:', e);
     res.json({ ok: false, error: e.message });
   }
 });
