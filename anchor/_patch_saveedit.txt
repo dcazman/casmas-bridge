@@ -1,0 +1,12 @@
+    async function saveEdit(id){
+      const c=document.getElementById('etxt-'+id).value.trim();if(!c)return;
+      try{
+        const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});
+        const d=await r.json();
+        if(d.ok){
+          document.getElementById('fmt-'+id).textContent=c;
+          document.getElementById('fmt-'+id).style.display='block';
+          document.getElementById('edit-'+id).style.display='none';
+        } else alert('Save failed');
+      }catch(e){alert('Save failed');}
+    }

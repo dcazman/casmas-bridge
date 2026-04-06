@@ -167,6 +167,8 @@ router.get('/', (req, res) => {
     .groom-report{margin-top:8px;padding:10px 12px;background:#0d1117;border:1px solid #c084fc30;border-radius:8px;font-size:.82rem;color:#c4b5fd;white-space:pre-wrap;display:none}
     .otd-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:14px}
     .empty{color:#334155;font-size:.9rem;padding:20px;text-align:center}
+    .save-confirm{font-size:.78rem;color:#4ade80;margin-left:8px;opacity:0;transition:opacity .3s}
+    .save-confirm.show{opacity:1}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -298,7 +300,7 @@ router.get('/', (req, res) => {
     }
     async function pullBridge(){
       const s=document.getElementById('bs');s.textContent='⏳ Syncing...';
-      try{const r=await fetch('/pull-bridge',{method:'POST'});const d=await r.json();if(d.ok){s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped';if(d.ingested>0)setTimeout(()=>location.reload(),1200);}else{s.textContent='✗ '+(d.error||'Failed');}}
+      try{const r=await fetch('/pull-bridge',{method:'POST'});const d=await r.json();if(d.ok){s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped'+(d.anchorFilesChanged&&d.anchorFilesChanged.length?' — code updated, restarting…':'');if(d.ingested>0||d.anchorFilesChanged&&d.anchorFilesChanged.length)setTimeout(()=>location.reload(),2500);}else{s.textContent='✗ '+(d.error||'Failed');}}
       catch(e){s.textContent='✗ Failed';}
     }
     async function runGroom(){
@@ -388,15 +390,42 @@ router.get('/', (req, res) => {
     if(isLocal()){['sb','nb','cb'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('collapsed');});['sc','nc','cc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('open');});}
     async function reclassify(id,type){
       if(!type)return;const s=document.getElementById('rcs-'+id);s.textContent='...';
-      try{const r=await fetch('/reclassify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,type})});const d=await r.json();if(d.ok){s.textContent='✓';setTimeout(()=>location.reload(),600);}else s.textContent='✗';}
+      try{
+        const r=await fetch('/reclassify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,type})});
+        const d=await r.json();
+        if(d.ok){
+          s.textContent='✓';
+          // Update type badge in place — no page reload
+          const noteEl=document.getElementById('note-'+id);
+          if(noteEl){
+            const badge=noteEl.querySelector('.note-type');
+            if(badge)badge.textContent=type;
+            const rb=noteEl.querySelector('.review-badge');
+            if(rb)rb.remove();
+            noteEl.classList.remove('note-review');
+          }
+        } else s.textContent='✗';
+      }
       catch(e){s.textContent='✗';}
     }
     function startEdit(id){document.getElementById('fmt-'+id).style.display='none';document.getElementById('edit-'+id).style.display='block';}
     function cancelEdit(id){document.getElementById('fmt-'+id).style.display='block';document.getElementById('edit-'+id).style.display='none';}
     async function saveEdit(id){
       const c=document.getElementById('etxt-'+id).value.trim();if(!c)return;
-      try{const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});const d=await r.json();if(d.ok)location.reload();else alert('Save failed');}
-      catch(e){alert('Save failed');}
+      try{
+        const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});
+        const d=await r.json();
+        if(d.ok){
+          // Update the displayed text in place — no page reload, no flash
+          const fmt=document.getElementById('fmt-'+id);
+          fmt.textContent=c;
+          fmt.style.display='block';
+          document.getElementById('edit-'+id).style.display='none';
+          // Brief ✓ confirmation on the edit button
+          const editBtn=document.querySelector('#note-'+id+' .btn-icon');
+          if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}
+        } else alert('Save failed');
+      }catch(e){alert('Save failed');}
     }
     async function deleteNote(id){
       if(!confirm('Delete this note? Cannot be undone.'))return;
