@@ -1,22 +1,70 @@
 'use strict';
-const express = require('express');
-const router  = express.Router();
-const fs      = require('fs');
-const path    = require('path');
-const { db }  = require('../lib/db');
+const express    = require('express');
+const router     = express.Router();
+const fs         = require('fs');
+const path       = require('path');
+const { execSync } = require('child_process');
+const { db }     = require('../lib/db');
 const { encrypt } = require('../lib/crypto');
 const { sendEmail, emailEnabled } = require('../lib/email');
 const { getPending } = require('../lib/db');
 const { getUsageStats } = require('../lib/usage');
 const { pullBridge, pushSessionMd } = require('../lib/session');
 
-const BRIDGE_PATH = '/bridge';
+const BRIDGE_PATH  = '/bridge';
+const ANCHOR_SRC   = BRIDGE_PATH + '/anchor';          // casmas-bridge/anchor/
+const ANCHOR_LIVE  = '/srv/mergerfs/warehouse/anchor'; // running service
+
+// Files that require a full docker rebuild (not just restart)
+const REBUILD_TRIGGERS = ['Dockerfile', 'package.json', 'package-lock.json'];
+
+// Copy changed anchor source files into the live service directory and restart
+function applyAnchorUpdate(changedFiles) {
+  const log = [];
+  let needsRebuild = false;
+
+  for (const relPath of changedFiles) {
+    // relPath is like "anchor/routes/sync.js" — strip the "anchor/" prefix
+    const filePart = relPath.replace(/^anchor\//, '');
+    const src  = path.join(ANCHOR_SRC, filePart);
+    const dest = path.join(ANCHOR_LIVE, filePart);
+
+    if (!fs.existsSync(src)) { log.push('skip (not found): ' + relPath); continue; }
+
+    // Ensure destination directory exists
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+    log.push('copied: ' + relPath);
+
+    if (REBUILD_TRIGGERS.some(t => filePart.endsWith(t))) needsRebuild = true;
+  }
+
+  try {
+    if (needsRebuild) {
+      log.push('rebuild triggered (Dockerfile or package.json changed)');
+      execSync(
+        'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml down && ' +
+        'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml build --no-cache && ' +
+        'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml up -d',
+        { timeout: 120000 }
+      );
+      log.push('full rebuild + restart done');
+    } else {
+      execSync('docker restart anchor', { timeout: 30000 });
+      log.push('docker restart anchor done');
+    }
+  } catch (e) {
+    log.push('restart failed: ' + e.message);
+  }
+
+  return { needsRebuild, log };
+}
 
 // POST /pull-bridge
-// Two-way sync: pull latest from git, ingest new md files, push fresh session-latest.md
+// Two-way sync: pull latest from git, auto-apply anchor source changes, ingest new md files, push session-latest.md
 router.post('/', async (req, res) => {
   try {
-    const result = { ok: true, ingested: 0, skipped: 0, session: null, anchorFilesChanged: [] };
+    const result = { ok: true, ingested: 0, skipped: 0, session: null, anchorFilesChanged: [], applyLog: [] };
 
     // ── 1. Pull latest from casmas-bridge ─────────────────────────────────────
     const pull = pullBridge();
@@ -24,15 +72,23 @@ router.post('/', async (req, res) => {
       return res.json({ ok: false, error: 'git pull failed: ' + pull.error });
     }
 
-    // ── 2. Notify if anchor source files changed ───────────────────────────────
+    // ── 2. Auto-apply anchor source changes ───────────────────────────────────
     if (pull.anchorFiles && pull.anchorFiles.length) {
       result.anchorFilesChanged = pull.anchorFiles;
       console.log('[bridge] anchor source files changed:', pull.anchorFiles.join(', '));
-      // Email notification — Dan applies the restart when ready
+
+      const apply = applyAnchorUpdate(pull.anchorFiles);
+      result.applyLog = apply.log;
+      console.log('[bridge] apply result:', apply.log.join('; '));
+
+      // NOTE: if docker restart was called, this response may still complete
+      // because the restart is async from Node's perspective for a moment.
+      // Email for awareness.
       const fileList = pull.anchorFiles.map(f => '  • ' + f).join('\n');
+      const applyDetail = apply.log.map(l => '  ' + l).join('\n');
       await sendEmail(
-        '⚓ Anchor — Source Files Updated',
-        `New code was pulled into casmas-bridge.\n\nChanged files:\n${fileList}\n\nTo apply, run on OMV:\n  cd /srv/mergerfs/warehouse/anchor\n  docker compose restart anchor\n\nOr full rebuild if Dockerfile/package.json changed:\n  docker compose down && docker compose build --no-cache && docker compose up -d`
+        '⚓ Anchor — Source Updated & Applied',
+        `Changed files pulled and applied automatically.\n\nFiles:\n${fileList}\n\nApply log:\n${applyDetail}`
       ).catch(e => console.error('[bridge] email failed:', e.message));
     }
 
@@ -41,7 +97,7 @@ router.post('/', async (req, res) => {
     if (fs.existsSync(mdDir)) {
       const files = fs.readdirSync(mdDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
       for (const file of files) {
-        if (file === 'session-latest.md') continue; // never ingest our own output
+        if (file === 'session-latest.md') continue;
         const key = 'bridge:file:' + file;
         if (db.prepare('SELECT key FROM secrets WHERE key=?').get(key)) { result.skipped++; continue; }
         const content = fs.readFileSync(path.join(mdDir, file), 'utf8').trim();
