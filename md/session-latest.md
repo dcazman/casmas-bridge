@@ -1,11 +1,12 @@
 # Anchor — Session Context
-**Generated:** 4/6/2026, 4:20:08 PM
-**Pending notes:** 3 | **Last sync:** 4/6/2026, 4:13:47 PM
+**Generated:** 4/6/2026, 4:27:36 PM
+**Pending notes:** 2 | **Last sync:** 4/6/2026, 4:27:10 PM
 
 ## 🔔 Active Reminders
 None set yet.
 
 ## 🔁 Open Loops
+• [pi] b52d4bf81cca12f67ae72b69:7313642def0f7d5db8a2d710b1145794:
 • [work] Cloudflare tunnel setup; Cloudflare Access auth; Docker Hub push; /sync endpoint; type/created_at encryption; date group
 • [personal-task] Type field encryption implementation; created_at field encryption; DB file-level encryption decision; date grouping UI d
 • [personal-task] New tagline text TBD; where tagline appears in UI (header, manifest, etc.)
