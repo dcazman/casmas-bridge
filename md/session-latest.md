@@ -1,42 +1,14 @@
 # Anchor — Session Context
-**Generated:** 4/7/2026, 1:16:09 PM
+**Generated:** 4/7/2026, 2:41:57 PM
 **Pending notes:** 0 | **Last sync:** 4/3/2026, 8:49:02 PM
 
 ## 🔔 Active Reminders
 None set yet.
 
 ## 💼 Recent Work Notes (7 days)
-• [work-decision] 4/4/2026 — GitHub ↔ Anchor integration — cron pull approach decided
-Goal: shared file layer between Personal Claude and Work Claude
-• [work] 4/4/2026 — # Session Summary — April 4, 2026 (Session 3)
-Short session. Discussed Anchor security.
-## Conclusion
-No new WAF rule ne
-• [work] 4/4/2026 — # Anchor Session Summary — April 4, 2026
-Session 2 with Personal Claude. Continuation from April 3.
-## What Was Built To
-• [work-task] 4/4/2026 — Pending items from April 3-4 full build:
-- Push dcazman/anchor and dcazman/anchor-mcp to Docker Hub
-- Remove ANTHROPIC_A
-• [work-task] 4/4/2026 — Pending items from April 3 status summary:
-- Cloudflare tunnel → anchor.thecasmas.com
-- Cloudflare Access auth layer
-- R
-• [work-task] 4/4/2026 — Phase 2 action items from April 3 session:
-- Build /sync POST endpoint — accepts markdown payload, stores as note
-- Set 
-• [work-decision] 4/4/2026 — Anchor sync approach decision — three options evaluated:
-1. Manual MD handoff — end of session, paste into Anchor. Works
 • [work-task] 4/4/2026 — Open loops from April 3 work session:
 - Cloudflare tunnel still needed for Anchor to go external
 - Update spec MD file w
-• [work-idea] 4/4/2026 — Anchor UI redesign idea: 
-- Input (Add Note) always visible and accessible — always on, no auth needed, dump anytime
-- N
-• [work] 4/4/2026 — # Anchor — Full Build Summary | April 3, 2026
-Built entirely in one session with Personal Claude.
-## What Anchor Is
-Pers
 
 ## 📋 Working With Anchor
 - anchor.thecasmas.com — main UI
