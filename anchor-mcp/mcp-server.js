@@ -15,8 +15,6 @@ const MCP_TOKEN = process.env.MCP_TOKEN;
 const REPO_PATH = process.env.REPO_PATH || '/repo/casmas-bridge';
 const SSH_KEY_PATH = process.env.SSH_KEY_PATH || '/root/.ssh/deploy_key';
 const WAREHOUSE = process.env.WAREHOUSE || '/warehouse';
-// Host path equivalent of WAREHOUSE — used for docker build context
-// Docker daemon needs host paths, not container-internal paths
 const WAREHOUSE_HOST = process.env.WAREHOUSE_HOST || '/srv/mergerfs/warehouse';
 
 if (!MCP_TOKEN) { console.error('FATAL: MCP_TOKEN not set'); process.exit(1); }
@@ -67,7 +65,7 @@ function sh(cmd, opts = {}) {
 const REBUILD_SERVICES = ['anchor'];
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.4.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.5.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -197,30 +195,30 @@ function createMcpServer(caller) {
   );
 
   server.tool('rebuild_service',
-    'Sync source from casmas-bridge repo and rebuild/restart a service. anchor = full docker rebuild. Others = docker restart.',
+    'Sync source from casmas-bridge repo and rebuild/restart a service. anchor = full docker compose rebuild. Others = docker restart.',
     { service: z.string().describe('Service name, e.g. "anchor", "gmr"') },
     async ({ service }) => {
       try {
-        const prodPath = `${WAREHOUSE}/${service}`;           // container path: /warehouse/anchor
-        const hostProdPath = `${WAREHOUSE_HOST}/${service}`;  // host path: /srv/mergerfs/warehouse/anchor
-        const repoPath = `${REPO_PATH}/${service}`;           // /repo/casmas-bridge/anchor
+        const prodPath = `${WAREHOUSE}/${service}`;          // /warehouse/anchor (container view)
+        const hostProdPath = `${WAREHOUSE_HOST}/${service}`; // /srv/mergerfs/warehouse/anchor (host view)
+        const repoPath = `${REPO_PATH}/${service}`;          // /repo/casmas-bridge/anchor
         let steps = [];
 
         if (REBUILD_SERVICES.includes(service)) {
-          // 1. Copy latest source files from casmas-bridge into live service dir
+          // 1. Copy latest source from casmas-bridge into live service dir
           await sh(`cp -r ${repoPath}/. ${prodPath}/`);
           steps.push(`Synced ${repoPath} → ${prodPath}`);
 
-          // 2. Build new image using host path (Docker daemon needs host paths)
-          const { stdout: buildOut, stderr: buildErr } = await sh(
-            `docker build --no-cache -t anchor-anchor ${hostProdPath} 2>&1`,
-            { timeout: 120000 }
+          // 2. Use docker compose with host path — compose handles image naming correctly
+          // PROJECT_NAME ensures image is named anchor-anchor (matching what OMV expects)
+          const composeFile = `${hostProdPath}/docker-compose.yml`;
+          const { stdout, stderr } = await sh(
+            `docker compose -f ${composeFile} up -d --build 2>&1`,
+            { timeout: 180000 }
           );
-          steps.push('Build output: ' + (buildOut || buildErr || '').trim().split('\n').slice(-3).join(' | '));
-
-          // 3. Restart container to pick up new image
-          await sh(`docker stop anchor && docker start anchor`, { timeout: 30000 });
-          steps.push('Container restarted with new image.');
+          const out = (stdout || stderr || '').trim().split('\n').slice(-5).join(' | ');
+          steps.push(`Compose output: ${out}`);
+          steps.push('Done.');
         } else {
           const { stdout } = await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
