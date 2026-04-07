@@ -1,12 +1,16 @@
 'use strict';
 const nodemailer = require('nodemailer');
 
-const SMTP_HOST   = process.env.SMTP_HOST  || '';
-const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_USER   = process.env.SMTP_USER  || '';
-const SMTP_PASS   = process.env.SMTP_PASS  || '';
-const ALERT_EMAIL = process.env.ALERT_EMAIL || SMTP_USER;
+const SMTP_HOST    = process.env.SMTP_HOST  || '';
+const SMTP_PORT    = parseInt(process.env.SMTP_PORT || '587');
+const SMTP_USER    = process.env.SMTP_USER  || '';
+const SMTP_PASS    = process.env.SMTP_PASS  || '';
+const ALERT_EMAIL  = process.env.ALERT_EMAIL || SMTP_USER;
+const ALERT_EMAIL2 = process.env.ALERT_EMAIL2 || '';
 const emailEnabled = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+
+// Build recipient list — primary + optional second address
+const toList = [ALERT_EMAIL, ALERT_EMAIL2].filter(Boolean).join(', ');
 
 let mailer = null;
 if (emailEnabled) {
@@ -15,7 +19,7 @@ if (emailEnabled) {
 
 async function sendEmail(subject, body) {
   if (!mailer) return { ok: false, error: 'Email not configured' };
-  try { await mailer.sendMail({ from: SMTP_USER, to: ALERT_EMAIL, subject, text: body }); return { ok: true }; }
+  try { await mailer.sendMail({ from: SMTP_USER, to: toList, subject, text: body }); return { ok: true }; }
   catch (e) { return { ok: false, error: e.message }; }
 }
 

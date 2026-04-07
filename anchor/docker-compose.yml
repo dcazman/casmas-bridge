@@ -16,6 +16,7 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - ALERT_EMAIL=${ALERT_EMAIL:-}
+      - ALERT_EMAIL2=${ALERT_EMAIL2:-}
     volumes:
       - /srv/mergerfs/warehouse/anchor/data:/data
       - /srv/mergerfs/warehouse/casmas-bridge:/bridge
