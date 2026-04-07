@@ -65,7 +65,7 @@ function sh(cmd, opts = {}) {
 const REBUILD_SERVICES = ['anchor'];
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.5.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.6.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -195,34 +195,33 @@ function createMcpServer(caller) {
   );
 
   server.tool('rebuild_service',
-    'Sync source from casmas-bridge repo and rebuild/restart a service. anchor = full docker compose rebuild. Others = docker restart.',
+    'Sync source from casmas-bridge repo and rebuild/restart a service. anchor = full compose rebuild. Others = docker restart.',
     { service: z.string().describe('Service name, e.g. "anchor", "gmr"') },
     async ({ service }) => {
       try {
-        const prodPath = `${WAREHOUSE}/${service}`;          // /warehouse/anchor (container view)
-        const hostProdPath = `${WAREHOUSE_HOST}/${service}`; // /srv/mergerfs/warehouse/anchor (host view)
-        const repoPath = `${REPO_PATH}/${service}`;          // /repo/casmas-bridge/anchor
+        const prodPath = `${WAREHOUSE}/${service}`;
+        const hostProdPath = `${WAREHOUSE_HOST}/${service}`;
+        const repoPath = `${REPO_PATH}/${service}`;
         let steps = [];
 
         if (REBUILD_SERVICES.includes(service)) {
-          // 1. Copy latest source from casmas-bridge into live service dir
-          await sh(`cp -r ${repoPath}/. ${prodPath}/`);
-          steps.push(`Synced ${repoPath} → ${prodPath}`);
+          // 1. Copy source files — exclude data/ and backup/ to avoid overwriting live DB
+          await sh(`rsync -a --exclude='data/' --exclude='backup/' ${repoPath}/ ${prodPath}/`);
+          steps.push(`Synced ${repoPath} → ${prodPath} (excluding data/ and backup/)`);
 
-          // 2. Use docker compose with host path — compose handles image naming correctly
-          // PROJECT_NAME ensures image is named anchor-anchor (matching what OMV expects)
+          // 2. Run compose with --env-file so ENCRYPTION_KEY etc are available
           const composeFile = `${hostProdPath}/docker-compose.yml`;
+          const envFile = `${hostProdPath}/.env`;
           const { stdout, stderr } = await sh(
-            `docker compose -f ${composeFile} up -d --build 2>&1`,
+            `docker compose -f ${composeFile} --env-file ${envFile} up -d --build 2>&1`,
             { timeout: 180000 }
           );
           const out = (stdout || stderr || '').trim().split('\n').slice(-5).join(' | ');
-          steps.push(`Compose output: ${out}`);
+          steps.push(`Compose: ${out}`);
           steps.push('Done.');
         } else {
-          const { stdout } = await sh(`docker restart ${service}`);
+          await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
-          steps.push(stdout.trim());
         }
 
         return { content: [{ type: 'text', text: steps.join('\n') }] };
