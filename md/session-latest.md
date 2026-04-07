@@ -1,6 +1,6 @@
 # Anchor — Session Context
-**Generated:** 4/6/2026, 8:53:42 PM
-**Pending notes:** 5 | **Last sync:** 4/3/2026, 8:49:02 PM
+**Generated:** 4/6/2026, 8:59:37 PM
+**Pending notes:** 2 | **Last sync:** 4/3/2026, 8:49:02 PM
 
 ## 🔔 Active Reminders
 None set yet.
