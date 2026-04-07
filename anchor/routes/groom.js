@@ -1,7 +1,8 @@
 'use strict';
 const express = require('express');
 const router  = express.Router();
-const { db, decryptNote } = require('../lib/db');
+const { db } = require('../lib/db');
+const { decrypt } = require('../lib/crypto');
 const { sendEmail, emailEnabled } = require('../lib/email');
 
 const JUNK_LOOPS_RE = /^[a-f0-9:]{20,}$/i;
@@ -13,6 +14,26 @@ function isJunkLoops(val) {
   const segs = trimmed.split(':').filter(Boolean);
   if (segs.length >= 2 && segs.every(s => /^[a-f0-9]{8,}$/i.test(s))) return true;
   return false;
+}
+
+// Keywords that indicate an open_loop is already resolved
+const RESOLVED_SIGNALS = [
+  'cloudflare tunnel', 'cloudflare access', 'docker hub push', '/sync endpoint',
+  'mcp server', 'mcp now live', 'phase 1 complete', 'phase 2 complete',
+  'tunnel live', 'tunnel setup', 'auth layer', 'encryption'
+];
+
+// A note's open_loops look stale if all signals it contains are in the resolved list
+// and the note is older than STALE_DAYS
+const STALE_DAYS = 14;
+
+function looksResolved(loopText) {
+  if (!loopText) return false;
+  const lower = loopText.toLowerCase();
+  // If any resolved signal appears and there are no forward-looking words, consider it stale
+  const hasResolved = RESOLVED_SIGNALS.some(s => lower.includes(s));
+  const hasForward = ['pending', 'tbd', 'todo', 'need to', 'not yet', 'waiting', 'open', 'undecided'].some(s => lower.includes(s));
+  return hasResolved && !hasForward;
 }
 
 router.post('/', async (req, res) => {
@@ -29,15 +50,15 @@ router.post('/', async (req, res) => {
     }
 
     // ── 1. Clear junk open_loops (hash garbage) ───────────────────────────────
-    const allLoops = db.prepare(
+    const allLoopNotes = db.prepare(
       "SELECT id, open_loops FROM notes WHERE open_loops IS NOT NULL AND open_loops!=''"
     ).all().map(n => {
       let val = n.open_loops;
-      try { const { decrypt } = require('../lib/crypto'); val = decrypt(n.open_loops); } catch {}
+      try { val = decrypt(n.open_loops); } catch {}
       return { id: n.id, open_loops: val };
     });
 
-    const junkIds = allLoops.filter(n => isJunkLoops(n.open_loops)).map(n => n.id);
+    const junkIds = allLoopNotes.filter(n => isJunkLoops(n.open_loops)).map(n => n.id);
     if (junkIds.length) {
       const stmt = db.prepare("UPDATE notes SET open_loops='' WHERE id=?");
       for (const id of junkIds) stmt.run(id);
@@ -50,7 +71,7 @@ router.post('/', async (req, res) => {
       "SELECT id, formatted, created_at FROM notes WHERE status='processed' ORDER BY created_at ASC"
     ).all().map(n => {
       let fmt = n.formatted || '';
-      try { const { decrypt } = require('../lib/crypto'); fmt = decrypt(n.formatted) || ''; } catch {}
+      try { fmt = decrypt(n.formatted) || ''; } catch {}
       return { id: n.id, fmt: fmt.trim().toLowerCase().substring(0, 150), created_at: n.created_at };
     });
 
@@ -68,22 +89,24 @@ router.post('/', async (req, res) => {
       fixed += dupeIds.length;
     }
 
-    // ── 3. Clear open_loops on stale task notes (30+ days, no reminder) ───────
-    const staleTaskTypes = ['personal-task','home-task','kids-task','health-task','finance-task'];
-    const staleTasks = db.prepare(
-      "SELECT id FROM notes WHERE status='processed' AND type IN (" +
-      staleTaskTypes.map(()=>'?').join(',') +
-      ") AND open_loops IS NOT NULL AND open_loops!='' AND remind_at IS NULL AND created_at < datetime('now','-30 days')"
-    ).all(...staleTaskTypes);
+    // ── 3. Clear open_loops on ALL stale notes (14+ days, no reminder) ────────
+    // Covers all types — tasks, work notes, decisions, summaries, everything
+    const staleLoopNotes = db.prepare(
+      "SELECT id, open_loops FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops!='' AND remind_at IS NULL AND created_at < datetime('now','-" + STALE_DAYS + " days')"
+    ).all().map(n => {
+      let val = n.open_loops;
+      try { val = decrypt(n.open_loops); } catch {}
+      return { id: n.id, open_loops: val };
+    });
 
-    if (staleTasks.length) {
+    if (staleLoopNotes.length) {
       const stmt = db.prepare("UPDATE notes SET open_loops='' WHERE id=?");
-      for (const n of staleTasks) stmt.run(n.id);
-      report.push(`✅ Cleared open_loops on ${staleTasks.length} stale task note(s) older than 30 days`);
-      fixed += staleTasks.length;
+      for (const n of staleLoopNotes) stmt.run(n.id);
+      report.push(`✅ Cleared open_loops on ${staleLoopNotes.length} note(s) older than ${STALE_DAYS} days (no reminder set)`);
+      fixed += staleLoopNotes.length;
     }
 
-    // ── 4. Flag stale pending notes (>24hrs) → brain-dump/processed ──────────
+    // ── 4. Rescue stale pending notes (>24hrs) → brain-dump ──────────────────
     const stalePending = db.prepare(
       "SELECT id FROM notes WHERE status='pending' AND created_at < datetime('now','-1 day')"
     ).all();
