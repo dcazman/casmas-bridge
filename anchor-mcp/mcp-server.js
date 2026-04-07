@@ -65,7 +65,7 @@ function sh(cmd, opts = {}) {
 const REBUILD_SERVICES = ['anchor'];
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.7.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.8.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -195,33 +195,24 @@ function createMcpServer(caller) {
   );
 
   server.tool('rebuild_service',
-    'Sync source from casmas-bridge repo and rebuild/restart a service. anchor = full compose rebuild. Others = docker restart.',
+    'Sync JS source files from casmas-bridge and restart the service. For anchor: copies routes/lib/server.js and restarts container (no image rebuild needed for JS changes).',
     { service: z.string().describe('Service name, e.g. "anchor", "gmr"') },
     async ({ service }) => {
       try {
         const prodPath = `${WAREHOUSE}/${service}`;
-        const hostProdPath = `${WAREHOUSE_HOST}/${service}`;
         const repoPath = `${REPO_PATH}/${service}`;
         let steps = [];
 
         if (REBUILD_SERVICES.includes(service)) {
-          // 1. Sync source files, protecting live DB and backup
-          await sh(`rsync -a --exclude='data/' --exclude='backup/' --exclude='.env' ${repoPath}/ ${prodPath}/`);
-          steps.push(`Synced source files`);
+          // Sync JS source only — exclude data, backup, .env, Dockerfile, package.json
+          // These are all Node.js files so a container restart picks them up
+          await sh(`rsync -a --exclude='data/' --exclude='backup/' --exclude='.env' --exclude='Dockerfile' --exclude='package.json' --exclude='package-lock.json' ${repoPath}/ ${prodPath}/`);
+          steps.push('Source files synced.');
 
-          // 2. Build image directly — avoids compose env var issues
-          const { stdout: buildOut } = await sh(
-            `docker build -t anchor-anchor ${hostProdPath} 2>&1`,
-            { timeout: 180000 }
-          );
-          const lastLines = buildOut.trim().split('\n').slice(-3).join(' | ');
-          steps.push(`Build: ${lastLines}`);
-
-          // 3. Recreate container with new image via compose
-          const composeFile = `${hostProdPath}/docker-compose.yml`;
-          const envFile = `${hostProdPath}/.env`;
-          await sh(`docker compose -f ${composeFile} --env-file ${envFile} up -d --no-build 2>&1`, { timeout: 30000 });
+          // Simple restart — Node re-requires all files on startup
+          await sh(`docker restart anchor`, { timeout: 30000 });
           steps.push('Container restarted.');
+          steps.push('Done — no image rebuild needed for JS-only changes.');
         } else {
           await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
@@ -229,7 +220,6 @@ function createMcpServer(caller) {
 
         return { content: [{ type: 'text', text: steps.join('\n') }] };
       } catch (err) {
-        // Return full error including stderr for debugging
         return { content: [{ type: 'text', text: `rebuild_service error: ${err.message}\n${err.stderr || ''}` }] };
       }
     }
