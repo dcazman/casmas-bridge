@@ -10,21 +10,46 @@ const { emailEnabled } = require('./bridge');
 const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
 
+// Render list-type note content as interactive checkboxes
+function renderListContent(text, noteId) {
+  const lines = (text || '').split('\n').filter(l => l.trim());
+  const items = lines.map((line, i) => {
+    const checked = /^\[x\]/i.test(line.trim());
+    const label = line.replace(/^\[.\]\s*/, '').trim();
+    const uid = 'chk-' + noteId + '-' + i;
+    return `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:4px">
+      <input type="checkbox" id="${uid}" ${checked?'checked':''} onchange="toggleListItem(${noteId},${i},this.checked)" style="margin-top:3px;accent-color:#22d3ee">
+      <span style="${checked?'text-decoration:line-through;color:#475569':''}">${esc(label)}</span>
+    </label>`;
+  }).join('');
+  return '<div class="list-items">' + items + '</div>';
+}
+
 function renderNote(n) {
   n = decryptNote(n);
   const color = typeColor(n.type), ip = n.status==='pending';
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
+  const isList   = n.type === 'list';
+  const isRemind = n.type === 'remind';
+  const remindBadge = isRemind && n.remind_at
+    ? '<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ' + new Date(n.remind_at).toLocaleString() + '</span>'
+    : '';
+  const formattedContent = isList
+    ? renderListContent(n.formatted || n.raw_input, n.id)
+    : '<div class="formatted" id="fmt-'+n.id+'">' + esc(n.formatted||n.raw_input) + '</div>';
+
   return `<div class="note${ip?' note-pending':''}" id="note-${n.id}">
     <div class="note-meta">
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
       ${ip?'<span class="pending-badge">⏳ unsynced</span>':''}
+      ${remindBadge}
       <span class="note-date" data-ts="${esc(n.created_at)}"></span>
       <span class="note-actions">
         <button class="btn-icon" onclick="startEdit(${n.id})">✏️</button>
         <button class="btn-icon btn-delete" onclick="deleteNote(${n.id})">🗑</button>
       </span>
     </div>
-    <div class="formatted" id="fmt-${n.id}">${esc(n.formatted||n.raw_input)}</div>
+    ${formattedContent}
     <div class="note-edit" id="edit-${n.id}" style="display:none">
       <textarea class="edit-ta" id="etxt-${n.id}">${esc(n.formatted||n.raw_input)}</textarea>
       <div style="display:flex;gap:8px;margin-top:6px">
@@ -68,7 +93,16 @@ router.get('/', (req, res) => {
   const yn=otd(ya), sn=otd(sa), mn=otd(ma);
   const hasOTD = yn.length||sn.length||mn.length;
 
-  const TG = [{l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},{l:'Personal',t:['personal','personal-task','personal-decision']},{l:'Home',t:['home','home-task','home-decision']},{l:'Kids',t:['kids','kids-task']},{l:'Health',t:['health','health-task']},{l:'Finance',t:['finance','finance-task']},{l:'Universal',t:['social','calendar','email','idea','pi','random','brain-dump']}];
+  const TG = [
+    {l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},
+    {l:'Personal',t:['personal','personal-task','personal-decision']},
+    {l:'Home',t:['home','home-task','home-decision']},
+    {l:'Kids',t:['kids','kids-task']},
+    {l:'Health',t:['health','health-task']},
+    {l:'Finance',t:['finance','finance-task']},
+    {l:'Universal',t:['social','calendar','email','idea','pi','random','brain-dump']},
+    {l:'Utility',t:['remind','list']}
+  ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
 
@@ -145,6 +179,7 @@ router.get('/', (req, res) => {
     .note-date{font-size:.78rem;color:#475569}
     .note-actions{margin-left:auto;display:flex;gap:2px}
     .formatted{white-space:pre-wrap;font-size:.95rem;line-height:1.7;color:#cbd5e1}
+    .list-items{font-size:.95rem;line-height:1.7;color:#cbd5e1}
     .note-edit{margin-top:8px}
     .edit-ta{width:100%;height:100px;background:#0d1117;color:#e2e8f0;border:1px solid #60a5fa;border-radius:8px;padding:10px;font-size:.92rem;font-family:inherit;resize:vertical}
     .note-tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
@@ -165,6 +200,10 @@ router.get('/', (req, res) => {
     .groom-report{margin-top:8px;padding:10px 12px;background:#0d1117;border:1px solid #c084fc30;border-radius:8px;font-size:.82rem;color:#c4b5fd;white-space:pre-wrap;display:none}
     .otd-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:14px}
     .empty{color:#334155;font-size:.9rem;padding:20px;text-align:center}
+    .cmd-ref{font-size:.82rem;color:#94a3b8;line-height:1.8}
+    .cmd-ref code{background:#0d1117;color:#22d3ee;padding:1px 6px;border-radius:4px;font-size:.8rem;font-family:monospace}
+    .cmd-ref .cmd-group{margin-bottom:10px}
+    .cmd-ref .cmd-label{color:#475569;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -256,6 +295,49 @@ router.get('/', (req, res) => {
           </div>
         </div>
       </div>
+
+      <div class="panel">
+        <h2 onclick="tp('refb','refc')"><span class="dot" style="background:#22d3ee"></span>📖 Command Reference<span class="chev" id="refc">▼</span></h2>
+        <div id="refb" class="collapsed">
+          <div class="cmd-ref">
+            <div class="cmd-group">
+              <div class="cmd-label">Categories (cat markup)</div>
+              <code>cat w</code> work &nbsp;|&nbsp; <code>cat wt</code> work-task &nbsp;|&nbsp; <code>cat wd</code> work-decision<br>
+              <code>cat p</code> personal &nbsp;|&nbsp; <code>cat pt</code> personal-task<br>
+              <code>cat ho</code> home &nbsp;|&nbsp; <code>cat ht</code> home-task<br>
+              <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
+              <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
+              <code>cat rem</code> remind &nbsp;|&nbsp; <code>cat ls</code> list
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Multi-cat (comma split)</div>
+              <code>cat w,at</code> → two notes: work + anchor-task<br>
+              <code>cat p,ht</code> → personal + home-task
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Reminders (type in Add Note, then Sync)</div>
+              <code>Remind pay bills Thursday at 11am</code><br>
+              <code>Remind call doctor next Monday 9am</code><br>
+              <code>Remind take out trash tomorrow</code>
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Lists (checkboxes in UI)</div>
+              <code>cat ls</code><br>
+              milk<br>
+              eggs<br>
+              bread
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Reminder commands (after sync)</div>
+              <code>done N</code> — mark reminder N complete<br>
+              <code>snooze N</code> — snooze 1 week<br>
+              <code>snooze N friday 3pm</code> — snooze to specific time<br>
+              <code>change N to call dentist thursday</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
       ${hasOTD?`<div class="panel">
         <h2><span class="dot" style="background:#fb923c"></span>🕰 On This Day</h2>
         ${yn.length?'<div class="otd-lbl">1 year ago</div>'+yn.map(renderNote).join(''):''}
@@ -297,7 +379,6 @@ router.get('/', (req, res) => {
     async function pullBridge(){
       const s=document.getElementById('bs');s.textContent='⏳ Syncing...';
       try{
-        // Always force-apply latest source files from casmas-bridge
         const r=await fetch('/pull-bridge?force=1',{method:'POST'});
         const d=await r.json();
         if(d.ok){
@@ -374,7 +455,7 @@ router.get('/', (req, res) => {
     document.getElementById('ci').addEventListener('keydown',e=>{if(e.key==='Enter')chat('haiku');});
     function isLocal(){const h=window.location.hostname;return h==='localhost'||h.startsWith('192.168.')||h.startsWith('10.')||h.startsWith('172.');}
     function tp(bid,cid){const b=document.getElementById(bid),c=document.getElementById(cid),col=b.classList.contains('collapsed');b.classList.toggle('collapsed',!col);c.classList.toggle('open',col);}
-    if(isLocal()){['sb','nb','cb'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('collapsed');});['sc','nc','cc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('open');});}
+    if(isLocal()){['sb','nb','cb','refb'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('collapsed');});['sc','nc','cc','refc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('open');});}
     async function reclassify(id,type){
       if(!type)return;const s=document.getElementById('rcs-'+id);s.textContent='...';
       try{
@@ -384,14 +465,14 @@ router.get('/', (req, res) => {
         else s.textContent='✗';
       }catch(e){s.textContent='✗';}
     }
-    function startEdit(id){document.getElementById('fmt-'+id).style.display='none';document.getElementById('edit-'+id).style.display='block';}
-    function cancelEdit(id){document.getElementById('fmt-'+id).style.display='block';document.getElementById('edit-'+id).style.display='none';}
+    function startEdit(id){document.getElementById('fmt-'+id)&&(document.getElementById('fmt-'+id).style.display='none');document.getElementById('edit-'+id).style.display='block';}
+    function cancelEdit(id){document.getElementById('fmt-'+id)&&(document.getElementById('fmt-'+id).style.display='block');document.getElementById('edit-'+id).style.display='none';}
     async function saveEdit(id){
       const c=document.getElementById('etxt-'+id).value.trim();if(!c)return;
       try{
         const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});
         const d=await r.json();
-        if(d.ok){const fmt=document.getElementById('fmt-'+id);fmt.textContent=c;fmt.style.display='block';document.getElementById('edit-'+id).style.display='none';const editBtn=document.querySelector('#note-'+id+' .btn-icon');if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}}
+        if(d.ok){const fmt=document.getElementById('fmt-'+id);if(fmt){fmt.textContent=c;fmt.style.display='block';}document.getElementById('edit-'+id).style.display='none';const editBtn=document.querySelector('#note-'+id+' .btn-icon');if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}}
         else alert('Save failed');
       }catch(e){alert('Save failed');}
     }
@@ -399,6 +480,27 @@ router.get('/', (req, res) => {
       if(!confirm('Delete this note? Cannot be undone.'))return;
       try{const r=await fetch('/notes/'+id,{method:'DELETE'});const d=await r.json();if(d.ok)document.getElementById('note-'+id).remove();else alert('Delete failed');}
       catch(e){alert('Delete failed');}
+    }
+    // Toggle list item checked state and persist to server
+    async function toggleListItem(noteId, lineIndex, checked){
+      try{
+        const fmtEl = document.getElementById('note-'+noteId)?.querySelector('.list-items');
+        if(!fmtEl) return;
+        const labels = fmtEl.querySelectorAll('label');
+        if(!labels[lineIndex]) return;
+        const span = labels[lineIndex].querySelector('span');
+        if(span) span.style.textDecoration = checked ? 'line-through' : '';
+        if(span) span.style.color = checked ? '#475569' : '';
+        // Fetch current note text, update [x]/[ ] markers, save
+        const r = await fetch('/notes/'+noteId);
+        const d = await r.json();
+        if(!d.ok) return;
+        const lines = (d.formatted || '').split('\n');
+        // Strip existing markers and reapply
+        const items = lines.filter(l => l.trim());
+        items[lineIndex] = (checked ? '[x] ' : '[ ] ') + items[lineIndex].replace(/^\[.\]\s*/,'');
+        await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\n')})});
+      } catch(e){ console.error('toggleListItem failed', e); }
     }
   </script></body></html>`);
 });

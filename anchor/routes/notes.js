@@ -51,6 +51,17 @@ router.post('/', upload.single('file'), async (req, res) => {
   } catch(e) { console.error(e); res.json({ ok: false, error: e.message }); }
 });
 
+// GET /notes/:id — return note content (used by list checkbox toggle)
+router.get('/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.json({ ok: false, error: 'Invalid id' });
+  try {
+    const row = db.prepare('SELECT * FROM notes WHERE id=?').get(id);
+    if (!row) return res.json({ ok: false, error: 'Not found' });
+    res.json({ ok: true, formatted: decrypt(row.formatted) || '', type: row.type });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 // DELETE /notes/:id
 router.delete('/:id', (req, res) => {
   const id = parseInt(req.params.id);
