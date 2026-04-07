@@ -9,6 +9,7 @@ services:
       - REPO_PATH=/repo/casmas-bridge
       - SSH_KEY_PATH=/root/.ssh/deploy_key
       - WAREHOUSE=/warehouse
+      - WAREHOUSE_HOST=/srv/mergerfs/warehouse
     volumes:
       - /srv/mergerfs/warehouse/casmas-bridge:/repo/casmas-bridge
       - /srv/mergerfs/warehouse:/warehouse
