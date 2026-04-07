@@ -65,7 +65,7 @@ function sh(cmd, opts = {}) {
 const REBUILD_SERVICES = ['anchor'];
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.6.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.7.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -205,20 +205,23 @@ function createMcpServer(caller) {
         let steps = [];
 
         if (REBUILD_SERVICES.includes(service)) {
-          // 1. Copy source files — exclude data/ and backup/ to avoid overwriting live DB
-          await sh(`rsync -a --exclude='data/' --exclude='backup/' ${repoPath}/ ${prodPath}/`);
-          steps.push(`Synced ${repoPath} → ${prodPath} (excluding data/ and backup/)`);
+          // 1. Sync source files, protecting live DB and backup
+          await sh(`rsync -a --exclude='data/' --exclude='backup/' --exclude='.env' ${repoPath}/ ${prodPath}/`);
+          steps.push(`Synced source files`);
 
-          // 2. Run compose with --env-file so ENCRYPTION_KEY etc are available
-          const composeFile = `${hostProdPath}/docker-compose.yml`;
-          const envFile = `${hostProdPath}/.env`;
-          const { stdout, stderr } = await sh(
-            `docker compose -f ${composeFile} --env-file ${envFile} up -d --build 2>&1`,
+          // 2. Build image directly — avoids compose env var issues
+          const { stdout: buildOut } = await sh(
+            `docker build -t anchor-anchor ${hostProdPath} 2>&1`,
             { timeout: 180000 }
           );
-          const out = (stdout || stderr || '').trim().split('\n').slice(-5).join(' | ');
-          steps.push(`Compose: ${out}`);
-          steps.push('Done.');
+          const lastLines = buildOut.trim().split('\n').slice(-3).join(' | ');
+          steps.push(`Build: ${lastLines}`);
+
+          // 3. Recreate container with new image via compose
+          const composeFile = `${hostProdPath}/docker-compose.yml`;
+          const envFile = `${hostProdPath}/.env`;
+          await sh(`docker compose -f ${composeFile} --env-file ${envFile} up -d --no-build 2>&1`, { timeout: 30000 });
+          steps.push('Container restarted.');
         } else {
           await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
@@ -226,7 +229,8 @@ function createMcpServer(caller) {
 
         return { content: [{ type: 'text', text: steps.join('\n') }] };
       } catch (err) {
-        return { content: [{ type: 'text', text: `rebuild_service error: ${err.message}` }] };
+        // Return full error including stderr for debugging
+        return { content: [{ type: 'text', text: `rebuild_service error: ${err.message}\n${err.stderr || ''}` }] };
       }
     }
   );
