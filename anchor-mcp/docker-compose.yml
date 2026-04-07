@@ -4,10 +4,9 @@ services:
     container_name: anchor-mcp
     restart: unless-stopped
     network_mode: host
+    env_file:
+      - /srv/mergerfs/warehouse/anchor-mcp/.env
     environment:
-      - ANCHOR_URL=http://localhost:7778
-      - REPO_PATH=/repo/casmas-bridge
-      - SSH_KEY_PATH=/root/.ssh/deploy_key
       - WAREHOUSE=/warehouse
       - WAREHOUSE_HOST=/srv/mergerfs/warehouse
     volumes:
