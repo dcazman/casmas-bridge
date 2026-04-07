@@ -35,7 +35,8 @@ const ALL_TYPES = [
   'finance','finance-task',
   'social','calendar','email','pi','idea','random','brain-dump',
   'anchor','anchor-task',
-  'employment','work-claude-handoff','system-summary'
+  'employment','work-claude-handoff','system-summary',
+  'remind','list'
 ];
 
 const WORK_TYPES = ['work','work-task','work-decision','work-idea','meeting','calendar','email'];
@@ -48,18 +49,38 @@ const CAT = {
   'h':'health','hat':'health-task',
   'f':'finance','ft':'finance-task',
   's':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump',
-  'a':'anchor','at':'anchor-task'
+  'a':'anchor','at':'anchor-task',
+  'rem':'remind','re':'remind','ls':'list','li':'list'
 };
 
+// parseCat: supports comma-separated types: "cat w,at" → two notes
 function parseCat(raw) {
   const lines = raw.split('\n'); const secs = []; let cur = null;
   for (const line of lines) {
     const m = line.match(/^cat\s+(\S+)/i);
-    if (m) { if(cur&&cur.lines.length) secs.push(cur); const k=m[1].toLowerCase(); cur={type:CAT[k]||(ALL_TYPES.includes(k)?k:'brain-dump'),lines:[]}; }
-    else if (cur && line.trim()) cur.lines.push(line);
+    if (m) {
+      if (cur && cur.lines.length) secs.push(cur);
+      // Comma-split: "cat w,at" → two sections
+      const keys = m[1].toLowerCase().split(',').map(k => k.trim()).filter(Boolean);
+      if (keys.length > 1) {
+        // Each key gets its own section; subsequent lines flow into the last one
+        for (let ki = 0; ki < keys.length; ki++) {
+          const t = CAT[keys[ki]] || (ALL_TYPES.includes(keys[ki]) ? keys[ki] : 'brain-dump');
+          cur = { type: t, lines: [] };
+          if (ki < keys.length - 1) secs.push(cur); // push empty placeholder for all but last
+        }
+        // cur is now the last type's section — lines accumulate there
+      } else {
+        const k = keys[0];
+        cur = { type: CAT[k] || (ALL_TYPES.includes(k) ? k : 'brain-dump'), lines: [] };
+      }
+    } else if (cur && line.trim()) {
+      cur.lines.push(line);
+    }
   }
   if (cur && cur.lines.length) secs.push(cur);
-  return secs;
+  // Remove empty placeholder sections (from comma-split with no lines)
+  return secs.filter(s => s.lines.length > 0);
 }
 
 const COLORS = {
@@ -72,7 +93,8 @@ const COLORS = {
   'finance':'#4ade80','finance-task':'#16a34a',
   'social':'#86efac','calendar':'#c084fc','email':'#67e8f9','idea':'#a78bfa','pi':'#fcd34d','random':'#94a3b8',
   'anchor':'#34d399','anchor-task':'#10b981',
-  'employment':'#94a3b8','work-claude-handoff':'#94a3b8','system-summary':'#94a3b8'
+  'employment':'#94a3b8','work-claude-handoff':'#94a3b8','system-summary':'#94a3b8',
+  'remind':'#f472b6','list':'#22d3ee'
 };
 function typeColor(t) { return COLORS[t] || '#60a5fa'; }
 
