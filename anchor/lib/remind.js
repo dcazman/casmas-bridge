@@ -4,6 +4,7 @@ const { db, decryptNote, getPending } = require('./db');
 const { encrypt, decrypt }            = require('./crypto');
 const { sendEmail }                   = require('./email');
 const { pullBridge, pushSessionMd }   = require('./session');
+const { applyAnchorUpdate }           = require('./deploy');
 
 // ── Reminder DB helpers ───────────────────────────────────────────────────────
 // These run safely even before the migration has added the remind_* columns.
@@ -285,6 +286,9 @@ function startScheduler() {
     try {
       const { subject, body } = buildDigestEmail();
       await sendEmail(subject, body);
+      // Mark any reminders that were due today as sent so 15-min cron doesn't re-fire them
+      const due = getDueReminders();
+      for (const n of due) markReminderSent(n.id);
       console.log('[remind] digest email sent');
     } catch (e) {
       console.error('[remind] digest email failed:', e.message);
@@ -296,24 +300,48 @@ function startScheduler() {
     }
   }, { timezone: 'America/New_York' });
 
-  // Every 5 minutes — git pull + notify on source changes
-  cron.schedule('*/5 * * * *', async () => {
+  // Every 3 hours — git pull + auto-apply anchor source changes
+  cron.schedule('0 */3 * * *', async () => {
     try {
       const pull = pullBridge();
       if (pull.ok && pull.anchorFiles && pull.anchorFiles.length) {
         console.log('[remind] anchor source files changed in git:', pull.anchorFiles.join(', '));
-        const fileList = pull.anchorFiles.map(f => '  • ' + f).join('\n');
+        const apply = applyAnchorUpdate(pull.anchorFiles);
+        console.log('[remind] auto-apply:', apply.log.join('; '));
+        const fileList  = pull.anchorFiles.map(f => '  • ' + f).join('\n');
+        const applyLog  = apply.log.map(l => '  ' + l).join('\n');
         await sendEmail(
-          '⚓ Anchor — Source Files Updated',
-          `New code pulled into casmas-bridge.\n\nChanged files:\n${fileList}\n\nTo apply on OMV:\n  cd /srv/mergerfs/warehouse/anchor\n  docker compose restart anchor\n\nFull rebuild if Dockerfile/package.json changed:\n  docker compose down && docker compose build --no-cache && docker compose up -d`
+          '⚓ Anchor — Source Updated & Applied',
+          `New code pulled and applied.\n\nChanged files:\n${fileList}\n\nApply log:\n${applyLog}`
         );
       }
     } catch (e) {
-      console.error('[remind] 5min cron error:', e.message);
+      console.error('[remind] 3hr cron error:', e.message);
     }
   });
 
-  console.log('[remind] scheduler ready — 7AM digest, 5min git pull');
+  // Every 15 minutes — fire individual due reminders
+  cron.schedule('*/15 * * * *', async () => {
+    const due = getDueReminders();
+    if (!due.length) return;
+    console.log(`[remind] ${due.length} due reminder(s) firing`);
+    for (const n of due) {
+      const num = n.remind_num ? `${n.remind_num}) ` : '';
+      const preview = (n.formatted || n.raw_input || '').substring(0, 60);
+      const subject = `⏰ Anchor Reminder — ${preview}`;
+      const ref = n.remind_num || n.id;
+      const body = `${num}${n.formatted || n.raw_input}\n\nCommands (type in Add Note → Sync Now):\n  done ${ref}  |  snooze ${ref}  |  snooze ${ref} friday 10am\n\nanchor.thecasmas.com`;
+      try {
+        await sendEmail(subject, body);
+        markReminderSent(n.id);
+        console.log(`[remind] fired reminder id=${n.id} num=${n.remind_num}`);
+      } catch (e) {
+        console.error('[remind] reminder email failed:', e.message);
+      }
+    }
+  });
+
+  console.log('[remind] scheduler ready — 7AM digest, 15min reminders, 3hr git pull+apply');
 }
 
 module.exports = { startScheduler, processCommands, isReminderCommand, nextRemindNum, parseReminderDate };

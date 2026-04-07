@@ -2,9 +2,32 @@
 const express = require('express');
 const multer  = require('multer');
 const router  = express.Router();
-const { db, getPending } = require('../lib/db');
+const { db, getPending, getApiKey } = require('../lib/db');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { fetchUrl, extractText, parseCat } = require('../lib/helpers');
+
+const IMAGE_RE = /\.(jpe?g|png|gif|webp)$/i;
+
+async function extractImage(file) {
+  const key = getApiKey();
+  const base64 = file.buffer.toString('base64');
+  const mediaType = /^image\//i.test(file.mimetype) ? file.mimetype : 'image/jpeg';
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: "Extract and transcribe all text from this image. If it's a screenshot, note, whiteboard, or document, reproduce the content faithfully. If it's a photo or diagram with no readable text, describe what you see concisely." }
+      ]}]
+    })
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error('Vision API error: ' + (data.error?.message || resp.status));
+  return data.content?.[0]?.text || '[No text found in image]';
+}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10*1024*1024 } });
 
@@ -13,8 +36,9 @@ router.post('/', upload.single('file'), async (req, res) => {
   try {
     let raw = (req.body.raw||'').trim();
     if (req.file) {
-      const e = await extractText(req.file);
-      const fn = '[File: '+req.file.originalname+']\n'+e.trim();
+      const isImg = /^image\//i.test(req.file.mimetype) || IMAGE_RE.test(req.file.originalname);
+      const e = isImg ? await extractImage(req.file) : await extractText(req.file);
+      const fn = (isImg ? '[Image: ' : '[File: ') + req.file.originalname + ']\n' + e.trim();
       raw = raw ? raw+'\n\n'+fn : fn;
     }
     const um = raw.match(/^(https?:\/\/\S+)$/);

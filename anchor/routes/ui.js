@@ -179,9 +179,9 @@ router.get('/', (req, res) => {
     <div style="display:flex;flex-direction:column;gap:20px">
       <div class="panel">
         <h2><span class="dot"></span>Add Note</h2>
-        <textarea id="inp" placeholder="Brain dump here. Just type. Paste a URL to ingest it."></textarea>
+        <textarea id="inp" placeholder="Brain dump here. Type, paste a URL, or paste/drag an image."></textarea>
         <div class="file-row">
-          <label class="file-lbl">📎 Attach<input type="file" id="fi" accept=".txt,.md,.csv,.pdf,.docx,.html,.htm" onchange="fileSelected(this)" style="display:none"></label>
+          <label class="file-lbl">📎 Attach<input type="file" id="fi" accept=".txt,.md,.csv,.pdf,.docx,.html,.htm,.jpg,.jpeg,.png,.gif,.webp" onchange="fileSelected(this)" style="display:none"></label>
           <span class="file-name" id="fn"></span>
           <button class="btn-cf" id="cfi" onclick="clearFile()" style="display:none">✕</button>
         </div>
@@ -400,6 +400,23 @@ router.get('/', (req, res) => {
       try{const r=await fetch('/notes/'+id,{method:'DELETE'});const d=await r.json();if(d.ok)document.getElementById('note-'+id).remove();else alert('Delete failed');}
       catch(e){alert('Delete failed');}
     }
+    document.getElementById('inp').addEventListener('paste',async function(e){
+      const items=(e.clipboardData||window.clipboardData||{}).items||[];
+      for(const item of items){
+        if(item.type.startsWith('image/')){
+          e.preventDefault();
+          const file=item.getAsFile();if(!file)continue;
+          const ns=document.getElementById('ns');ns.textContent='📷 Reading image...';
+          const fd=new FormData();fd.append('file',file,'pasted-image.png');
+          try{
+            const r=await fetch('/note',{method:'POST',body:fd});const d=await r.json();
+            if(d.ok){ns.textContent='✓ Image saved';document.getElementById('pc').textContent=d.pendingCount;if(d.pendingCount>0)document.getElementById('syncBtn').disabled=false;setTimeout(()=>{ns.textContent='';},2000);setTimeout(()=>location.reload(),600);}
+            else{ns.textContent='✗ '+(d.error||'Failed');}
+          }catch(err){ns.textContent='✗ Failed';}
+          return;
+        }
+      }
+    });
   </script></body></html>`);
 });
 
