@@ -12,7 +12,7 @@ const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer
 
 // Render list-type note content as interactive checkboxes
 function renderListContent(text, noteId) {
-  const lines = (text || '').split('\n').filter(l => l.trim());
+  const lines = (text || '').split('\\n').filter(l => l.trim());
   const items = lines.map((line, i) => {
     const checked = /^\[x\]/i.test(line.trim());
     const label = line.replace(/^\[.\]\s*/, '').trim();
@@ -512,11 +512,11 @@ router.get('/', (req, res) => {
         const r = await fetch('/notes/'+noteId);
         const d = await r.json();
         if(!d.ok) return;
-        const lines = (d.formatted || '').split('\n');
+        const lines = (d.formatted || '').split('\\n');
         // Strip existing markers and reapply
         const items = lines.filter(l => l.trim());
         items[lineIndex] = (checked ? '[x] ' : '[ ] ') + items[lineIndex].replace(/^\[.\]\s*/,'');
-        await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\n')})});
+        await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\\n')})});
       } catch(e){ console.error('toggleListItem failed', e); }
     }
   </script></body></html>`);
