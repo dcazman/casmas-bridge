@@ -12,7 +12,7 @@ const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer
 
 // Render list-type note content as interactive checkboxes
 function renderListContent(text, noteId) {
-  const lines = (text || '').split('\\n').filter(l => l.trim());
+  const lines = (text || '').split('\n').filter(l => l.trim());
   const items = lines.map((line, i) => {
     const checked = /^\[x\]/i.test(line.trim());
     const label = line.replace(/^\[.\]\s*/, '').trim();

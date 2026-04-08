@@ -5,6 +5,7 @@ const router  = express.Router();
 const { db, getPending, getApiKey } = require('../lib/db');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { fetchUrl, extractText, parseCat } = require('../lib/helpers');
+const { parseReminderDate, nextRemindNum } = require('../lib/remind');
 
 const IMAGE_RE = /\.(jpe?g|png|gif|webp)$/i;
 
@@ -44,6 +45,32 @@ router.post('/', upload.single('file'), async (req, res) => {
     const um = raw.match(/^(https?:\/\/\S+)$/);
     if (um) raw = await fetchUrl(um[1]);
     if (!raw) return res.json({ ok: false, error: 'No input' });
+
+    // remind <thing>, <date>  or  remind <thing> <date tokens>
+    const remindMatch = raw.match(/^remind\s+(.+)$/i);
+    if (remindMatch) {
+      const body = remindMatch[1].trim();
+      let thing, dateStr;
+      if (body.includes(',')) {
+        const ci = body.indexOf(',');
+        thing = body.slice(0, ci).trim();
+        dateStr = body.slice(ci + 1).trim();
+      } else {
+        const dateM = body.match(/((?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}(?::\d{2})?\s*(?:am|pm)|tomorrow|\d+\s*(?:week|day)s?).*)$/i);
+        if (dateM && dateM.index > 0) {
+          thing = body.slice(0, dateM.index).trim();
+          dateStr = dateM[1];
+        } else {
+          thing = body;
+          dateStr = '';
+        }
+      }
+      const remindAt = parseReminderDate(dateStr).toISOString();
+      const num = nextRemindNum();
+      const enc = encrypt(thing);
+      db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num) VALUES ('remind','processed',?,?,?,?)").run(enc, enc, remindAt, num);
+      return res.json({ ok: true, pendingCount: getPending().count });
+    }
 
     const secs = parseCat(raw);
     if (secs.length > 0) {
