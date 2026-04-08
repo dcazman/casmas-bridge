@@ -84,13 +84,19 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.json({ ok: true, pendingCount: getPending().count });
     }
 
-    const remindMatch = raw.match(/^(?:r(?:em(?:ind(?:er)?)?)?|todo)\s+(.+)$/i);
+    const remindMatch = raw.match(/^(?:r(?:em(?:ind(?:er)?)?)?|todo)\s+(.+)$/im);
     if (remindMatch) {
-      // Single-line: "remind thing, date"
+      // Single-line with optional extra detail below:
+      //   remind dan taxes tomorrow 6pm
+      //   other detail here         ← appended to thing
+      const allLines = raw.split('\n');
+      const remindLineIdx = allLines.findIndex(l => /^(?:r(?:em(?:ind(?:er)?)?)?|todo)\s+/i.test(l.trim()));
+      const extraLines = allLines.slice(remindLineIdx + 1).filter(l => l.trim());
       const { thing, dateStr } = parseRemindLine(remindMatch[1].trim());
+      const fullThing = extraLines.length ? thing + '\n' + extraLines.join('\n') : thing;
       const remindAt = parseReminderDate(dateStr).toISOString();
       const num = nextRemindNum();
-      const enc = encrypt(thing);
+      const enc = encrypt(fullThing);
       db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num) VALUES ('remind','processed',?,?,?,?)").run(enc, enc, remindAt, num);
       return res.json({ ok: true, pendingCount: getPending().count });
     }
