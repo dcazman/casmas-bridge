@@ -36,7 +36,7 @@ const ALL_TYPES = [
   'social','calendar','email','pi','idea','random','brain-dump',
   'anchor','anchor-task',
   'employment','work-claude-handoff','system-summary',
-  'remind','list'
+  'remind','list','summary'
 ];
 
 const WORK_TYPES = ['work','work-task','work-decision','work-idea','meeting','calendar','email'];
@@ -48,7 +48,8 @@ const CAT = {
   'k':'kids','kt':'kids-task',
   'h':'health','hat':'health-task',
   'f':'finance','ft':'finance-task',
-  's':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump',
+  'so':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump',
+  's':'summary','sum':'summary','summ':'summary',
   'a':'anchor','at':'anchor-task',
   'rem':'remind','re':'remind','ls':'list','li':'list'
 };
@@ -91,7 +92,7 @@ const COLORS = {
   'kids':'#fde68a','kids-task':'#fbbf24',
   'health':'#f87171','health-task':'#ef4444',
   'finance':'#4ade80','finance-task':'#16a34a',
-  'social':'#86efac','calendar':'#c084fc','email':'#67e8f9','idea':'#a78bfa','pi':'#fcd34d','random':'#94a3b8',
+  'social':'#86efac','summary':'#fbbf24','calendar':'#c084fc','email':'#67e8f9','idea':'#a78bfa','pi':'#fcd34d','random':'#94a3b8',
   'anchor':'#34d399','anchor-task':'#10b981',
   'employment':'#94a3b8','work-claude-handoff':'#94a3b8','system-summary':'#94a3b8',
   'remind':'#f472b6','list':'#22d3ee'

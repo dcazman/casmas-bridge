@@ -101,7 +101,7 @@ router.get('/', (req, res) => {
     {l:'Health',t:['health','health-task']},
     {l:'Finance',t:['finance','finance-task']},
     {l:'Universal',t:['social','calendar','email','idea','pi','random','brain-dump']},
-    {l:'Utility',t:['remind','list']}
+    {l:'Utility',t:['remind','list','summary']}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
@@ -309,7 +309,8 @@ router.get('/', (req, res) => {
               <code>cat ho</code> home &nbsp;|&nbsp; <code>cat ht</code> home-task<br>
               <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
               <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
-              <code>cat rem</code> remind &nbsp;|&nbsp; <code>cat ls</code> list
+              <code>cat so</code> social &nbsp;|&nbsp; <code>cat rem</code> remind &nbsp;|&nbsp; <code>cat ls</code> list<br>
+              <code>cat s</code> summary &nbsp;|&nbsp; <code>cat sum</code> summary &nbsp;|&nbsp; <code>cat summ</code> summary
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Multi-cat (comma split)</div>
