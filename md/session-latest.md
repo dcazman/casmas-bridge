@@ -1,9 +1,8 @@
 # Anchor — Session Context
-**Generated:** 4/8/2026, 11:16:47 AM
+**Generated:** 4/8/2026, 5:09:30 PM
 **Pending notes:** 0 | **Last sync:** 4/7/2026, 10:44:27 PM
 
 ## 🔔 Active Reminders
-3) Cat med — due 4/8/2026, 3:00:00 PM
 2) pay bills — due 4/9/2026, 11:00:00 AM
 
 ## 💼 Recent Work Notes (7 days)
