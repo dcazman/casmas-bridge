@@ -318,9 +318,10 @@ router.get('/', (req, res) => {
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders (direct — no sync needed)</div>
-              <code>remind</code> or <code>r</code><br>
+              <code>remind</code> or <code>r</code> or <code>todo</code><br>
               pay bills, thursday 11am<br>
-              call doctor, next monday 9am
+              call doctor, next monday 9am<br>
+              doug to drink (no date = +7 days 11am)
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Lists (checkboxes in UI)</div>

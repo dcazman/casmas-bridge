@@ -55,7 +55,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         thing = body.slice(0, ci).trim();
         dateStr = body.slice(ci + 1).trim();
       } else {
-        const dateM = body.match(/((?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}(?::\d{2})?\s*(?:am|pm)|tomorrow|\d+\s*(?:week|day)s?).*)$/i);
+        const dateM = body.match(/((?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}(?::\d{2})?\s*(?:am|pm)|tom(?:orrow)?|\d+\s*(?:week|day)s?).*)$/i);
         if (dateM && dateM.index > 0) {
           thing = body.slice(0, dateM.index).trim();
           dateStr = dateM[1];
@@ -67,10 +67,10 @@ router.post('/', upload.single('file'), async (req, res) => {
       return { thing, dateStr };
     }
 
-    if (/^r(?:emind)?\s*$/im.test(raw)) {
-      // Multi-line block: "remind\nthing, date\nthing2, date2" (also accepts "r")
+    if (/^(?:r(?:emind)?|todo)\s*$/im.test(raw)) {
+      // Multi-line block: "remind\nthing, date\nthing2, date2" (also accepts "r", "todo")
       const lines = raw.split('\n');
-      const startIdx = lines.findIndex(l => /^r(?:emind)?\s*$/i.test(l.trim()));
+      const startIdx = lines.findIndex(l => /^(?:r(?:emind)?|todo)\s*$/i.test(l.trim()));
       const remindLines = lines.slice(startIdx + 1).filter(l => l.trim());
       for (const line of remindLines) {
         const { thing, dateStr } = parseRemindLine(line.trim());
@@ -83,7 +83,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.json({ ok: true, pendingCount: getPending().count });
     }
 
-    const remindMatch = raw.match(/^r(?:emind)?\s+(.+)$/i);
+    const remindMatch = raw.match(/^(?:r(?:emind)?|todo)\s+(.+)$/i);
     if (remindMatch) {
       // Single-line: "remind thing, date"
       const { thing, dateStr } = parseRemindLine(remindMatch[1].trim());

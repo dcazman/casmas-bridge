@@ -48,15 +48,17 @@ function nextRemindNum() {
 // ── Date parser ───────────────────────────────────────────────────────────────
 // Parses human-ish time strings into a Date.
 // Handles: "friday", "10am", "friday 10am", "jan 5", "jan 5 10pm",
-//          "2 weeks", "tomorrow", default (1 week).
+//          "2 weeks", "tomorrow"/"tom", default (7 days at 11am).
 
 function parseReminderDate(str) {
   const s   = (str || '').trim().toLowerCase();
   const now = new Date();
+  const DH  = 11; // default hour (11am) when no time specified
 
   if (!s) {
     const d = new Date(now);
     d.setDate(d.getDate() + 7);
+    d.setHours(DH, 0, 0, 0);
     return d;
   }
 
@@ -67,13 +69,7 @@ function parseReminderDate(str) {
     const n = parseInt(relM[1]);
     if (relM[2] === 'week') d.setDate(d.getDate() + n * 7);
     else d.setDate(d.getDate() + n);
-    return d;
-  }
-
-  // "tomorrow"
-  if (s === 'tomorrow') {
-    const d = new Date(now);
-    d.setDate(d.getDate() + 1);
+    d.setHours(DH, 0, 0, 0);
     return d;
   }
 
@@ -86,6 +82,15 @@ function parseReminderDate(str) {
     if (timeM[3] === 'pm' && hour < 12) hour += 12;
     if (timeM[3] === 'am' && hour === 12) hour = 0;
   }
+  const h = hour !== null ? hour : DH;
+
+  // "tomorrow" or "tom"
+  if (/\btom(?:orrow)?\b/.test(s)) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    d.setHours(h, min, 0, 0);
+    return d;
+  }
 
   // Day of week
   const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
@@ -95,7 +100,7 @@ function parseReminderDate(str) {
     let diff = dayM - d.getDay();
     if (diff <= 0) diff += 7;
     d.setDate(d.getDate() + diff);
-    if (hour !== null) { d.setHours(hour, min, 0, 0); }
+    d.setHours(h, min, 0, 0);
     return d;
   }
 
@@ -107,7 +112,7 @@ function parseReminderDate(str) {
     const day  = numM ? parseInt(numM[1]) : 1;
     const d    = new Date(now.getFullYear(), moM, day);
     if (d < now) d.setFullYear(d.getFullYear() + 1);
-    if (hour !== null) { d.setHours(hour, min, 0, 0); }
+    d.setHours(h, min, 0, 0);
     return d;
   }
 
@@ -119,9 +124,10 @@ function parseReminderDate(str) {
     return d;
   }
 
-  // Default: 1 week from now
+  // Default: 7 days from now at 11am
   const d = new Date(now);
   d.setDate(d.getDate() + 7);
+  d.setHours(DH, 0, 0, 0);
   return d;
 }
 
