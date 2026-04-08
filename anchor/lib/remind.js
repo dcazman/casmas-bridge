@@ -45,6 +45,29 @@ function nextRemindNum() {
   } catch { return null; }
 }
 
+// ── Remind line parser ────────────────────────────────────────────────────────
+// Splits "thing [, date]" or "thing date" into { thing, dateStr }.
+// Used by notes.js (inline remind) and server.js (reclassify to remind).
+
+function parseRemindLine(body) {
+  let thing, dateStr;
+  if (body.includes(',')) {
+    const ci = body.indexOf(',');
+    thing   = body.slice(0, ci).trim();
+    dateStr = body.slice(ci + 1).trim();
+  } else {
+    const dateM = body.match(/((?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}(?::\d{2})?\s*(?:am|pm)|tom(?:orrow)?|\d+\s*(?:week|day)s?).*)$/i);
+    if (dateM && dateM.index > 0) {
+      thing   = body.slice(0, dateM.index).trim();
+      dateStr = dateM[1];
+    } else {
+      thing   = body;
+      dateStr = '';
+    }
+  }
+  return { thing, dateStr };
+}
+
 // ── Date parser ───────────────────────────────────────────────────────────────
 // Parses human-ish time strings into a Date.
 // Handles: "friday", "10am", "friday 10am", "jan 5", "jan 5 10pm",
@@ -350,4 +373,4 @@ function startScheduler() {
   console.log('[remind] scheduler ready — 7AM digest, 15min reminders, 3hr git pull+apply');
 }
 
-module.exports = { startScheduler, processCommands, isReminderCommand, nextRemindNum, parseReminderDate };
+module.exports = { startScheduler, processCommands, isReminderCommand, nextRemindNum, parseReminderDate, parseRemindLine };

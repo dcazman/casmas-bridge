@@ -49,25 +49,6 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     // remind block — "remind" on its own line, then each subsequent line is a reminder
     // Also supports single-line: "remind thing, date"
-    function parseRemindLine(body) {
-      let thing, dateStr;
-      if (body.includes(',')) {
-        const ci = body.indexOf(',');
-        thing = body.slice(0, ci).trim();
-        dateStr = body.slice(ci + 1).trim();
-      } else {
-        const dateM = body.match(/((?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}(?::\d{2})?\s*(?:am|pm)|tom(?:orrow)?|\d+\s*(?:week|day)s?).*)$/i);
-        if (dateM && dateM.index > 0) {
-          thing = body.slice(0, dateM.index).trim();
-          dateStr = dateM[1];
-        } else {
-          thing = body;
-          dateStr = '';
-        }
-      }
-      return { thing, dateStr };
-    }
-
     if (/^(?:r(?:em(?:ind(?:er)?)?)?|todo)\s*$/im.test(raw)) {
       // Multi-line block: "remind\nthing, date\nthing2, date2" (also accepts "r", "todo")
       const lines = raw.split('\n');
