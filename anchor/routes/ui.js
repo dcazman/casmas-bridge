@@ -318,7 +318,7 @@ router.get('/', (req, res) => {
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders (direct — no sync needed)</div>
-              <code>remind</code><br>
+              <code>remind</code> or <code>r</code><br>
               pay bills, thursday 11am<br>
               call doctor, next monday 9am
             </div>

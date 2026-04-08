@@ -67,10 +67,10 @@ router.post('/', upload.single('file'), async (req, res) => {
       return { thing, dateStr };
     }
 
-    if (/^remind\s*$/im.test(raw)) {
-      // Multi-line block: "remind\nthing, date\nthing2, date2"
+    if (/^r(?:emind)?\s*$/im.test(raw)) {
+      // Multi-line block: "remind\nthing, date\nthing2, date2" (also accepts "r")
       const lines = raw.split('\n');
-      const startIdx = lines.findIndex(l => /^remind\s*$/i.test(l.trim()));
+      const startIdx = lines.findIndex(l => /^r(?:emind)?\s*$/i.test(l.trim()));
       const remindLines = lines.slice(startIdx + 1).filter(l => l.trim());
       for (const line of remindLines) {
         const { thing, dateStr } = parseRemindLine(line.trim());
@@ -83,7 +83,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.json({ ok: true, pendingCount: getPending().count });
     }
 
-    const remindMatch = raw.match(/^remind\s+(.+)$/i);
+    const remindMatch = raw.match(/^r(?:emind)?\s+(.+)$/i);
     if (remindMatch) {
       // Single-line: "remind thing, date"
       const { thing, dateStr } = parseRemindLine(remindMatch[1].trim());
