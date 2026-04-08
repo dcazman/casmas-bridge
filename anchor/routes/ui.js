@@ -325,7 +325,8 @@ router.get('/', (req, res) => {
             <div class="cmd-group">
               <div class="cmd-label">Lists (checkboxes in UI)</div>
               <code>cat ls</code><br>
-              milk, eggs, cat food, bread
+              milk, eggs, butter<br>
+              <span style="font-size:.75rem;color:#475569">or one item per line — both work</span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminder commands (after sync)</div>

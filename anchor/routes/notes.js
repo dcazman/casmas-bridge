@@ -100,6 +100,18 @@ router.post('/', upload.single('file'), async (req, res) => {
       let inserted = 0;
       db.transaction(s => {
         for (const sec of s) {
+          // For list notes, expand comma-separated lines into individual items
+          if (sec.type === 'list') {
+            const expanded = [];
+            for (const line of sec.lines) {
+              if (line.trim() && !line.trim().match(/^\[.\]/) && line.includes(',')) {
+                expanded.push(...line.split(',').map(l => l.trim()).filter(Boolean));
+              } else {
+                expanded.push(line);
+              }
+            }
+            sec.lines = expanded;
+          }
           const t = sec.lines.join('\n').trim();
           if (!t) continue;
           // Dedup: skip if identical formatted content already exists
