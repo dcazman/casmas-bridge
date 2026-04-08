@@ -51,7 +51,8 @@ const CAT = {
   'so':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump',
   's':'summary','sum':'summary','summ':'summary',
   'a':'anchor','at':'anchor-task',
-  'rem':'remind','re':'remind','ls':'list','li':'list'
+  'rem':'remind','re':'remind','ls':'list','li':'list',
+  'emp':'employment'
 };
 
 // parseCat: supports comma-separated types: "cat w,at" → two notes

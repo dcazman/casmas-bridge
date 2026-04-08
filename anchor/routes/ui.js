@@ -310,7 +310,8 @@ router.get('/', (req, res) => {
               <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
               <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
               <code>cat so</code> social &nbsp;|&nbsp; <code>cat rem</code> remind &nbsp;|&nbsp; <code>cat ls</code> list<br>
-              <code>cat s</code> summary &nbsp;|&nbsp; <code>cat sum</code> summary &nbsp;|&nbsp; <code>cat summ</code> summary
+              <code>cat s</code> summary &nbsp;|&nbsp; <code>cat sum</code> summary &nbsp;|&nbsp; <code>cat summ</code> summary<br>
+              <code>cat emp</code> employment
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Multi-cat (comma split)</div>
