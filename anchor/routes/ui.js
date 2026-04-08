@@ -11,18 +11,30 @@ const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
 
 // Render list-type note content as interactive checkboxes
+// First line with no [x]/[ ] prefix is treated as a label/title (not a checkbox)
 function renderListContent(text, noteId) {
   const lines = (text || '').split('\n').filter(l => l.trim());
-  const items = lines.map((line, i) => {
+  if (!lines.length) return '<div class="list-items"></div>';
+
+  const firstIsLabel = lines.length > 1 && !/^\[.\]/i.test(lines[0].trim());
+  let html = '';
+
+  if (firstIsLabel) {
+    html += `<div style="font-weight:600;color:#22d3ee;margin-bottom:8px;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">${esc(lines[0].trim())}</div>`;
+  }
+
+  const startIdx = firstIsLabel ? 1 : 0;
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i];
     const checked = /^\[x\]/i.test(line.trim());
     const label = line.replace(/^\[.\]\s*/, '').trim();
     const uid = 'chk-' + noteId + '-' + i;
-    return `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:4px">
+    html += `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:4px">
       <input type="checkbox" id="${uid}" ${checked?'checked':''} onchange="toggleListItem(${noteId},${i},this.checked)" style="margin-top:3px;accent-color:#22d3ee">
       <span style="${checked?'text-decoration:line-through;color:#475569':''}">${esc(label)}</span>
     </label>`;
-  }).join('');
-  return '<div class="list-items">' + items + '</div>';
+  }
+  return '<div class="list-items">' + html + '</div>';
 }
 
 function renderNote(n) {
@@ -33,17 +45,18 @@ function renderNote(n) {
   const isRemind = n.type === 'remind';
   const remindBadge = isRemind && n.remind_at
     ? '<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ' + new Date(n.remind_at).toLocaleString() + '</span>'
-    : '';
+    : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
   const formattedContent = isList
     ? renderListContent(n.formatted || n.raw_input, n.id)
     : '<div class="formatted" id="fmt-'+n.id+'">' + esc(n.formatted||n.raw_input) + '</div>';
+  const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
 
   return `<div class="note${ip?' note-pending':''}" id="note-${n.id}">
     <div class="note-meta">
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
       ${ip?'<span class="pending-badge">⏳ unsynced</span>':''}
       ${remindBadge}
-      <span class="note-date" data-ts="${esc(n.created_at)}"></span>
+      <span class="note-date" data-ts="${esc(dateTs)}"></span>
       <span class="note-actions">
         <button class="btn-icon" onclick="startEdit(${n.id})">✏️</button>
         <button class="btn-icon btn-delete" onclick="deleteNote(${n.id})">🗑</button>
@@ -519,11 +532,10 @@ router.get('/', (req, res) => {
     // Toggle list item checked state and persist to server
     async function toggleListItem(noteId, lineIndex, checked){
       try{
-        const fmtEl = document.getElementById('note-'+noteId)?.querySelector('.list-items');
-        if(!fmtEl) return;
-        const labels = fmtEl.querySelectorAll('label');
-        if(!labels[lineIndex]) return;
-        const span = labels[lineIndex].querySelector('span');
+        // Find by checkbox ID (lineIndex = actual text line index, not DOM position)
+        const chkEl = document.getElementById('chk-'+noteId+'-'+lineIndex);
+        if(!chkEl) return;
+        const span = chkEl.parentElement?.querySelector('span');
         if(span) span.style.textDecoration = checked ? 'line-through' : '';
         if(span) span.style.color = checked ? '#475569' : '';
         // Fetch current note text, update [x]/[ ] markers, save

@@ -5,7 +5,8 @@ const router  = express.Router();
 const { db, getPending, getApiKey } = require('../lib/db');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { fetchUrl, extractText, parseCat } = require('../lib/helpers');
-const { parseReminderDate, nextRemindNum } = require('../lib/remind');
+const { parseReminderDate, parseRemindLine, nextRemindNum } = require('../lib/remind');
+const { decryptNote } = require('../lib/db');
 
 const IMAGE_RE = /\.(jpe?g|png|gif|webp)$/i;
 
@@ -170,8 +171,18 @@ router.put('/:id', (req, res) => {
       // Content edit only — also clear review status
       db.prepare("UPDATE notes SET formatted=?, status='processed' WHERE id=?").run(encrypt(formatted), id);
     } else if (type && ALL_TYPES.includes(type)) {
-      // Reclassify only
-      db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
+      if (type === 'remind') {
+        // Reclassify to remind — parse remind_at from existing content
+        const note = decryptNote(db.prepare('SELECT * FROM notes WHERE id=?').get(id));
+        const content = note ? (note.formatted || note.raw_input || '') : '';
+        const firstLine = content.split('\n')[0].trim();
+        const { dateStr } = parseRemindLine(firstLine);
+        const remindAt = parseReminderDate(dateStr).toISOString();
+        const num = nextRemindNum();
+        db.prepare("UPDATE notes SET type=?, status='processed', remind_at=?, remind_num=? WHERE id=?").run(type, remindAt, num, id);
+      } else {
+        db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
+      }
     }
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
