@@ -315,10 +315,11 @@ router.get('/', (req, res) => {
               <code>cat p,ht</code> → personal + home-task
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Reminders (type in Add Note, then Sync)</div>
-              <code>Remind pay bills Thursday at 11am</code><br>
-              <code>Remind call doctor next Monday 9am</code><br>
-              <code>Remind take out trash tomorrow</code>
+              <div class="cmd-label">Reminders (direct — no sync needed)</div>
+              <code>Remind pay bills, Thursday 11am</code><br>
+              <code>Remind call doctor, next Monday 9am</code><br>
+              <code>Remind take out trash, tomorrow</code><br>
+              <span style="font-size:.75rem;color:#475569">Format: remind &lt;thing&gt;, &lt;date&gt; — or omit comma, date parsed from end</span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Lists (checkboxes in UI)</div>
