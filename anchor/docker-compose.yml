@@ -23,3 +23,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
       - /srv/mergerfs/warehouse/anchor:/anchordeploy
+      - /srv/mergerfs/warehouse/anchor/routes:/app/routes
+      - /srv/mergerfs/warehouse/anchor/lib:/app/lib
+      - /srv/mergerfs/warehouse/anchor/server.js:/app/server.js
