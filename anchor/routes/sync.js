@@ -33,12 +33,12 @@ function extractJSON(raw) {
   throw new Error('Could not parse JSON from AI response');
 }
 
-// Stuck notes become brain-dump/processed — no review status
+// Stuck notes become random/processed — no review status
 function flagStuck(ids, reason) {
-  const stmt = db.prepare("UPDATE notes SET status='processed', type='brain-dump' WHERE id=?");
+  const stmt = db.prepare("UPDATE notes SET status='processed', type='random' WHERE id=?");
   for (const id of ids) {
     stmt.run(id);
-    console.warn(`[sync] flagged note ${id} as brain-dump — ${reason}`);
+    console.warn(`[sync] flagged note ${id} as random — ${reason}`);
   }
 }
 
@@ -106,7 +106,7 @@ router.post('/', async (req, res) => {
 
   const SYS = `You are Anchor, Dan Casmas's AI organizer.
 ${guide ? 'GUIDE:\n' + guide : ''}
-Classify each note. Split multi-topic notes.
+Classify each note. Split multi-topic notes. Never use type 'brain-dump'.
 
 REMINDERS: If a note contains reminder intent — phrases like "remind me", "remind dan", "don't forget", "remember to", "don't let me forget" — set remind_at to an ISO 8601 datetime string parsed from the note text (America/New_York timezone). Use today's date as the base for relative dates. If no specific time is given use null.
 
@@ -137,8 +137,8 @@ No markdown. No explanation. Only the JSON array.`;
       return res.json({ ok: true, processed: 0, flagged: regularIds.length, engine: USE_OLLAMA ? 'ollama' : 'anthropic' });
     }
 
-    // Uncertain notes become brain-dump/processed — no review status
-    const flagUncertain = db.prepare("UPDATE notes SET status='processed', type='brain-dump' WHERE id=?");
+    // Uncertain notes become random/processed — no review status
+    const flagUncertain = db.prepare("UPDATE notes SET status='processed', type='random' WHERE id=?");
     const ins = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
 
     db.transaction(items => {
