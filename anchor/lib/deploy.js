@@ -71,4 +71,22 @@ function applyAnchorUpdate(changedFiles) {
   return { needsRebuild, log };
 }
 
-module.exports = { applyAnchorUpdate };
+// Force a full docker compose rebuild regardless of which files changed
+function rebuildAnchor() {
+  const log = [];
+  try {
+    log.push('starting full rebuild...');
+    execSync(
+      'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml down && ' +
+      'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml build --no-cache && ' +
+      'docker compose -f ' + ANCHOR_LIVE + '/docker-compose.yml up -d',
+      { timeout: 300000 }
+    );
+    log.push('full rebuild + restart done');
+  } catch (e) {
+    log.push('rebuild failed: ' + e.message);
+  }
+  return { log };
+}
+
+module.exports = { applyAnchorUpdate, rebuildAnchor };

@@ -9,7 +9,7 @@ const { sendEmail, emailEnabled } = require('../lib/email');
 const { getPending } = require('../lib/db');
 const { getUsageStats } = require('../lib/usage');
 const { pullBridge, pushSessionMd } = require('../lib/session');
-const { applyAnchorUpdate } = require('../lib/deploy');
+const { applyAnchorUpdate, rebuildAnchor } = require('../lib/deploy');
 
 const BRIDGE_PATH  = '/bridge';
 
@@ -65,6 +65,18 @@ router.post('/', async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error('[bridge] error:', e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// POST /rebuild — force full docker compose build + up -d
+router.post('/rebuild', async (req, res) => {
+  try {
+    console.log('[bridge] full rebuild requested');
+    const result = rebuildAnchor();
+    console.log('[bridge] rebuild log:', result.log.join('; '));
+    res.json({ ok: true, log: result.log });
+  } catch (e) {
     res.json({ ok: false, error: e.message });
   }
 });

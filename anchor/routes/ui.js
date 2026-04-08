@@ -152,6 +152,7 @@ router.get('/', (req, res) => {
     .btn-mic.listening{background:#7c3aed;color:#fff;border-color:#7c3aed;animation:pulse 1.2s infinite}
     .btn-opus{background:#1e1a35;color:#a78bfa;border:1px solid #a78bfa40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-bridge{background:#1e2d45;color:#4ade80;border:1px solid #4ade8040;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn-rebuild{background:#2d1e1e;color:#f87171;border:1px solid #f8717140;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-alert{background:#1e2d45;color:#fb923c;border:1px solid #fb923c40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-groom{background:#1e2d45;color:#c084fc;border:1px solid #c084fc40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-icon{background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 5px;opacity:.4;transition:opacity .15s}
@@ -242,6 +243,7 @@ router.get('/', (req, res) => {
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
             <button class="btn-bridge" onclick="pullBridge()">⇄ Sync Bridge</button>
+            <button class="btn-rebuild" onclick="runRebuild()">🔨 Rebuild</button>
             <button class="btn-groom" onclick="runGroom()">🧹 Groom</button>
             ${emailEnabled?'<button class="btn-alert" onclick="sendAlert()">📧 Alert</button>':''}
             <span class="status" id="bs" style="margin:0"></span>
@@ -388,6 +390,20 @@ router.get('/', (req, res) => {
           setTimeout(()=>location.reload(),2500);
         }else{s.textContent='✗ '+(d.error||'Failed');}
       }catch(e){s.textContent='✗ Failed';}
+    }
+    async function runRebuild(){
+      if(!confirm('Full Docker rebuild — service will be down for ~1-2 min. Continue?')) return;
+      const s=document.getElementById('bs');s.textContent='⏳ Rebuilding... (this takes ~1-2 min)';
+      const btn=document.querySelector('.btn-rebuild');if(btn)btn.disabled=true;
+      try{
+        const r=await fetch('/pull-bridge/rebuild',{method:'POST'});
+        const d=await r.json();
+        if(d.ok){
+          s.textContent='✓ Rebuild done — reloading in 5s…';
+          setTimeout(()=>location.reload(),5000);
+        }else{s.textContent='✗ '+(d.error||'Rebuild failed');}
+      }catch(e){s.textContent='✗ Request failed (container may have restarted — reload manually)';}
+      if(btn)btn.disabled=false;
     }
     async function runGroom(){
       const s=document.getElementById('bs');const r=document.getElementById('groomReport');
