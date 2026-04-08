@@ -512,11 +512,11 @@ router.get('/', (req, res) => {
         const r = await fetch('/notes/'+noteId);
         const d = await r.json();
         if(!d.ok) return;
-        const lines = (d.formatted || '').split('\n');
+        const lines = (d.formatted || '').split('\\n');
         // Strip existing markers and reapply
         const items = lines.filter(l => l.trim());
         items[lineIndex] = (checked ? '[x] ' : '[ ] ') + items[lineIndex].replace(/^\[.\]\s*/,'');
-        await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\n')})});
+        await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\\n')})});
       } catch(e){ console.error('toggleListItem failed', e); }
     }
   </script></body></html>`);
