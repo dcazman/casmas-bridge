@@ -1,9 +1,11 @@
 # Anchor — Session Context
-**Generated:** 4/7/2026, 10:43:23 PM
-**Pending notes:** 0 | **Last sync:** 4/7/2026, 10:32:16 PM
+**Generated:** 4/8/2026, 7:00:02 AM
+**Pending notes:** 0 | **Last sync:** 4/7/2026, 10:44:27 PM
 
 ## 🔔 Active Reminders
-None set yet.
+3) Cat med — due 4/8/2026, 3:00:00 PM
+2) pay bills — due 4/9/2026, 11:00:00 AM
+1) kathie d — due 10/1/2026, 1:00:00 PM
 
 ## 💼 Recent Work Notes (7 days)
 • [work-task] 4/4/2026 — Open loops from April 3 work session:
