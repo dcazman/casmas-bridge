@@ -318,10 +318,11 @@ router.get('/', (req, res) => {
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders (direct — no sync needed)</div>
-              <code>Remind pay bills, Thursday 11am</code><br>
-              <code>Remind call doctor, next Monday 9am</code><br>
-              <code>Remind take out trash, tomorrow</code><br>
-              <span style="font-size:.75rem;color:#475569">Format: remind &lt;thing&gt;, &lt;date&gt; — or omit comma, date parsed from end</span>
+              <code>remind</code><br>
+              pay bills, thursday 11am<br>
+              call doctor, next monday 9am<br>
+              take out trash, tomorrow<br>
+              <span style="font-size:.75rem;color:#475569">One reminder per line. Format: thing, date — or thing date (date parsed from end). Also works single-line: <code>remind thing, date</code></span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Lists (checkboxes in UI)</div>

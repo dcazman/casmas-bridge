@@ -46,10 +46,9 @@ router.post('/', upload.single('file'), async (req, res) => {
     if (um) raw = await fetchUrl(um[1]);
     if (!raw) return res.json({ ok: false, error: 'No input' });
 
-    // remind <thing>, <date>  or  remind <thing> <date tokens>
-    const remindMatch = raw.match(/^remind\s+(.+)$/i);
-    if (remindMatch) {
-      const body = remindMatch[1].trim();
+    // remind block — "remind" on its own line, then each subsequent line is a reminder
+    // Also supports single-line: "remind thing, date"
+    function parseRemindLine(body) {
       let thing, dateStr;
       if (body.includes(',')) {
         const ci = body.indexOf(',');
@@ -65,6 +64,29 @@ router.post('/', upload.single('file'), async (req, res) => {
           dateStr = '';
         }
       }
+      return { thing, dateStr };
+    }
+
+    if (/^remind\s*$/im.test(raw)) {
+      // Multi-line block: "remind\nthing, date\nthing2, date2"
+      const lines = raw.split('\n');
+      const startIdx = lines.findIndex(l => /^remind\s*$/i.test(l.trim()));
+      const remindLines = lines.slice(startIdx + 1).filter(l => l.trim());
+      for (const line of remindLines) {
+        const { thing, dateStr } = parseRemindLine(line.trim());
+        if (!thing) continue;
+        const remindAt = parseReminderDate(dateStr).toISOString();
+        const num = nextRemindNum();
+        const enc = encrypt(thing);
+        db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num) VALUES ('remind','processed',?,?,?,?)").run(enc, enc, remindAt, num);
+      }
+      return res.json({ ok: true, pendingCount: getPending().count });
+    }
+
+    const remindMatch = raw.match(/^remind\s+(.+)$/i);
+    if (remindMatch) {
+      // Single-line: "remind thing, date"
+      const { thing, dateStr } = parseRemindLine(remindMatch[1].trim());
       const remindAt = parseReminderDate(dateStr).toISOString();
       const num = nextRemindNum();
       const enc = encrypt(thing);
