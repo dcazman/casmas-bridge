@@ -1,9 +1,10 @@
 # Anchor — Session Context
-**Generated:** 4/8/2026, 5:09:30 PM
+**Generated:** 4/8/2026, 5:15:45 PM
 **Pending notes:** 0 | **Last sync:** 4/7/2026, 10:44:27 PM
 
 ## 🔔 Active Reminders
 2) pay bills — due 4/9/2026, 11:00:00 AM
+5) animals to vet — due 4/10/2026, 11:00:00 AM
 
 ## 💼 Recent Work Notes (7 days)
 • [work-task] 4/4/2026 — Open loops from April 3 work session:
