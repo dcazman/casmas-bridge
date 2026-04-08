@@ -5,7 +5,7 @@ const { execSync } = require('child_process');
 
 const BRIDGE_PATH       = '/bridge';
 const ANCHOR_SRC        = BRIDGE_PATH + '/anchor';
-const ANCHOR_LIVE       = '/srv/mergerfs/warehouse/anchor';
+const ANCHOR_LIVE       = '/anchordeploy';
 const REBUILD_TRIGGERS  = ['Dockerfile', 'package.json', 'package-lock.json'];
 
 function walkDir(dir, base) {

@@ -22,3 +22,4 @@ services:
       - /srv/mergerfs/warehouse/casmas-bridge:/bridge
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
+      - /srv/mergerfs/warehouse/anchor:/anchordeploy
