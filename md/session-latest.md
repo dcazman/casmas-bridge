@@ -1,15 +1,21 @@
 # Anchor — Session Context
-**Generated:** 4/9/2026, 7:00:03 AM
-**Pending notes:** 0 | **Last sync:** 4/8/2026, 7:16:38 PM
+**Generated:** 4/9/2026, 3:38:26 PM
+**Pending notes:** 0 | **Last sync:** 4/9/2026, 3:37:07 PM
 
 ## 🔔 Active Reminders
-2) pay bills — due 4/9/2026, 11:00:00 AM
 6) taxes
 Taxes Denver office 
 118 south highway 16 business — due 4/9/2026, 6:00:00 PM
 5) animals to vet — due 4/10/2026, 11:00:00 AM
 7) make doc apt
 For 6 days to get stitches out — due 4/10/2026, 11:00:00 AM
+9) smoked meat
+Smoker Thursdays - Master's Edition at Lithia Creek Tavern / Lincoln Country Club. BBQ s — due 4/16/2026, 4:00:00 PM
+
+## 💼 Recent Work Notes (7 days)
+• [work-task] 4/9/2026 — GCP project last-activity report script
+Goal: find last-used date for all GCP projects
+Approach: gcloud CLI + PowerShell
 
 ## 📋 Working With Anchor
 - anchor.thecasmas.com — main UI
