@@ -37,7 +37,8 @@ router.post('/', async (req, res) => {
     } else {
       const key = getApiKey();
       const m = forceCloud ? MODEL_OPUS : MODEL_HAIKU;
-      const prompt = "You are Anchor, Dan's AI assistant.\n\nTime: " + (clientTime||new Date().toLocaleString()) + '\n\nNOTES:\n' + notes + '\n\nQ: ' + question;
+      const sysPromptCloud = loadOllamaPrompt();
+      const prompt = sysPromptCloud + '\n\nTime: ' + (clientTime||new Date().toLocaleString()) + '\n\nNOTES:\n' + notes + '\n\nQ: ' + question;
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
