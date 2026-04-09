@@ -260,8 +260,10 @@ function buildDigestEmail() {
   if (dueToday.length) {
     body += `📅 Due Today\n`;
     for (const n of dueToday) {
-      const num = n.remind_num ? `${n.remind_num})` : '•';
-      body += `${num} ${(n.formatted || '').substring(0, 80)}\n`;
+      const num     = n.remind_num ? `${n.remind_num})` : '•';
+      const text    = (n.formatted || '').split('\n')[0].trim().substring(0, 70);
+      const timeStr = new Date(n.remind_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
+      body += `${num} ${text} — ${timeStr}\n`;
     }
     body += '\n';
   }
@@ -270,8 +272,9 @@ function buildDigestEmail() {
     body += `🗓 Coming Up\n`;
     for (const n of upcoming) {
       const num  = n.remind_num ? `${n.remind_num})` : '•';
-      const when = new Date(n.remind_at).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', ...tz });
-      body += `${num} ${(n.formatted || '').substring(0, 70)} — ${when}\n`;
+      const text = (n.formatted || '').split('\n')[0].trim().substring(0, 60);
+      const when = new Date(n.remind_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
+      body += `${num} ${text} — ${when}\n`;
     }
     body += '\n';
   }
