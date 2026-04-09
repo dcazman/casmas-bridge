@@ -47,9 +47,12 @@ function renderNote(n) {
     ? '<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ' + new Date(n.remind_at).toLocaleString() + '</span>'
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
   const rawText = n.formatted || n.raw_input || '';
+  const listLines = isList ? (rawText).split('\n').filter(l=>l.trim()) : [];
+  const isLongList = isList && !ip && listLines.length > 4;
   const isLong = !isList && !ip && (rawText.split('\n').filter(l=>l.trim()).length > 4 || rawText.length > 400);
   const formattedContent = isList
-    ? renderListContent(n.formatted || n.raw_input, n.id)
+    ? '<div class="list-wrap' + (isLongList ? ' list-collapse' : '') + '" id="fmt-'+n.id+'">' + renderListContent(n.formatted || n.raw_input, n.id) + '</div>'
+      + (isLongList ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '')
     : '<div class="formatted' + (isLong ? ' fmt-collapse' : '') + '" id="fmt-'+n.id+'">' + esc(rawText) + '</div>'
       + (isLong ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
   const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
@@ -232,6 +235,7 @@ router.get('/', (req, res) => {
     .cmd-ref .cmd-group{margin-bottom:10px}
     .cmd-ref .cmd-label{color:#475569;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
     .fmt-collapse{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .list-collapse{max-height:140px;overflow:hidden}
     .btn-expand{background:none;border:none;color:#3b82f6;font-size:.78rem;cursor:pointer;padding:3px 0;margin-top:2px;display:block;opacity:.8}
     .btn-expand:hover{color:#60a5fa;opacity:1}
   </style></head><body>
@@ -476,8 +480,9 @@ router.get('/', (req, res) => {
     function toggleExpand(id){
       const fmt=document.getElementById('fmt-'+id),btn=document.getElementById('exp-'+id);
       if(!fmt||!btn)return;
-      const collapsed=fmt.classList.contains('fmt-collapse');
-      fmt.classList.toggle('fmt-collapse',!collapsed);
+      const cls=fmt.classList.contains('list-collapse')?'list-collapse':'fmt-collapse';
+      const collapsed=fmt.classList.contains(cls);
+      fmt.classList.toggle(cls,!collapsed);
       btn.textContent=collapsed?'▲ less':'▼ more';
     }
     const HIST_KEY='anchor_chat_history';const MAX_HIST=30;
