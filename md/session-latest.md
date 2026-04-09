@@ -1,5 +1,5 @@
 # Anchor — Session Context
-**Generated:** 4/8/2026, 8:06:56 PM
+**Generated:** 4/8/2026, 10:39:02 PM
 **Pending notes:** 0 | **Last sync:** 4/8/2026, 7:16:38 PM
 
 ## 🔔 Active Reminders
@@ -8,11 +8,8 @@
 Taxes Denver office 
 118 south highway 16 business — due 4/9/2026, 6:00:00 PM
 5) animals to vet — due 4/10/2026, 11:00:00 AM
-
-## 💼 Recent Work Notes (7 days)
-• [work-task] 4/4/2026 — Open loops from April 3 work session:
-- Cloudflare tunnel still needed for Anchor to go external
-- Update spec MD file w
+7) make doc apt
+For 6 days to get stitches out — due 4/10/2026, 11:00:00 AM
 
 ## 📋 Working With Anchor
 - anchor.thecasmas.com — main UI
