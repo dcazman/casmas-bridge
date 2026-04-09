@@ -46,9 +46,12 @@ function renderNote(n) {
   const remindBadge = isRemind && n.remind_at
     ? '<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ' + new Date(n.remind_at).toLocaleString() + '</span>'
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
+  const rawText = n.formatted || n.raw_input || '';
+  const isLong = !isList && !ip && (rawText.split('\n').filter(l=>l.trim()).length > 4 || rawText.length > 400);
   const formattedContent = isList
     ? renderListContent(n.formatted || n.raw_input, n.id)
-    : '<div class="formatted" id="fmt-'+n.id+'">' + esc(n.formatted||n.raw_input) + '</div>';
+    : '<div class="formatted' + (isLong ? ' fmt-collapse' : '') + '" id="fmt-'+n.id+'">' + esc(rawText) + '</div>'
+      + (isLong ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
   const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
 
   return `<div class="note${ip?' note-pending':''}" id="note-${n.id}">
@@ -83,15 +86,25 @@ router.get('/apple-touch-icon.png', (q,s) => { s.setHeader('Content-Type','image
 router.get('/icon-192.png',         (q,s) => { s.setHeader('Content-Type','image/png'); s.send(ICON_BUF); });
 router.get('/manifest.json',        (q,s) => s.json({ name:'Anchor', short_name:'Anchor', description:"Dan's memory, context, and second brain", start_url:'/', display:'standalone', background_color:'#0d1117', theme_color:'#1e3a5f', icons:[{src:'/icon-192.png',sizes:'192x192',type:'image/png'}] }));
 
-router.get('/', (req, res) => {
-  const { q, type, tag, sort } = req.query;
+function queryNotes(q, type, tag, sort) {
   let query = 'SELECT * FROM notes WHERE 1=1'; const params = [];
   if (q)   { query += ' AND (formatted LIKE ? OR raw_input LIKE ? OR tags LIKE ?)'; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
   if (type){ query += ' AND type=?'; params.push(type); }
   if (tag) { query += ' AND tags LIKE ?'; params.push('%'+tag+'%'); }
   const so = { 'newest':'ORDER BY created_at DESC','oldest':'ORDER BY created_at ASC','type':'ORDER BY type ASC,created_at DESC','unsynced':"ORDER BY (status='pending') DESC,created_at DESC",'open-loops':"ORDER BY (open_loops IS NOT NULL AND open_loops!='') DESC,created_at DESC",'type-date':'ORDER BY type ASC,created_at DESC' };
   query += ' ' + (so[sort]||so['newest']) + ' LIMIT 30';
-  const notes = db.prepare(query).all(...params);
+  return db.prepare(query).all(...params);
+}
+
+router.get('/notes-html', (req, res) => {
+  const { q, type, sort } = req.query;
+  const notes = queryNotes(q, type, '', sort);
+  res.send(notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>');
+});
+
+router.get('/', (req, res) => {
+  const { q, type, tag, sort } = req.query;
+  const notes = queryNotes(q, type, tag, sort);
 
   const { count: pc, estimatedTokens: pt } = getPending();
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
@@ -218,6 +231,9 @@ router.get('/', (req, res) => {
     .cmd-ref code{background:#0d1117;color:#22d3ee;padding:1px 6px;border-radius:4px;font-size:.8rem;font-family:monospace}
     .cmd-ref .cmd-group{margin-bottom:10px}
     .cmd-ref .cmd-label{color:#475569;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+    .fmt-collapse{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .btn-expand{background:none;border:none;color:#3b82f6;font-size:.78rem;cursor:pointer;padding:3px 0;margin-top:2px;display:block;opacity:.8}
+    .btn-expand:hover{color:#60a5fa;opacity:1}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -365,10 +381,8 @@ router.get('/', (req, res) => {
   </div>
 
   <script>
-    document.querySelectorAll('.note-date[data-ts]').forEach(el=>{
-      const ts=el.getAttribute('data-ts');
-      if(ts){const u=ts.includes('T')?ts:ts.replace(' ','T')+'Z';el.textContent=new Date(u).toLocaleString();}
-    });
+    function renderTimestamps(){document.querySelectorAll('.note-date[data-ts]').forEach(el=>{const ts=el.getAttribute('data-ts');if(ts){const u=ts.includes('T')?ts:ts.replace(' ','T')+'Z';el.textContent=new Date(u).toLocaleString();}});}
+    renderTimestamps();
     function clock(){const el=document.getElementById('hdrTime');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}
     clock();setInterval(clock,30000);
     function fileSelected(i){const n=i.files[0]?i.files[0].name:'';document.getElementById('fn').textContent=n;document.getElementById('cfi').style.display=n?'inline':'none';}
@@ -444,12 +458,28 @@ router.get('/', (req, res) => {
       rec.onend=()=>{btn.classList.remove('listening');btn.textContent='🎤 Mic';rec=null;};
       rec.start();btn.classList.add('listening');btn.textContent='🔴 Listening...';
     }
-    function doSearch(){
+    async function doSearch(){
       const q=document.getElementById('sq').value,t=document.getElementById('st').value,s=document.getElementById('so').value;
       const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);
-      window.location.href='/?'+p.toString();
+      try{
+        const r=await fetch('/notes-html?'+p.toString());
+        const html=await r.text();
+        document.querySelector('.notes-list').innerHTML=html;
+        renderTimestamps();
+      }catch(e){console.error('search failed',e);}
     }
+    let _st;
     document.getElementById('sq').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+    document.getElementById('sq').addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});
+    document.getElementById('st').addEventListener('change',doSearch);
+    document.getElementById('so').addEventListener('change',doSearch);
+    function toggleExpand(id){
+      const fmt=document.getElementById('fmt-'+id),btn=document.getElementById('exp-'+id);
+      if(!fmt||!btn)return;
+      const collapsed=fmt.classList.contains('fmt-collapse');
+      fmt.classList.toggle('fmt-collapse',!collapsed);
+      btn.textContent=collapsed?'▲ less':'▼ more';
+    }
     const HIST_KEY='anchor_chat_history';const MAX_HIST=30;
     function loadHistory(){try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch{return[];}}
     function saveToHistory(q,a,engine){const h=loadHistory();h.push({ts:new Date().toLocaleString(),q,a,engine});if(h.length>MAX_HIST)h.splice(0,h.length-MAX_HIST);localStorage.setItem(HIST_KEY,JSON.stringify(h));renderHistory();}
@@ -496,8 +526,16 @@ router.get('/', (req, res) => {
         else s.textContent='✗';
       }catch(e){s.textContent='✗';}
     }
-    function startEdit(id){document.getElementById('fmt-'+id)&&(document.getElementById('fmt-'+id).style.display='none');document.getElementById('edit-'+id).style.display='block';}
-    function cancelEdit(id){document.getElementById('fmt-'+id)&&(document.getElementById('fmt-'+id).style.display='block');document.getElementById('edit-'+id).style.display='none';}
+    function startEdit(id){
+      const fmt=document.getElementById('fmt-'+id),exp=document.getElementById('exp-'+id);
+      if(fmt)fmt.style.display='none';if(exp)exp.style.display='none';
+      document.getElementById('edit-'+id).style.display='block';
+    }
+    function cancelEdit(id){
+      const fmt=document.getElementById('fmt-'+id),exp=document.getElementById('exp-'+id);
+      if(fmt)fmt.style.display='block';if(exp)exp.style.display='block';
+      document.getElementById('edit-'+id).style.display='none';
+    }
     async function saveEdit(id){
       const c=document.getElementById('etxt-'+id).value.trim();if(!c)return;
       try{
