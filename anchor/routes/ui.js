@@ -48,6 +48,13 @@ function renderNote(n) {
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
   const rawText = n.formatted || n.raw_input || '';
   const collapsible = !ip;
+  const snoozeRow = isRemind && !ip
+    ? '<div class="note-snooze" id="snz-'+n.id+'" style="display:none;margin-top:6px;gap:6px;align-items:center">'
+      + '<input type="datetime-local" id="snzdt-'+n.id+'" style="font-size:.8rem;padding:4px 8px;border-radius:6px;border:1px solid #2d4a7a;background:#0d1117;color:#e2e8f0">'
+      + '<button class="btn btn-primary" style="padding:4px 10px;font-size:.8rem" onclick="doSnooze('+n.id+')">Set</button>'
+      + '<button class="btn btn-secondary" style="padding:4px 10px;font-size:.8rem" onclick="document.getElementById(\'snz-'+n.id+'\').style.display=\'none\'">✕</button>'
+      + '</div>'
+    : '';
   const formattedContent = isList
     ? '<div class="list-wrap' + (collapsible ? ' list-collapse' : '') + '" id="fmt-'+n.id+'">' + renderListContent(n.formatted || n.raw_input, n.id) + '</div>'
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '')
@@ -62,11 +69,13 @@ function renderNote(n) {
       ${remindBadge}
       <span class="note-date" data-ts="${esc(dateTs)}"></span>
       <span class="note-actions">
+        ${isRemind&&!ip?'<button class="btn-icon" title="Snooze" onclick="toggleSnooze('+n.id+')">🔔</button>':''}
         <button class="btn-icon" onclick="startEdit(${n.id})">✏️</button>
         <button class="btn-icon btn-delete" onclick="deleteNote(${n.id})">🗑</button>
       </span>
     </div>
     ${formattedContent}
+    ${snoozeRow}
     <div class="note-edit" id="edit-${n.id}" style="display:none">
       <textarea class="edit-ta" id="etxt-${n.id}">${esc(n.formatted||n.raw_input)}</textarea>
       <div style="display:flex;gap:8px;margin-top:6px">
@@ -475,6 +484,24 @@ router.get('/', (req, res) => {
     document.getElementById('sq').addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});
     document.getElementById('st').addEventListener('change',doSearch);
     document.getElementById('so').addEventListener('change',doSearch);
+    function toggleSnooze(id){
+      const el=document.getElementById('snz-'+id);
+      const show=el.style.display==='none';
+      el.style.display=show?'flex':'none';
+      if(show){const dt=new Date(Date.now()+7*24*60*60*1000);document.getElementById('snzdt-'+id).value=dt.toISOString().slice(0,16);}
+    }
+    async function doSnooze(id){
+      const dt=document.getElementById('snzdt-'+id).value;if(!dt)return;
+      try{
+        const r=await fetch('/notes/'+id+'/remind',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({remind_at:new Date(dt).toISOString()})});
+        const d=await r.json();
+        if(d.ok){
+          document.getElementById('snz-'+id).style.display='none';
+          const meta=document.querySelector('#note-'+id+' .note-meta');
+          if(meta){meta.querySelectorAll('span').forEach(b=>{if(b.textContent.includes('🔔'))b.textContent='🔔 '+new Date(dt).toLocaleString();});}
+        }else alert('Snooze failed');
+      }catch(e){alert('Snooze failed');}
+    }
     function toggleExpand(id){
       const fmt=document.getElementById('fmt-'+id),btn=document.getElementById('exp-'+id);
       if(!fmt||!btn)return;

@@ -175,4 +175,17 @@ router.put('/:id', (req, res) => {
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
+// PATCH /notes/:id/remind — snooze: update remind_at and reset remind_sent so it fires again
+router.patch('/:id/remind', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.json({ ok: false, error: 'Invalid id' });
+  const { remind_at } = req.body;
+  if (!remind_at) return res.json({ ok: false, error: 'remind_at required' });
+  try {
+    const iso = new Date(remind_at).toISOString();
+    db.prepare("UPDATE notes SET remind_at=?, remind_sent=0 WHERE id=?").run(iso, id);
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 module.exports = router;
