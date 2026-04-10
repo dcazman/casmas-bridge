@@ -1,14 +1,13 @@
 # Anchor — Session Context
-**Generated:** 4/9/2026, 4:51:28 PM
-**Pending notes:** 0 | **Last sync:** 4/9/2026, 3:37:07 PM
+**Generated:** 4/10/2026, 7:00:03 AM
+**Pending notes:** 0 | **Last sync:** 4/9/2026, 6:23:26 PM
 
 ## 🔔 Active Reminders
-6) taxes
-Taxes Denver office 
-118 south highway 16 business — due 4/9/2026, 6:00:00 PM
 5) animals to vet — due 4/10/2026, 11:00:00 AM
 7) make doc apt
 For 6 days to get stitches out — due 4/10/2026, 11:00:00 AM
+10) tax follow up — due 4/11/2026, 11:00:00 AM
+11) finish taxes before — due 4/11/2026, 12:00:00 PM
 9) smoked meat
 Smoker Thursdays - Master's Edition at Lithia Creek Tavern / Lincoln Country Club. BBQ s — due 4/16/2026, 4:00:00 PM
 
