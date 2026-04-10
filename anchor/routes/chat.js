@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
         body: JSON.stringify({ model: 'llama3.2:3b', stream: false, messages: [{ role: 'user', content: fullPrompt }] })
       });
       const data = await resp.json();
-      res.json({ answer: data.message?.content || 'No response.', engine: 'ollama' });
+      res.json({ answer: data.message?.content || 'No response.', engine: 'rooster' });
     } else {
       const key = getApiKey();
       const m = forceCloud ? MODEL_OPUS : MODEL_HAIKU;

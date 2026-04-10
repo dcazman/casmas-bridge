@@ -145,7 +145,7 @@ router.get('/', (req, res) => {
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
   const as  = shouldSync();
   const useOllama = process.env.USE_OLLAMA === 'true';
-  const engineLabel = useOllama ? '🦙 Ollama (local)' : '🤖 Anthropic API';
+  const engineLabel = useOllama ? '🐓 Rooster (local)' : '🤖 Anthropic API';
   const now = new Date();
   const ya = new Date(now); ya.setFullYear(now.getFullYear()-1);
   const sa = new Date(now); sa.setMonth(now.getMonth()-6);
@@ -256,7 +256,7 @@ router.get('/', (req, res) => {
     .msg.user{background:#1e3a5f;color:#bfdbfe;align-self:flex-end}
     .msg.ai{background:#1a2232;color:#e2e8f0;align-self:flex-start;border-left:3px solid #3b82f6}
     .msg.ai.opus{border-left-color:#a78bfa}
-    .msg.ai.ollama{border-left-color:#4ade80}
+    .msg.ai.rooster{border-left-color:#4ade80}
     .chat-in{display:flex;gap:8px}.chat-in input{flex:1}
     .chat-mr{display:flex;align-items:center;gap:8px;margin-top:8px}
     .model-lbl{font-size:.75rem;color:#475569}
@@ -537,7 +537,7 @@ router.get('/', (req, res) => {
       const h=loadHistory();
       if(!h.length){box.innerHTML='<div style="color:#475569;font-size:.8rem">No history yet.</div>';return;}
       box.innerHTML=[...h].reverse().map(e=>{
-        const eng=e.engine==='ollama'?'<span style="color:#4ade80;font-size:.65rem">🦙</span>':e.engine==='claude'?'<span style="color:#a78bfa;font-size:.65rem">⚡</span>':'';
+        const eng=e.engine==='rooster'?'<span style="color:#4ade80;font-size:.65rem">🐓</span>':e.engine==='claude'?'<span style="color:#a78bfa;font-size:.65rem">⚡</span>':'';
         return '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1e2d45"><div style="font-size:.7rem;color:#475569;margin-bottom:3px">'+e.ts+' '+eng+'</div><div style="font-size:.82rem;color:#94a3b8;margin-bottom:3px">Q: '+e.q+'</div><div style="font-size:.85rem;color:#e2e8f0">'+e.a+'</div></div>';
       }).join('');
     }
@@ -553,9 +553,9 @@ router.get('/', (req, res) => {
       try{
         const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:v,model,clientTime:new Date().toString()})});
         const d=await r.json();
-        const isOllama=d.engine==='ollama';
-        const cls=isOllama?'msg ai ollama':model==='claude'?'msg ai opus':'msg ai';
-        const lbl=isOllama?' <span style="font-size:.75rem;color:#4ade80;font-weight:600">🦙 Local</span>':model==='claude'?' <span style="font-size:.75rem;color:#a78bfa;font-weight:600">⚡ Claude</span>':'';
+        const isRooster=d.engine==='rooster';
+        const cls=isRooster?'msg ai rooster':model==='claude'?'msg ai opus':'msg ai';
+        const lbl=isRooster?' <span style="font-size:.75rem;color:#4ade80;font-weight:600">🐓 Rooster</span>':model==='claude'?' <span style="font-size:.75rem;color:#a78bfa;font-weight:600">⚡ Claude</span>':'';
         msgs.innerHTML+='<div class="'+cls+'">'+d.answer+lbl+'</div>';
         saveToHistory(v,d.answer,d.engine);
       }catch(e){msgs.innerHTML+='<div class="msg ai">Error.</div>';}
