@@ -10,19 +10,14 @@ const { emailEnabled } = require('./bridge');
 const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
 
-// Render list-type note content as interactive checkboxes
-// First line with no [x]/[ ] prefix is treated as a label/title (not a checkbox)
 function renderListContent(text, noteId) {
   const lines = (text || '').split('\n').filter(l => l.trim());
   if (!lines.length) return '<div class="list-items"></div>';
-
   const firstIsLabel = lines.length > 1 && !/^\[.\]/i.test(lines[0].trim());
   let html = '';
-
   if (firstIsLabel) {
     html += `<div style="font-weight:600;color:#22d3ee;margin-bottom:8px;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">${esc(lines[0].trim())}</div>`;
   }
-
   const startIdx = firstIsLabel ? 1 : 0;
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
@@ -44,17 +39,14 @@ function renderNote(n) {
   const isList   = n.type === 'list';
   const isRemind = n.type === 'remind';
 
-  // ── Reminder number badge — large, obvious, always first ──────────────────
   const numBadge = (isRemind && n.remind_num != null)
     ? `<span class="remind-num" title="Reminder #${n.remind_num} — type: done ${n.remind_num} or snooze ${n.remind_num}">#${n.remind_num}</span>`
     : '';
 
-  // ── Reminder date badge ────────────────────────────────────────────────────
   const remindBadge = isRemind && n.remind_at
     ? `<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ${new Date(n.remind_at).toLocaleString()}</span>`
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
 
-  // ── Quick-action buttons for reminders with a number ──────────────────────
   const quickActions = (isRemind && n.remind_num != null)
     ? `<div class="remind-actions">
         <button class="btn-done" onclick="quickDone(${n.remind_num},${n.id})" title="done ${n.remind_num}">✓ done ${n.remind_num}</button>
@@ -122,7 +114,6 @@ router.get('/notes-html', (req, res) => {
   res.send(notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>');
 });
 
-// POST /remind-cmd — handle done/snooze directly from UI buttons (no sync needed)
 router.post('/remind-cmd', (req, res) => {
   const { cmd, num, when } = req.body;
   if (!cmd || num == null) return res.json({ ok: false, error: 'Missing cmd or num' });
@@ -271,9 +262,7 @@ router.get('/', (req, res) => {
     .list-collapse{max-height:140px;overflow:hidden}
     .btn-expand{background:none;border:none;color:#3b82f6;font-size:.78rem;cursor:pointer;padding:3px 0;margin-top:2px;display:block;opacity:.8}
     .btn-expand:hover{color:#60a5fa;opacity:1}
-    /* ── Reminder number badge ── */
     .remind-num{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 10px;background:#7c1d3f;color:#fda4af;font-size:1rem;font-weight:800;border-radius:8px;border:2px solid #f472b6;letter-spacing:.5px;cursor:default;flex-shrink:0}
-    /* ── Reminder quick-action buttons ── */
     .remind-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
     .btn-done{background:#14532d;color:#4ade80;border:1px solid #4ade8040;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
     .btn-done:hover{background:#166534;border-color:#4ade80}
@@ -474,10 +463,8 @@ router.get('/', (req, res) => {
       try{
         const r=await fetch('/pull-bridge/rebuild',{method:'POST'});
         const d=await r.json();
-        if(d.ok){
-          s.textContent='✓ Rebuild done — reloading in 5s…';
-          setTimeout(()=>location.reload(),5000);
-        }else{s.textContent='✗ '+(d.error||'Rebuild failed');}
+        if(d.ok){s.textContent='✓ Rebuild done — reloading in 5s…';setTimeout(()=>location.reload(),5000);}
+        else{s.textContent='✗ '+(d.error||'Rebuild failed');}
       }catch(e){s.textContent='✗ Request failed (container may have restarted — reload manually)';}
       if(btn)btn.disabled=false;
     }
@@ -506,21 +493,9 @@ router.get('/', (req, res) => {
       rec.onend=()=>{btn.classList.remove('listening');btn.textContent='🎤 Mic';rec=null;};
       rec.start();btn.classList.add('listening');btn.textContent='🔴 Listening...';
     }
-    async function doSearch(){
-      const q=document.getElementById('sq').value,t=document.getElementById('st').value,s=document.getElementById('so').value;
-      const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);
-      try{
-        const r=await fetch('/notes-html?'+p.toString());
-        const html=await r.text();
-        document.querySelector('.notes-list').innerHTML=html;
-        renderTimestamps();
-      }catch(e){console.error('search failed',e);}
-    }
-    let _st;
-    document.getElementById('sq').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
-    document.getElementById('sq').addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});
-    document.getElementById('st').addEventListener('change',doSearch);
-    document.getElementById('so').addEventListener('change',doSearch);
+    function tp(bid,cid){const b=document.getElementById(bid),c=document.getElementById(cid),col=b.classList.contains('collapsed');b.classList.toggle('collapsed',!col);c.classList.toggle('open',col);}
+    function isLocal(){const h=window.location.hostname;return h==='localhost'||h.startsWith('192.168.')||h.startsWith('10.')||h.startsWith('172.');}
+    if(isLocal()){['sb','nb','cb','refb'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('collapsed');});['sc','nc','cc','refc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('open');});}
     function toggleExpand(id){
       const fmt=document.getElementById('fmt-'+id),btn=document.getElementById('exp-'+id);
       if(!fmt||!btn)return;
@@ -562,10 +537,37 @@ router.get('/', (req, res) => {
       document.getElementById('cl').style.display='none';
       msgs.scrollTop=msgs.scrollHeight;
     }
-    document.getElementById('ci').addEventListener('keydown',e=>{if(e.key==='Enter')chat('haiku');});
-    function isLocal(){const h=window.location.hostname;return h==='localhost'||h.startsWith('192.168.')||h.startsWith('10.')||h.startsWith('172.');}
-    function tp(bid,cid){const b=document.getElementById(bid),c=document.getElementById(cid),col=b.classList.contains('collapsed');b.classList.toggle('collapsed',!col);c.classList.toggle('open',col);}
-    if(isLocal()){['sb','nb','cb','refb'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('collapsed');});['sc','nc','cc','refc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('open');});}
+    document.getElementById('ci')?.addEventListener('keydown',e=>{if(e.key==='Enter')chat('haiku');});
+    document.getElementById('inp')?.addEventListener('paste',async function(e){
+      const items=(e.clipboardData||window.clipboardData||{}).items||[];
+      for(const item of items){
+        if(item.type.startsWith('image/')){
+          e.preventDefault();
+          const file=item.getAsFile();if(!file)continue;
+          const ns=document.getElementById('ns');ns.textContent='📷 Reading image...';
+          const fd=new FormData();fd.append('file',file,'pasted-image.png');
+          try{
+            const r=await fetch('/note',{method:'POST',body:fd});const d=await r.json();
+            if(d.ok){ns.textContent='✓ Image saved';document.getElementById('pc').textContent=d.pendingCount;if(d.pendingCount>0)document.getElementById('syncBtn').disabled=false;setTimeout(()=>{ns.textContent='';},2000);setTimeout(()=>location.reload(),600);}
+            else{ns.textContent='✗ '+(d.error||'Failed');}
+          }catch(err){ns.textContent='✗ Failed';}
+          return;
+        }
+      }
+    });
+    // Safe search listeners — elements live inside collapsed panels, guard with ?.
+    document.getElementById('sq')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+    let _st;
+    document.getElementById('sq')?.addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});
+    document.getElementById('st')?.addEventListener('change',doSearch);
+    document.getElementById('so')?.addEventListener('change',doSearch);
+    function doSearch(){
+      const q=document.getElementById('sq')?.value||'',t=document.getElementById('st')?.value||'',s=document.getElementById('so')?.value||'';
+      const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);
+      fetch('/notes-html?'+p.toString()).then(r=>r.text()).then(html=>{
+        const nl=document.querySelector('.notes-list');if(nl){nl.innerHTML=html;renderTimestamps();}
+      }).catch(e=>console.error('search failed',e));
+    }
     async function reclassify(id,type){
       if(!type)return;const s=document.getElementById('rcs-'+id);s.textContent='...';
       try{
@@ -599,51 +601,28 @@ router.get('/', (req, res) => {
       try{const r=await fetch('/notes/'+id,{method:'DELETE'});const d=await r.json();if(d.ok)document.getElementById('note-'+id).remove();else alert('Delete failed');}
       catch(e){alert('Delete failed');}
     }
-    document.getElementById('inp').addEventListener('paste',async function(e){
-      const items=(e.clipboardData||window.clipboardData||{}).items||[];
-      for(const item of items){
-        if(item.type.startsWith('image/')){
-          e.preventDefault();
-          const file=item.getAsFile();if(!file)continue;
-          const ns=document.getElementById('ns');ns.textContent='📷 Reading image...';
-          const fd=new FormData();fd.append('file',file,'pasted-image.png');
-          try{
-            const r=await fetch('/note',{method:'POST',body:fd});const d=await r.json();
-            if(d.ok){ns.textContent='✓ Image saved';document.getElementById('pc').textContent=d.pendingCount;if(d.pendingCount>0)document.getElementById('syncBtn').disabled=false;setTimeout(()=>{ns.textContent='';},2000);setTimeout(()=>location.reload(),600);}
-            else{ns.textContent='✗ '+(d.error||'Failed');}
-          }catch(err){ns.textContent='✗ Failed';}
-          return;
-        }
-      }
-    });
-    // Toggle list item checked state and persist to server
     async function toggleListItem(noteId, lineIndex, checked){
       try{
-        const chkEl = document.getElementById('chk-'+noteId+'-'+lineIndex);
-        if(!chkEl) return;
-        const span = chkEl.parentElement?.querySelector('span');
-        if(span) span.style.textDecoration = checked ? 'line-through' : '';
-        if(span) span.style.color = checked ? '#475569' : '';
-        const r = await fetch('/notes/'+noteId);
-        const d = await r.json();
-        if(!d.ok) return;
-        const lines = (d.formatted || '').split('\\n');
-        const items = lines.filter(l => l.trim());
-        items[lineIndex] = (checked ? '[x] ' : '[ ] ') + items[lineIndex].replace(/^\[.\]\s*/,'');
+        const chkEl=document.getElementById('chk-'+noteId+'-'+lineIndex);if(!chkEl)return;
+        const span=chkEl.parentElement?.querySelector('span');
+        if(span){span.style.textDecoration=checked?'line-through':'';span.style.color=checked?'#475569':'';}
+        const r=await fetch('/notes/'+noteId);const d=await r.json();if(!d.ok)return;
+        const lines=(d.formatted||'').split('\\n');
+        const items=lines.filter(l=>l.trim());
+        items[lineIndex]=(checked?'[x] ':'[ ] ')+items[lineIndex].replace(/^\[.\]\s*/,'');
         await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\\n')})});
-      } catch(e){ console.error('toggleListItem failed', e); }
+      }catch(e){console.error('toggleListItem failed',e);}
     }
-    // ── Reminder quick-action handlers ────────────────────────────────────────
-    async function quickDone(num, noteId){
-      if(!confirm('Mark reminder #'+num+' done and delete it?')) return;
+    async function quickDone(num,noteId){
+      if(!confirm('Mark reminder #'+num+' done and delete it?'))return;
       try{
         const r=await fetch('/remind-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'done',num})});
         const d=await r.json();
-        if(d.ok){ document.getElementById('note-'+noteId)?.remove(); }
+        if(d.ok)document.getElementById('note-'+noteId)?.remove();
         else alert('Failed: '+(d.error||'unknown'));
       }catch(e){alert('Failed');}
     }
-    async function quickSnooze(num, noteId){
+    async function quickSnooze(num,noteId){
       try{
         const r=await fetch('/remind-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'snooze',num})});
         const d=await r.json();
@@ -655,9 +634,9 @@ router.get('/', (req, res) => {
         }else alert('Failed: '+(d.error||'unknown'));
       }catch(e){alert('Failed');}
     }
-    async function quickSnoozePick(num, noteId){
-      const when=prompt('Snooze #'+num+' until when?\n\nExamples: friday 3pm, tomorrow, monday 10am, 2 weeks');
-      if(!when) return;
+    async function quickSnoozePick(num,noteId){
+      const when=prompt('Snooze #'+num+' until when?\\n\\nExamples: friday 3pm, tomorrow, monday 10am, 2 weeks');
+      if(!when)return;
       try{
         const r=await fetch('/remind-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'snooze',num,when})});
         const d=await r.json();
