@@ -43,9 +43,26 @@ function renderNote(n) {
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
   const isList   = n.type === 'list';
   const isRemind = n.type === 'remind';
+
+  // ── Reminder number badge — large, obvious, always first ──────────────────
+  const numBadge = (isRemind && n.remind_num != null)
+    ? `<span class="remind-num" title="Reminder #${n.remind_num} — type: done ${n.remind_num} or snooze ${n.remind_num}">#${n.remind_num}</span>`
+    : '';
+
+  // ── Reminder date badge ────────────────────────────────────────────────────
   const remindBadge = isRemind && n.remind_at
-    ? '<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ' + new Date(n.remind_at).toLocaleString() + '</span>'
+    ? `<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ${new Date(n.remind_at).toLocaleString()}</span>`
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
+
+  // ── Quick-action buttons for reminders with a number ──────────────────────
+  const quickActions = (isRemind && n.remind_num != null)
+    ? `<div class="remind-actions">
+        <button class="btn-done" onclick="quickDone(${n.remind_num},${n.id})" title="done ${n.remind_num}">✓ done ${n.remind_num}</button>
+        <button class="btn-snooze" onclick="quickSnooze(${n.remind_num},${n.id})" title="snooze ${n.remind_num}">⏱ snooze ${n.remind_num}</button>
+        <button class="btn-snooze-pick" onclick="quickSnoozePick(${n.remind_num},${n.id})" title="snooze to...">📅 snooze to…</button>
+      </div>`
+    : '';
+
   const rawText = n.formatted || n.raw_input || '';
   const collapsible = !ip;
   const formattedContent = isList
@@ -55,8 +72,9 @@ function renderNote(n) {
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
   const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
 
-  return `<div class="note${ip?' note-pending':''}" id="note-${n.id}">
+  return `<div class="note${ip?' note-pending':''}${isRemind&&n.remind_num!=null?' note-remind':''}" id="note-${n.id}">
     <div class="note-meta">
+      ${numBadge}
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
       ${ip?'<span class="pending-badge">⏳ unsynced</span>':''}
       ${remindBadge}
@@ -67,6 +85,7 @@ function renderNote(n) {
       </span>
     </div>
     ${formattedContent}
+    ${quickActions}
     <div class="note-edit" id="edit-${n.id}" style="display:none">
       <textarea class="edit-ta" id="etxt-${n.id}">${esc(n.formatted||n.raw_input)}</textarea>
       <div style="display:flex;gap:8px;margin-top:6px">
@@ -101,6 +120,21 @@ router.get('/notes-html', (req, res) => {
   const { q, type, sort } = req.query;
   const notes = queryNotes(q, type, '', sort);
   res.send(notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>');
+});
+
+// POST /remind-cmd — handle done/snooze directly from UI buttons (no sync needed)
+router.post('/remind-cmd', (req, res) => {
+  const { cmd, num, when } = req.body;
+  if (!cmd || num == null) return res.json({ ok: false, error: 'Missing cmd or num' });
+  try {
+    const { processCommands } = require('../lib/remind');
+    let text;
+    if (cmd === 'done')   text = `done ${num}`;
+    if (cmd === 'snooze') text = when ? `snooze ${num} ${when}` : `snooze ${num}`;
+    if (!text) return res.json({ ok: false, error: 'Unknown cmd' });
+    const results = processCommands(text);
+    res.json({ ok: true, results });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
 router.get('/', (req, res) => {
@@ -201,6 +235,7 @@ router.get('/', (req, res) => {
     .note{background:#0d1117;border:1px solid #1e2d45;border-radius:10px;padding:16px;margin-bottom:12px}
     .note:hover{border-color:#2d4a7a}
     .note-pending{border-color:#f59e0b30;background:#1a1500}
+    .note-remind{border-color:#f472b630;background:#1a0a14}
     .note-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
     .note-type{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:20px;border:1px solid}
     .pending-badge{font-size:.7rem;color:#f59e0b;background:#292208;padding:2px 7px;border-radius:20px;border:1px solid #f59e0b30}
@@ -236,6 +271,16 @@ router.get('/', (req, res) => {
     .list-collapse{max-height:140px;overflow:hidden}
     .btn-expand{background:none;border:none;color:#3b82f6;font-size:.78rem;cursor:pointer;padding:3px 0;margin-top:2px;display:block;opacity:.8}
     .btn-expand:hover{color:#60a5fa;opacity:1}
+    /* ── Reminder number badge ── */
+    .remind-num{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 10px;background:#7c1d3f;color:#fda4af;font-size:1rem;font-weight:800;border-radius:8px;border:2px solid #f472b6;letter-spacing:.5px;cursor:default;flex-shrink:0}
+    /* ── Reminder quick-action buttons ── */
+    .remind-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .btn-done{background:#14532d;color:#4ade80;border:1px solid #4ade8040;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
+    .btn-done:hover{background:#166534;border-color:#4ade80}
+    .btn-snooze{background:#1e1a35;color:#a78bfa;border:1px solid #a78bfa40;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
+    .btn-snooze:hover{background:#2e1a5e;border-color:#a78bfa}
+    .btn-snooze-pick{background:#1a2232;color:#60a5fa;border:1px solid #60a5fa40;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
+    .btn-snooze-pick:hover{background:#1e3a5f;border-color:#60a5fa}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -363,11 +408,12 @@ router.get('/', (req, res) => {
               <span style="font-size:.75rem;color:#475569">or one item per line — both work</span>
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Reminder commands (after sync)</div>
+              <div class="cmd-label">Reminder commands (Add Note → no sync needed)</div>
               <code>done N</code> — mark reminder N complete<br>
               <code>snooze N</code> — snooze 1 week<br>
               <code>snooze N friday 3pm</code> — snooze to specific time<br>
-              <code>change N to call dentist thursday</code>
+              <code>change N to call dentist thursday</code><br>
+              <span style="font-size:.75rem;color:#4ade80">Or use the ✓ done / ⏱ snooze buttons on each reminder card</span>
             </div>
           </div>
         </div>
@@ -573,22 +619,55 @@ router.get('/', (req, res) => {
     // Toggle list item checked state and persist to server
     async function toggleListItem(noteId, lineIndex, checked){
       try{
-        // Find by checkbox ID (lineIndex = actual text line index, not DOM position)
         const chkEl = document.getElementById('chk-'+noteId+'-'+lineIndex);
         if(!chkEl) return;
         const span = chkEl.parentElement?.querySelector('span');
         if(span) span.style.textDecoration = checked ? 'line-through' : '';
         if(span) span.style.color = checked ? '#475569' : '';
-        // Fetch current note text, update [x]/[ ] markers, save
         const r = await fetch('/notes/'+noteId);
         const d = await r.json();
         if(!d.ok) return;
         const lines = (d.formatted || '').split('\\n');
-        // Strip existing markers and reapply
         const items = lines.filter(l => l.trim());
         items[lineIndex] = (checked ? '[x] ' : '[ ] ') + items[lineIndex].replace(/^\[.\]\s*/,'');
         await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\\n')})});
       } catch(e){ console.error('toggleListItem failed', e); }
+    }
+    // ── Reminder quick-action handlers ────────────────────────────────────────
+    async function quickDone(num, noteId){
+      if(!confirm('Mark reminder #'+num+' done and delete it?')) return;
+      try{
+        const r=await fetch('/remind-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'done',num})});
+        const d=await r.json();
+        if(d.ok){ document.getElementById('note-'+noteId)?.remove(); }
+        else alert('Failed: '+(d.error||'unknown'));
+      }catch(e){alert('Failed');}
+    }
+    async function quickSnooze(num, noteId){
+      try{
+        const r=await fetch('/remind-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'snooze',num})});
+        const d=await r.json();
+        if(d.ok){
+          const res=d.results&&d.results[0];
+          const newDate=res&&res.newDate?new Date(res.newDate).toLocaleString():'1 week';
+          const noteEl=document.getElementById('note-'+noteId);
+          if(noteEl){const badge=noteEl.querySelector('span[style*="f472b6"]');if(badge)badge.textContent='🔔 '+newDate;}
+        }else alert('Failed: '+(d.error||'unknown'));
+      }catch(e){alert('Failed');}
+    }
+    async function quickSnoozePick(num, noteId){
+      const when=prompt('Snooze #'+num+' until when?\n\nExamples: friday 3pm, tomorrow, monday 10am, 2 weeks');
+      if(!when) return;
+      try{
+        const r=await fetch('/remind-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'snooze',num,when})});
+        const d=await r.json();
+        if(d.ok){
+          const res=d.results&&d.results[0];
+          const newDate=res&&res.newDate?new Date(res.newDate).toLocaleString():when;
+          const noteEl=document.getElementById('note-'+noteId);
+          if(noteEl){const badge=noteEl.querySelector('span[style*="f472b6"]');if(badge)badge.textContent='🔔 '+newDate;}
+        }else alert('Failed: '+(d.error||'unknown'));
+      }catch(e){alert('Failed');}
     }
   </script></body></html>`);
 });
