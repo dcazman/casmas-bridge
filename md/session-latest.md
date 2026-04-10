@@ -1,13 +1,12 @@
 # Anchor — Session Context
-**Generated:** 4/10/2026, 10:05:03 AM
+**Generated:** 4/10/2026, 1:38:24 PM
 **Pending notes:** 0 | **Last sync:** 4/9/2026, 6:23:26 PM
 
 ## 🔔 Active Reminders
-5) animals to vet — due 4/10/2026, 11:00:00 AM
 7) make doc apt
-For 6 days to get stitches out — due 4/10/2026, 11:00:00 AM
+For 6 days to get stitches out — due 4/10/2026, 11:00:00 AM ✓sent
 10) tax follow up — due 4/11/2026, 11:00:00 AM
-11) finish taxes before — due 4/11/2026, 12:00:00 PM
+12) animals to vet — due 4/16/2026, 11:00:00 AM
 9) smoked meat
 Smoker Thursdays - Master's Edition at Lithia Creek Tavern / Lincoln Country Club. BBQ s — due 4/16/2026, 4:00:00 PM
 
