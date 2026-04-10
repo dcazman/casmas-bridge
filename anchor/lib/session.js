@@ -115,6 +115,7 @@ function gitExec(cmd, cwd = BRIDGE_PATH) {
 function pullBridge() {
   try {
     const before = gitExec('git rev-parse HEAD');
+    try { gitExec('git checkout -- .'); } catch (_) {} // discard any local edits so pull never conflicts
     const out    = gitExec('git pull');
     const after  = gitExec('git rev-parse HEAD');
     const changed = before !== after;
