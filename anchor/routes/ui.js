@@ -38,6 +38,7 @@ function renderNote(n) {
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
   const isList   = n.type === 'list';
   const isRemind = n.type === 'remind';
+  const isOpenLoop = n.type === 'open-loop';
 
   const numBadge = (isRemind && n.remind_num != null)
     ? `<span class="remind-num" title="Reminder #${n.remind_num} — type: done ${n.remind_num} or snooze ${n.remind_num}">#${n.remind_num}</span>`
@@ -46,6 +47,10 @@ function renderNote(n) {
   const remindBadge = isRemind && n.remind_at
     ? `<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ${new Date(n.remind_at).toLocaleString()}</span>`
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
+
+  const openLoopBadge = isOpenLoop
+    ? '<span style="font-size:.7rem;color:#fb923c;background:#1a0a00;padding:2px 7px;border-radius:20px;border:1px solid #fb923c40">🔓 open loop — in daily email</span>'
+    : '';
 
   const quickActions = (isRemind && n.remind_num != null)
     ? `<div class="remind-actions">
@@ -64,12 +69,13 @@ function renderNote(n) {
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
   const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
 
-  return `<div class="note${ip?' note-pending':''}${isRemind&&n.remind_num!=null?' note-remind':''}" id="note-${n.id}">
+  return `<div class="note${ip?' note-pending':''}${isRemind&&n.remind_num!=null?' note-remind':''}${isOpenLoop?' note-openloop':''}" id="note-${n.id}">
     <div class="note-meta">
       ${numBadge}
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
       ${ip?'<span class="pending-badge">⏳ unsynced</span>':''}
       ${remindBadge}
+      ${openLoopBadge}
       <span class="note-date" data-ts="${esc(dateTs)}"></span>
       <span class="note-actions">
         <button class="btn-icon" onclick="startEdit(${n.id})">✏️</button>
@@ -152,7 +158,7 @@ router.get('/', (req, res) => {
     {l:'Kids',t:['kids','kids-task']},
     {l:'Health',t:['health','health-task']},
     {l:'Finance',t:['finance','finance-task']},
-    {l:'Universal',t:['social','calendar','email','idea','pi','random','brain-dump']},
+    {l:'Universal',t:['social','calendar','email','idea','open-loop','pi','random','brain-dump']},
     {l:'Utility',t:['remind','list','summary']}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
@@ -227,6 +233,7 @@ router.get('/', (req, res) => {
     .note:hover{border-color:#2d4a7a}
     .note-pending{border-color:#f59e0b30;background:#1a1500}
     .note-remind{border-color:#f472b630;background:#1a0a14}
+    .note-openloop{border-color:#fb923c50;background:#1a0d00}
     .note-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
     .note-type{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:20px;border:1px solid}
     .pending-badge{font-size:.7rem;color:#f59e0b;background:#292208;padding:2px 7px;border-radius:20px;border:1px solid #f59e0b30}
@@ -374,6 +381,7 @@ router.get('/', (req, res) => {
               <code>cat ho</code> home &nbsp;|&nbsp; <code>cat ht</code> home-task<br>
               <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
               <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
+              <code>cat ol</code> open-loop — shows in daily email 🔓<br>
               <code>cat so</code> social &nbsp;|&nbsp; <code>cat rem</code> remind &nbsp;|&nbsp; <code>cat ls</code> list<br>
               <code>cat s</code> summary &nbsp;|&nbsp; <code>cat sum</code> summary &nbsp;|&nbsp; <code>cat summ</code> summary<br>
               <code>cat emp</code> employment
@@ -555,7 +563,6 @@ router.get('/', (req, res) => {
         }
       }
     });
-    // Safe search listeners — elements live inside collapsed panels, guard with ?.
     document.getElementById('sq')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
     let _st;
     document.getElementById('sq')?.addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});

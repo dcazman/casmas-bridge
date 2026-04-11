@@ -34,6 +34,7 @@ const ALL_TYPES = [
   'health','health-task',
   'finance','finance-task',
   'social','calendar','email','pi','idea','random','brain-dump',
+  'open-loop',
   'anchor','anchor-task',
   'employment','work-claude-handoff','system-summary',
   'remind','list','summary'
@@ -49,6 +50,7 @@ const CAT = {
   'h':'health','hat':'health-task',
   'f':'finance','ft':'finance-task',
   'so':'social','c':'calendar','e':'email','i':'idea','pi':'pi','r':'random','bd':'brain-dump',
+  'ol':'open-loop',
   's':'summary','sum':'summary','summ':'summary',
   'a':'anchor','at':'anchor-task',
   'rem':'remind','re':'remind','ls':'list','li':'list',
@@ -94,6 +96,7 @@ const COLORS = {
   'health':'#f87171','health-task':'#ef4444',
   'finance':'#4ade80','finance-task':'#16a34a',
   'social':'#86efac','summary':'#fbbf24','calendar':'#c084fc','email':'#67e8f9','idea':'#a78bfa','pi':'#fcd34d','random':'#94a3b8',
+  'open-loop':'#fb923c',
   'anchor':'#34d399','anchor-task':'#10b981',
   'employment':'#94a3b8','work-claude-handoff':'#94a3b8','system-summary':'#94a3b8',
   'remind':'#f472b6','list':'#22d3ee'
