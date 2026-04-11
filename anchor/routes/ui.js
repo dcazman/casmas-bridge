@@ -212,7 +212,7 @@ router.get('/', (req, res) => {
     .btn-opus{background:#1e1a35;color:#a78bfa;border:1px solid #a78bfa40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-bridge{background:#1e2d45;color:#4ade80;border:1px solid #4ade8040;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-rebuild{background:#2d1e1e;color:#f87171;border:1px solid #f8717140;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
-    .btn-alert{background:#1e2d45;color:#fb923c;border:1px solid #fb923c40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn-digest{background:#1e2d45;color:#fb923c;border:1px solid #fb923c40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-groom{background:#1e2d45;color:#c084fc;border:1px solid #c084fc40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-remind-toggle{background:#1e2d45;color:#f472b6;border:1px solid #f472b640;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap}
     .btn-remind-toggle.active{background:#2d0a1a;color:#fda4af;border-color:#f472b6}
@@ -320,7 +320,7 @@ router.get('/', (req, res) => {
             <button class="btn-bridge" onclick="pullBridge()">⇄ Sync Bridge</button>
             <button class="btn-rebuild" onclick="runRebuild()">🔨 Rebuild</button>
             <button class="btn-groom" onclick="runGroom()">🧹 Groom</button>
-            ${emailEnabled?'<button class="btn-alert" onclick="sendAlert()">📧 Alert</button>':''}
+            ${emailEnabled?'<button class="btn-digest" onclick="sendDigest()">📋 Digest</button>':''}
             <span class="status" id="bs" style="margin:0"></span>
           </div>
           <div class="groom-report" id="groomReport"></div>
@@ -475,7 +475,7 @@ router.get('/', (req, res) => {
         else{s.textContent='✗ '+(d.error||'Groom failed');}
       }catch(e){s.textContent='✗ Failed';}
     }
-    async function sendAlert(){
+    async function sendDigest(){
       const s=document.getElementById('bs');s.textContent='⏳ Sending...';
       try{const r=await fetch('/alert',{method:'POST'});const d=await r.json();s.textContent=d.ok?'✓ Sent':'✗ '+(d.error||'Failed');}
       catch(e){s.textContent='✗ Failed';}
@@ -508,7 +508,6 @@ router.get('/', (req, res) => {
       const btn=document.getElementById('remindToggle');
       btn.classList.toggle('active',_showReminders);
       btn.textContent=_showReminders?'🔔 Reminders ✓':'🔔 Reminders';
-      // clear type filter if switching to reminder view
       const st=document.getElementById('st');
       if(_showReminders&&st)st.value='';
       doSearch();
