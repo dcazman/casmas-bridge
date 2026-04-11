@@ -36,8 +36,8 @@ function renderNote(n) {
   n = decryptNote(n);
   const color = typeColor(n.type), ip = n.status==='pending';
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
-  const isList   = n.type === 'list';
-  const isRemind = n.type === 'remind';
+  const isList    = n.type === 'list';
+  const isRemind  = n.type === 'remind';
   const isOpenLoop = n.type === 'open-loop';
 
   const numBadge = (isRemind && n.remind_num != null)
@@ -54,9 +54,9 @@ function renderNote(n) {
 
   const quickActions = (isRemind && n.remind_num != null)
     ? `<div class="remind-actions">
-        <button class="btn-done" onclick="quickDone(${n.remind_num},${n.id})" title="done ${n.remind_num}">✓ done ${n.remind_num}</button>
-        <button class="btn-snooze" onclick="quickSnooze(${n.remind_num},${n.id})" title="snooze ${n.remind_num}">⏱ snooze ${n.remind_num}</button>
-        <button class="btn-snooze-pick" onclick="quickSnoozePick(${n.remind_num},${n.id})" title="snooze to...">📅 snooze to…</button>
+        <button class="btn-done" onclick="quickDone(${n.remind_num},${n.id})">✓ done ${n.remind_num}</button>
+        <button class="btn-snooze" onclick="quickSnooze(${n.remind_num},${n.id})">⏱ snooze ${n.remind_num}</button>
+        <button class="btn-snooze-pick" onclick="quickSnoozePick(${n.remind_num},${n.id})">📅 snooze to…</button>
       </div>`
     : '';
 
@@ -74,8 +74,7 @@ function renderNote(n) {
       ${numBadge}
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
       ${ip?'<span class="pending-badge">⏳ unsynced</span>':''}
-      ${remindBadge}
-      ${openLoopBadge}
+      ${remindBadge}${openLoopBadge}
       <span class="note-date" data-ts="${esc(dateTs)}"></span>
       <span class="note-actions">
         <button class="btn-icon" onclick="startEdit(${n.id})">✏️</button>
@@ -261,9 +260,9 @@ router.get('/', (req, res) => {
     .groom-report{margin-top:8px;padding:10px 12px;background:#0d1117;border:1px solid #c084fc30;border-radius:8px;font-size:.82rem;color:#c4b5fd;white-space:pre-wrap;display:none}
     .otd-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:14px}
     .empty{color:#334155;font-size:.9rem;padding:20px;text-align:center}
-    .cmd-ref{font-size:.82rem;color:#94a3b8;line-height:1.8}
+    .cmd-ref{font-size:.82rem;color:#94a3b8;line-height:1.9}
     .cmd-ref code{background:#0d1117;color:#22d3ee;padding:1px 6px;border-radius:4px;font-size:.8rem;font-family:monospace}
-    .cmd-ref .cmd-group{margin-bottom:10px}
+    .cmd-ref .cmd-group{margin-bottom:12px}
     .cmd-ref .cmd-label{color:#475569;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
     .fmt-collapse{max-height:72px;overflow:hidden}
     .list-collapse{max-height:140px;overflow:hidden}
@@ -371,46 +370,30 @@ router.get('/', (req, res) => {
       </div>
 
       <div class="panel">
-        <h2 onclick="tp('refb','refc')"><span class="dot" style="background:#22d3ee"></span>📖 Command Reference<span class="chev" id="refc">▼</span></h2>
+        <h2 onclick="tp('refb','refc')"><span class="dot" style="background:#22d3ee"></span>📖 Commands<span class="chev" id="refc">▼</span></h2>
         <div id="refb" class="collapsed">
           <div class="cmd-ref">
             <div class="cmd-group">
-              <div class="cmd-label">Categories (cat markup)</div>
-              <code>cat w</code> work &nbsp;|&nbsp; <code>cat wt</code> work-task &nbsp;|&nbsp; <code>cat wd</code> work-decision<br>
+              <div class="cmd-label">Categories</div>
+              <code>cat w</code> work &nbsp;|&nbsp; <code>cat wt</code> task &nbsp;|&nbsp; <code>cat wd</code> decision<br>
               <code>cat p</code> personal &nbsp;|&nbsp; <code>cat pt</code> personal-task<br>
               <code>cat ho</code> home &nbsp;|&nbsp; <code>cat ht</code> home-task<br>
               <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
               <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
-              <code>cat ol</code> open-loop — shows in daily email 🔓<br>
-              <code>cat so</code> social &nbsp;|&nbsp; <code>cat rem</code> remind &nbsp;|&nbsp; <code>cat ls</code> list<br>
-              <code>cat s</code> summary &nbsp;|&nbsp; <code>cat sum</code> summary &nbsp;|&nbsp; <code>cat summ</code> summary<br>
-              <code>cat emp</code> employment
+              <code>cat ol</code> open-loop 🔓 &nbsp;|&nbsp; <code>cat ls</code> list &nbsp;|&nbsp; <code>cat s</code> summary
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Multi-cat (comma split)</div>
-              <code>cat w,at</code> → two notes: work + anchor-task<br>
-              <code>cat p,ht</code> → personal + home-task
+              <div class="cmd-label">Reminders — no sync needed</div>
+              <code>remind</code> or <code>r</code> or <code>todo</code><br>
+              <span style="color:#64748b">call dentist, monday 9am</span><br>
+              <span style="color:#64748b">pick up kids (no date = +7 days)</span>
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Reminders (direct — no sync needed)</div>
-              <code>remind</code> <code>reminder</code> <code>rem</code> <code>r</code> <code>todo</code><br>
-              pay bills, thursday 11am<br>
-              call doctor, next monday 9am<br>
-              doug to drink (no date = +7 days 11am)
-            </div>
-            <div class="cmd-group">
-              <div class="cmd-label">Lists (checkboxes in UI)</div>
-              <code>cat ls</code><br>
-              milk, eggs, butter<br>
-              <span style="font-size:.75rem;color:#475569">or one item per line — both work</span>
-            </div>
-            <div class="cmd-group">
-              <div class="cmd-label">Reminder commands (Add Note → no sync needed)</div>
-              <code>done N</code> — mark reminder N complete<br>
-              <code>snooze N</code> — snooze 1 week<br>
-              <code>snooze N friday 3pm</code> — snooze to specific time<br>
-              <code>change N to call dentist thursday</code><br>
-              <span style="font-size:.75rem;color:#4ade80">Or use the ✓ done / ⏱ snooze buttons on each reminder card</span>
+              <div class="cmd-label">Reminder commands — no sync needed</div>
+              <code>done N</code> — delete reminder<br>
+              <code>snooze N</code> — push 1 week<br>
+              <code>snooze N friday 3pm</code> — push to time<br>
+              <code>change N to new text thursday</code>
             </div>
           </div>
         </div>
@@ -458,7 +441,7 @@ router.get('/', (req, res) => {
         const r=await fetch('/pull-bridge?force=1',{method:'POST'});
         const d=await r.json();
         if(d.ok){
-          const applied = d.applyLog && d.applyLog.length ? ' — code applied, restarting…' : '';
+          const applied=d.applyLog&&d.applyLog.length?' — code applied, restarting…':'';
           s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped'+applied;
           setTimeout(()=>location.reload(),2500);
         }else{s.textContent='✗ '+(d.error||'Failed');}
@@ -466,14 +449,14 @@ router.get('/', (req, res) => {
     }
     async function runRebuild(){
       if(!confirm('Full Docker rebuild — service will be down for ~1-2 min. Continue?')) return;
-      const s=document.getElementById('bs');s.textContent='⏳ Rebuilding... (this takes ~1-2 min)';
+      const s=document.getElementById('bs');s.textContent='⏳ Rebuilding...';
       const btn=document.querySelector('.btn-rebuild');if(btn)btn.disabled=true;
       try{
         const r=await fetch('/pull-bridge/rebuild',{method:'POST'});
         const d=await r.json();
         if(d.ok){s.textContent='✓ Rebuild done — reloading in 5s…';setTimeout(()=>location.reload(),5000);}
         else{s.textContent='✗ '+(d.error||'Rebuild failed');}
-      }catch(e){s.textContent='✗ Request failed (container may have restarted — reload manually)';}
+      }catch(e){s.textContent='✗ Request failed (reload manually)';}
       if(btn)btn.disabled=false;
     }
     async function runGroom(){
@@ -608,7 +591,7 @@ router.get('/', (req, res) => {
       try{const r=await fetch('/notes/'+id,{method:'DELETE'});const d=await r.json();if(d.ok)document.getElementById('note-'+id).remove();else alert('Delete failed');}
       catch(e){alert('Delete failed');}
     }
-    async function toggleListItem(noteId, lineIndex, checked){
+    async function toggleListItem(noteId,lineIndex,checked){
       try{
         const chkEl=document.getElementById('chk-'+noteId+'-'+lineIndex);if(!chkEl)return;
         const span=chkEl.parentElement?.querySelector('span');

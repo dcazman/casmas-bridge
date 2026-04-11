@@ -25,14 +25,12 @@ function getActiveReminders() {
   } catch { return []; }
 }
 
-// Open loops from open_loops field (AI-detected)
 function getOpenLoops() {
   return db.prepare(
     "SELECT * FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops!='' ORDER BY created_at DESC LIMIT 15"
   ).all().map(decryptNote);
 }
 
-// Open loops from explicit open-loop type (manually set by Dan)
 function getOpenLoopNotes() {
   try {
     return db.prepare(
@@ -217,42 +215,49 @@ function processCommands(text) {
   return results;
 }
 
+// ── Email command block ───────────────────────────────────────────────────────
+// Shared footer used in both digest and individual reminder emails.
+
+function cmdBlock(ref) {
+  if (ref != null) {
+    return `Reply in Anchor (Add Note → Sync Now):\n  done ${ref}  ·  snooze ${ref}  ·  snooze ${ref} friday 3pm  ·  change ${ref} to new text`;
+  }
+  return `Reply in Anchor (Add Note → Sync Now):\n  done N  ·  snooze N  ·  snooze N friday 3pm  ·  change N to new text`;
+}
+
 // ── 7AM digest email builder ──────────────────────────────────────────────────
 
 function buildDigestEmail() {
-  const reminders   = getActiveReminders();
+  const reminders     = getActiveReminders();
   const openLoopNotes = getOpenLoopNotes();
-  const today       = new Date();
+  const today         = new Date();
   today.setHours(0, 0, 0, 0);
-  const tomorrow    = new Date(today);
+  const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const dueToday = reminders.filter(n => {
-    if (!n.remind_at) return false;
     const d = new Date(n.remind_at);
     return d >= today && d < tomorrow;
   });
   const upcoming = reminders.filter(n => {
-    if (!n.remind_at) return false;
     const d = new Date(n.remind_at);
     return d >= tomorrow;
   }).slice(0, 5);
 
-  const loops   = getOpenLoops();
+  const loops           = getOpenLoops();
   const { count: pending } = getPending();
+  const tz              = { timeZone: 'America/New_York' };
+  const dateStr         = new Date().toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', ...tz });
 
-  const tz      = { timeZone: 'America/New_York' };
-  const dateStr = new Date().toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', ...tz });
-
-  let body = `☀️ Anchor Morning Brief — ${dateStr}\n\n`;
+  let body = `☀️ Anchor — ${dateStr}\n\n`;
 
   if (dueToday.length) {
     body += `📅 Due Today\n`;
     for (const n of dueToday) {
-      const num     = n.remind_num ? `${n.remind_num})` : '•';
-      const text    = (n.formatted || '').split('\n')[0].trim().substring(0, 70);
-      const timeStr = new Date(n.remind_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
-      body += `${num} ${text} — ${timeStr}\n`;
+      const num  = n.remind_num ? `${n.remind_num})` : '•';
+      const text = (n.formatted || '').split('\n')[0].trim().substring(0, 70);
+      const time = new Date(n.remind_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
+      body += `  ${num} ${text} — ${time}\n`;
     }
     body += '\n';
   }
@@ -263,46 +268,40 @@ function buildDigestEmail() {
       const num  = n.remind_num ? `${n.remind_num})` : '•';
       const text = (n.formatted || '').split('\n')[0].trim().substring(0, 60);
       const when = new Date(n.remind_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
-      body += `${num} ${text} — ${when}\n`;
+      body += `  ${num} ${text} — ${when}\n`;
     }
     body += '\n';
   }
 
-  // ── Open loops — explicit open-loop notes (manually flagged) ──
   if (openLoopNotes.length) {
-    body += `🔓 Open Loops (${openLoopNotes.length})\n`;
+    body += `🔓 Open Loops\n`;
     for (const n of openLoopNotes) {
       const text = (n.formatted || n.raw_input || '').split('\n')[0].trim().substring(0, 90);
-      body += `• ${text}\n`;
+      body += `  • ${text}\n`;
     }
     body += '\n';
   }
 
-  // ── Open loops — AI-detected from open_loops field ──
   if (loops.length) {
-    body += `🔁 AI-Detected Loops (${loops.length})\n`;
+    body += `🔁 AI-Flagged Loops\n`;
     for (const n of loops.slice(0, 8)) {
-      body += `• ${(n.open_loops || '').substring(0, 90)}\n`;
+      body += `  • ${(n.open_loops || '').substring(0, 90)}\n`;
     }
-    if (loops.length > 8) body += `  ...and ${loops.length - 8} more\n`;
+    if (loops.length > 8) body += `  …and ${loops.length - 8} more\n`;
     body += '\n';
   }
 
-  if (pending > 0) {
-    body += `📋 ${pending} notes pending sync\n\n`;
-  }
+  if (pending > 0) body += `📋 ${pending} unsynced notes\n\n`;
 
   if (!dueToday.length && !upcoming.length && !openLoopNotes.length && !loops.length && !pending) {
-    body += `✅ All clear — nothing pending.\n\n`;
+    body += `✅ All clear.\n\n`;
   }
 
-  body += `---\nCommands: type in Add Note box and Sync Now\n`;
-  body += `  done N  |  snooze N  |  snooze N friday 10am  |  change N to new text\n`;
-  body += `\nanchor.thecasmas.com`;
+  body += `---\n${cmdBlock()}\nanchor.thecasmas.com`;
 
   const subject = dueToday.length
-    ? `☀️ Anchor — ${dueToday.length} reminder${dueToday.length > 1 ? 's' : ''} due today`
-    : `☀️ Anchor Morning Brief — ${dateStr}`;
+    ? `☀️ Anchor — ${dueToday.length} due today · ${dateStr}`
+    : `☀️ Anchor — ${dateStr}`;
 
   return { subject, body };
 }
@@ -323,53 +322,38 @@ function startScheduler() {
     } catch (e) {
       console.error('[remind] digest email failed:', e.message);
     }
-    try {
-      pushSessionMd();
-    } catch (e) {
-      console.error('[remind] session push failed:', e.message);
-    }
+    try { pushSessionMd(); } catch (e) { console.error('[remind] session push failed:', e.message); }
   }, { timezone: 'America/New_York' });
 
   cron.schedule('0 */3 * * *', async () => {
     try {
       const pull = pullBridge();
       if (pull.ok && pull.anchorFiles && pull.anchorFiles.length) {
-        console.log('[remind] anchor source files changed in git:', pull.anchorFiles.join(', '));
-        const apply = applyAnchorUpdate(pull.anchorFiles);
-        console.log('[remind] auto-apply:', apply.log.join('; '));
+        const apply    = applyAnchorUpdate(pull.anchorFiles);
         const fileList = pull.anchorFiles.map(f => '  • ' + f).join('\n');
         const applyLog = apply.log.map(l => '  ' + l).join('\n');
-        await sendEmail(
-          '⚓ Anchor — Source Updated & Applied',
-          `New code pulled and applied.\n\nChanged files:\n${fileList}\n\nApply log:\n${applyLog}`
-        );
+        await sendEmail('⚓ Anchor — Source Updated', `Files:\n${fileList}\n\nLog:\n${applyLog}`);
       }
-    } catch (e) {
-      console.error('[remind] 3hr cron error:', e.message);
-    }
+    } catch (e) { console.error('[remind] 3hr cron error:', e.message); }
   });
 
   cron.schedule('*/15 * * * *', async () => {
     const due = getDueReminders();
     if (!due.length) return;
-    console.log(`[remind] ${due.length} due reminder(s) firing`);
     for (const n of due) {
-      const num     = n.remind_num ? `${n.remind_num}) ` : '';
-      const preview = (n.formatted || n.raw_input || '').substring(0, 60);
-      const subject = `⏰ Anchor Reminder — ${preview}`;
       const ref     = n.remind_num || n.id;
-      const body    = `${num}${n.formatted || n.raw_input}\n\nCommands (type in Add Note → Sync Now):\n  done ${ref}  |  snooze ${ref}  |  snooze ${ref} friday 10am\n\nanchor.thecasmas.com`;
+      const num     = n.remind_num ? `${n.remind_num}) ` : '';
+      const preview = (n.formatted || n.raw_input || '').split('\n')[0].trim().substring(0, 60);
+      const subject = `⏰ ${num}${preview}`;
+      const body    = `${num}${n.formatted || n.raw_input}\n\n---\n${cmdBlock(ref)}\nanchor.thecasmas.com`;
       try {
         await sendEmail(subject, body);
         markReminderSent(n.id);
-        console.log(`[remind] fired reminder id=${n.id} num=${n.remind_num}`);
-      } catch (e) {
-        console.error('[remind] reminder email failed:', e.message);
-      }
+      } catch (e) { console.error('[remind] reminder email failed:', e.message); }
     }
   });
 
-  console.log('[remind] scheduler ready — 7AM digest, 15min reminders, 3hr git pull+apply');
+  console.log('[remind] scheduler ready');
 }
 
 module.exports = { startScheduler, processCommands, isReminderCommand, nextRemindNum, parseReminderDate, parseRemindLine };
