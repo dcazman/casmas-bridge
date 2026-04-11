@@ -81,16 +81,16 @@ router.post('/rebuild', async (req, res) => {
   }
 });
 
-// POST /alert
+// POST /alert — on-demand digest (same content as the 7AM scheduled email)
 router.post('/alert', async (req, res) => {
-  const { count: pc } = getPending();
-  const loops = db.prepare("SELECT COUNT(*) as c FROM notes WHERE status='processed' AND open_loops IS NOT NULL AND open_loops!=''").get();
-  const u = getUsageStats();
-  const r = await sendEmail(
-    'Anchor Alert — ' + pc + ' pending, ' + loops.c + ' open loops',
-    'Pending: ' + pc + '\nOpen loops: ' + loops.c + '\nAPI spend: $' + u.cost + ' / $' + u.limit + '\n\nVisit anchor.thecasmas.com'
-  );
-  res.json(r);
+  try {
+    const { buildDigestEmail } = require('../lib/remind');
+    const { subject, body } = buildDigestEmail();
+    const r = await sendEmail(subject, body);
+    res.json(r);
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 module.exports = { router, emailEnabled };

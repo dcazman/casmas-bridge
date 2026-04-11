@@ -216,7 +216,6 @@ function processCommands(text) {
 }
 
 // ── Email command block ───────────────────────────────────────────────────────
-// Shared footer used in both digest and individual reminder emails.
 
 function cmdBlock(ref) {
   if (ref != null) {
@@ -225,7 +224,7 @@ function cmdBlock(ref) {
   return `Reply in Anchor (Add Note → Sync Now):\n  done N  ·  snooze N  ·  snooze N friday 3pm  ·  change N to new text`;
 }
 
-// ── 7AM digest email builder ──────────────────────────────────────────────────
+// ── Digest email builder (shared by 7AM cron and on-demand alert) ─────────────
 
 function buildDigestEmail() {
   const reminders     = getActiveReminders();
@@ -356,4 +355,4 @@ function startScheduler() {
   console.log('[remind] scheduler ready');
 }
 
-module.exports = { startScheduler, processCommands, isReminderCommand, nextRemindNum, parseReminderDate, parseRemindLine };
+module.exports = { startScheduler, buildDigestEmail, processCommands, isReminderCommand, nextRemindNum, parseReminderDate, parseRemindLine };
