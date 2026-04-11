@@ -14,20 +14,17 @@ const { applyAnchorUpdate, rebuildAnchor } = require('../lib/deploy');
 const BRIDGE_PATH  = '/bridge';
 
 // POST /pull-bridge
-// ?force=1 — always copy all anchor/ source files even if git reports no changes
 router.post('/', async (req, res) => {
   try {
     const force = req.query.force === '1' || req.body.force === true || req.body.force === '1';
     const result = { ok: true, ingested: 0, skipped: 0, session: null, anchorFilesChanged: [], applyLog: [], forced: force };
 
-    // ── 1. Pull latest from git ────────────────────────────────────────────────
     const pull = pullBridge();
     if (!pull.ok) return res.json({ ok: false, error: 'git pull failed: ' + pull.error });
 
-    // ── 2. Apply anchor source files ──────────────────────────────────────────
     const hasNewFiles = pull.anchorFiles && pull.anchorFiles.length > 0;
     if (hasNewFiles || force) {
-      const filesToApply = force ? null : pull.anchorFiles; // null = force all
+      const filesToApply = force ? null : pull.anchorFiles;
       result.anchorFilesChanged = force ? ['(force — all files)'] : pull.anchorFiles;
       const apply = applyAnchorUpdate(filesToApply);
       result.applyLog = apply.log;
@@ -41,7 +38,6 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // ── 3. Ingest new md/ files ────────────────────────────────────────────────
     const mdDir = path.join(BRIDGE_PATH, 'md');
     if (fs.existsSync(mdDir)) {
       const files = fs.readdirSync(mdDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
@@ -58,7 +54,6 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // ── 4. Push session-latest.md ─────────────────────────────────────────────
     const session = pushSessionMd();
     result.session = session;
 
@@ -69,25 +64,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// POST /rebuild — force full docker compose build + up -d
+// POST /pull-bridge/rebuild
 router.post('/rebuild', async (req, res) => {
   try {
     console.log('[bridge] full rebuild requested');
     const result = rebuildAnchor();
     console.log('[bridge] rebuild log:', result.log.join('; '));
     res.json({ ok: true, log: result.log });
-  } catch (e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
-
-// POST /alert — on-demand digest (same content as the 7AM scheduled email)
-router.post('/alert', async (req, res) => {
-  try {
-    const { buildDigestEmail } = require('../lib/remind');
-    const { subject, body } = buildDigestEmail();
-    const r = await sendEmail(subject, body);
-    res.json(r);
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }

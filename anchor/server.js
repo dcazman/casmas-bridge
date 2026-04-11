@@ -15,7 +15,8 @@ const { router: bridgeRouter } = require('./routes/bridge');
 const mcpRouter    = require('./routes/mcp');
 const groomRouter  = require('./routes/groom');
 const { getUsageStats } = require('./lib/usage');
-const { startScheduler } = require('./lib/remind');
+const { startScheduler, buildDigestEmail } = require('./lib/remind');
+const { sendEmail, emailEnabled } = require('./lib/email');
 
 app.use('/',      uiRouter);
 app.use('/note',  notesRouter);
@@ -23,12 +24,21 @@ app.use('/notes', notesRouter);
 app.use('/sync',  syncRouter);
 app.use('/chat',  chatRouter);
 app.use('/pull-bridge', bridgeRouter);
-app.use('/alert',       bridgeRouter);
 app.use('/groom',       groomRouter);
 app.use('/mcp',         mcpRouter);
 
-// POST /reclassify — used by anchor-mcp reclassify_note tool and UI reclassify button
-// Also clears review status so the 👁 badge goes away after manual review
+// POST /alert — on-demand digest email
+app.post('/alert', async (req, res) => {
+  try {
+    const { subject, body } = buildDigestEmail();
+    const r = await sendEmail(subject, body);
+    res.json(r);
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// POST /reclassify
 app.post('/reclassify', (req, res) => {
   const { id, type } = req.body;
   const { ALL_TYPES } = require('./lib/helpers');
