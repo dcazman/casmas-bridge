@@ -103,10 +103,11 @@ router.get('/apple-touch-icon.png', (q,s) => { s.setHeader('Content-Type','image
 router.get('/icon-192.png',         (q,s) => { s.setHeader('Content-Type','image/png'); s.send(ICON_BUF); });
 router.get('/manifest.json',        (q,s) => s.json({ name:'Anchor', short_name:'Anchor', description:"Dan's memory, context, and second brain", start_url:'/', display:'standalone', background_color:'#0d1117', theme_color:'#1e3a5f', icons:[{src:'/icon-192.png',sizes:'192x192',type:'image/png'}] }));
 
-function queryNotes(q, type, tag, sort) {
+function queryNotes(q, type, tag, sort, showReminders) {
   let query = 'SELECT * FROM notes WHERE 1=1'; const params = [];
   if (q)   { query += ' AND (formatted LIKE ? OR raw_input LIKE ? OR tags LIKE ?)'; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
   if (type){ query += ' AND type=?'; params.push(type); }
+  else if (!showReminders) { query += " AND type != 'remind'"; }
   if (tag) { query += ' AND tags LIKE ?'; params.push('%'+tag+'%'); }
   const so = { 'newest':'ORDER BY created_at DESC','oldest':'ORDER BY created_at ASC','type':'ORDER BY type ASC,created_at DESC','unsynced':"ORDER BY (status='pending') DESC,created_at DESC",'open-loops':"ORDER BY (open_loops IS NOT NULL AND open_loops!='') DESC,created_at DESC",'type-date':'ORDER BY type ASC,created_at DESC' };
   query += ' ' + (so[sort]||so['newest']) + ' LIMIT 30';
@@ -114,8 +115,9 @@ function queryNotes(q, type, tag, sort) {
 }
 
 router.get('/notes-html', (req, res) => {
-  const { q, type, sort } = req.query;
-  const notes = queryNotes(q, type, '', sort);
+  const { q, type, sort, reminders } = req.query;
+  const showReminders = reminders === '1' || type === 'remind';
+  const notes = queryNotes(q, type, '', sort, showReminders);
   res.send(notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>');
 });
 
@@ -135,7 +137,7 @@ router.post('/remind-cmd', (req, res) => {
 
 router.get('/', (req, res) => {
   const { q, type, tag, sort } = req.query;
-  const notes = queryNotes(q, type, tag, sort);
+  const notes = queryNotes(q, type, tag, sort, false);
 
   const { count: pc, estimatedTokens: pt } = getPending();
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
@@ -212,6 +214,8 @@ router.get('/', (req, res) => {
     .btn-rebuild{background:#2d1e1e;color:#f87171;border:1px solid #f8717140;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-alert{background:#1e2d45;color:#fb923c;border:1px solid #fb923c40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn-groom{background:#1e2d45;color:#c084fc;border:1px solid #c084fc40;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn-remind-toggle{background:#1e2d45;color:#f472b6;border:1px solid #f472b640;font-size:.82rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap}
+    .btn-remind-toggle.active{background:#2d0a1a;color:#fda4af;border-color:#f472b6}
     .btn-icon{background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 5px;opacity:.4;transition:opacity .15s}
     .btn-icon:hover{opacity:1}.btn-delete:hover{color:#f87171}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
@@ -340,6 +344,9 @@ router.get('/', (req, res) => {
               <option value="type-date" ${ss('type-date')}>Type+date</option>
             </select>
             <button class="btn btn-secondary" onclick="doSearch()">Search</button>
+          </div>
+          <div style="margin-bottom:12px">
+            <button class="btn-remind-toggle" id="remindToggle" onclick="toggleReminders()">🔔 Reminders</button>
           </div>
           <div class="notes-list">${notes.length?notes.map(renderNote).join(''):'<div class="empty">No notes yet.</div>'}</div>
         </div>
@@ -495,6 +502,17 @@ router.get('/', (req, res) => {
       fmt.classList.toggle(cls,!collapsed);
       btn.textContent=collapsed?'▲ less':'▼ more';
     }
+    let _showReminders=false;
+    function toggleReminders(){
+      _showReminders=!_showReminders;
+      const btn=document.getElementById('remindToggle');
+      btn.classList.toggle('active',_showReminders);
+      btn.textContent=_showReminders?'🔔 Reminders ✓':'🔔 Reminders';
+      // clear type filter if switching to reminder view
+      const st=document.getElementById('st');
+      if(_showReminders&&st)st.value='';
+      doSearch();
+    }
     const HIST_KEY='anchor_chat_history';const MAX_HIST=30;
     function loadHistory(){try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch{return[];}}
     function saveToHistory(q,a,engine){const h=loadHistory();h.push({ts:new Date().toLocaleString(),q,a,engine});if(h.length>MAX_HIST)h.splice(0,h.length-MAX_HIST);localStorage.setItem(HIST_KEY,JSON.stringify(h));renderHistory();}
@@ -549,11 +567,12 @@ router.get('/', (req, res) => {
     document.getElementById('sq')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
     let _st;
     document.getElementById('sq')?.addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});
-    document.getElementById('st')?.addEventListener('change',doSearch);
+    document.getElementById('st')?.addEventListener('change',()=>{_showReminders=false;document.getElementById('remindToggle').classList.remove('active');document.getElementById('remindToggle').textContent='🔔 Reminders';doSearch();});
     document.getElementById('so')?.addEventListener('change',doSearch);
     function doSearch(){
       const q=document.getElementById('sq')?.value||'',t=document.getElementById('st')?.value||'',s=document.getElementById('so')?.value||'';
       const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);
+      if(_showReminders&&!t)p.set('reminders','1');
       fetch('/notes-html?'+p.toString()).then(r=>r.text()).then(html=>{
         const nl=document.querySelector('.notes-list');if(nl){nl.innerHTML=html;renderTimestamps();}
       }).catch(e=>console.error('search failed',e));
