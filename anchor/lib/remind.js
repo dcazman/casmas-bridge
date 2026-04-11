@@ -5,6 +5,7 @@ const { encrypt, decrypt }            = require('./crypto');
 const { sendEmail }                   = require('./email');
 const { pullBridge, pushSessionMd }   = require('./session');
 const { applyAnchorUpdate }           = require('./deploy');
+const { getTempestBlock }             = require('./weather');
 
 // ── Reminder DB helpers ───────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ function cmdBlock(ref) {
 
 // ── Digest email builder (shared by 7AM cron and on-demand alert) ─────────────
 
-function buildDigestEmail() {
+async function buildDigestEmail() {
   const reminders     = getActiveReminders();
   const openLoopNotes = getOpenLoopNotes();
   const today         = new Date();
@@ -249,6 +250,14 @@ function buildDigestEmail() {
   const dateStr         = new Date().toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', ...tz });
 
   let body = `☀️ Anchor — ${dateStr}\n\n`;
+
+  // ── Tempest weather block (fails gracefully) ──────────────────────────────
+  try {
+    const weatherBlock = await getTempestBlock();
+    if (weatherBlock) body += weatherBlock + '\n\n';
+  } catch (e) {
+    console.warn('[remind] weather block error:', e.message, '— continuing without weather');
+  }
 
   if (dueToday.length) {
     body += `📅 Due Today\n`;
@@ -313,7 +322,7 @@ function startScheduler() {
   cron.schedule('0 7 * * *', async () => {
     console.log('[remind] 7AM digest running');
     try {
-      const { subject, body } = buildDigestEmail();
+      const { subject, body } = await buildDigestEmail();
       await sendEmail(subject, body);
       const due = getDueReminders();
       for (const n of due) markReminderSent(n.id);

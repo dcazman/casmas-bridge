@@ -17,6 +17,7 @@ const groomRouter  = require('./routes/groom');
 const { getUsageStats } = require('./lib/usage');
 const { startScheduler, buildDigestEmail } = require('./lib/remind');
 const { sendEmail, emailEnabled } = require('./lib/email');
+const { getTempestToken, setTempestToken, getTempestBlock } = require('./lib/weather');
 
 app.use('/',      uiRouter);
 app.use('/note',  notesRouter);
@@ -27,12 +28,43 @@ app.use('/pull-bridge', bridgeRouter);
 app.use('/groom',       groomRouter);
 app.use('/mcp',         mcpRouter);
 
-// POST /alert — on-demand digest email
+// POST /alert — on-demand digest email (buildDigestEmail is async due to weather)
 app.post('/alert', async (req, res) => {
   try {
-    const { subject, body } = buildDigestEmail();
+    const { subject, body } = await buildDigestEmail();
     const r = await sendEmail(subject, body);
     res.json(r);
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// GET /settings/tempest — check if token is configured
+app.get('/settings/tempest', (req, res) => {
+  const token = getTempestToken();
+  res.json({ ok: true, configured: !!token });
+});
+
+// POST /settings/tempest — store token + optional test fetch
+app.post('/settings/tempest', async (req, res) => {
+  const { token } = req.body;
+  if (!token || !token.trim()) return res.json({ ok: false, error: 'token required' });
+  try {
+    setTempestToken(token.trim());
+    // Test the token immediately
+    const block = await getTempestBlock();
+    res.json({ ok: true, test: block || 'Token saved but no observation returned' });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// DELETE /settings/tempest — remove token
+app.delete('/settings/tempest', (req, res) => {
+  try {
+    const { db } = require('./lib/db');
+    db.prepare("DELETE FROM secrets WHERE key='tempest_token'").run();
+    res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
