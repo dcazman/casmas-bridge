@@ -12,6 +12,9 @@ const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://192.168.50.50:11434';
 const USE_OLLAMA  = process.env.USE_OLLAMA === 'true';
 const OLLAMA_PROMPT_PATH = '/bridge/md/ollama-system-prompt.md';
 
+// Types that should never be reclassified by the sync engine
+const PROTECTED_TYPES = new Set(['list', 'pi', 'summary', 'anchor']);
+
 function loadOllamaPrompt() {
   try { return fs.readFileSync(OLLAMA_PROMPT_PATH, 'utf8').trim(); }
   catch { return 'You are Anchor, Dan Casmas\'s personal AI organizer.'; }
@@ -76,13 +79,25 @@ async function callAI(system, userContent) {
 }
 
 router.post('/', async (req, res) => {
-  const pending = db.prepare("SELECT id,raw_input FROM notes WHERE status='pending'").all();
+  const pending = db.prepare("SELECT id,type,raw_input FROM notes WHERE status='pending'").all();
   console.log(`[sync] POST received — ${pending.length} pending notes, ids: ${pending.map(n=>n.id).join(',')}`);
   if (!pending.length) return res.json({ ok: true, processed: 0 });
 
+  // Auto-process protected types — never send to AI
+  const protectedNotes = pending.filter(n => PROTECTED_TYPES.has(n.type));
+  if (protectedNotes.length) {
+    const protectedStmt = db.prepare("UPDATE notes SET status='processed' WHERE id=?");
+    for (const n of protectedNotes) {
+      protectedStmt.run(n.id);
+      console.log(`[sync] protected note ${n.id} (type=${n.type}) — marked processed, skipping AI`);
+    }
+  }
+
+  const unprotected = pending.filter(n => !PROTECTED_TYPES.has(n.type));
+
   const commands = [];
   const regular  = [];
-  for (const n of pending) {
+  for (const n of unprotected) {
     const text = decrypt(n.raw_input) || '';
     if (isReminderCommand(text)) commands.push({ id: n.id, text });
     else regular.push(n);
@@ -97,7 +112,7 @@ router.post('/', async (req, res) => {
 
   if (!regular.length) {
     setLastSync();
-    return res.json({ ok: true, processed: 0, commands: commandResults.length, commandDetail: commandResults });
+    return res.json({ ok: true, processed: protectedNotes.length, protected: protectedNotes.length, commands: commandResults.length, commandDetail: commandResults });
   }
 
   const dec   = regular.map(n => ({ id: n.id, text: decrypt(n.raw_input) }));
@@ -176,6 +191,7 @@ No markdown. No explanation. Only the JSON array.`;
     res.json({
       ok:        true,
       processed: results.filter(r => !r.uncertain).length,
+      protected: protectedNotes.length,
       flagged:   results.filter(r => r.uncertain).length + stillPending.length,
       reminders: results.filter(r => r.remind_at).length,
       splits:    Math.max(0, results.length - regular.length),
