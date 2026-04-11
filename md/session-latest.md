@@ -1,10 +1,9 @@
 # Anchor — Session Context
-**Generated:** 4/11/2026, 7:00:03 AM
+**Generated:** 4/11/2026, 1:40:34 PM
 **Pending notes:** 0 | **Last sync:** 4/10/2026, 6:39:53 PM
 
 ## 🔔 Active Reminders
 7) make doc apt — due 4/10/2026, 11:00:00 AM ✓sent
-10) tax follow up — due 4/11/2026, 11:00:00 AM
 12) animals to vet — due 4/16/2026, 11:00:00 AM
 9) smoked meat — due 4/16/2026, 4:00:00 PM
 15) auto policy — due 5/15/2026, 11:00:00 AM
