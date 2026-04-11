@@ -9,18 +9,22 @@ const ALERT_EMAIL  = process.env.ALERT_EMAIL || SMTP_USER;
 const ALERT_EMAIL2 = process.env.ALERT_EMAIL2 || '';
 const emailEnabled = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 
-// Build recipient list — primary + optional second address
 const toList = [ALERT_EMAIL, ALERT_EMAIL2].filter(Boolean).join(', ');
 
-let mailer = null;
-if (emailEnabled) {
-  mailer = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS } });
-}
-
 async function sendEmail(subject, body) {
-  if (!mailer) return { ok: false, error: 'Email not configured' };
-  try { await mailer.sendMail({ from: SMTP_USER, to: toList, subject, text: body }); return { ok: true }; }
-  catch (e) { return { ok: false, error: e.message }; }
+  if (!emailEnabled) return { ok: false, error: 'Email not configured' };
+  try {
+    const mailer = nodemailer.createTransport({
+      host: SMTP_HOST, port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    });
+    await mailer.sendMail({ from: SMTP_USER, to: toList, subject, text: body });
+    mailer.close();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 module.exports = { sendEmail, emailEnabled };
