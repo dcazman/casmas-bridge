@@ -429,7 +429,7 @@ router.get('/', (req, res) => {
               <div class="cmd-label">System</div>
               <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat re</code> remind &nbsp;|&nbsp; <code>cat r</code> random<br>
               <code>cat ol</code> open-loop &nbsp;|&nbsp; <code>cat cal</code> calendar &nbsp;|&nbsp; <code>cat ch</code> claude-handoff<br>
-              <span style="color:#475569;font-size:.75rem">💡 add [ ] / [x] lines to any note for checkboxes</span>
+              <div style="color:#475569;font-size:.75rem;margin-top:4px;line-height:1.5">✅ Any note becomes a checklist if lines start with <code style="background:#0d1117;color:#22d3ee;padding:1px 4px;border-radius:3px">[ ]</code> or <code style="background:#0d1117;color:#22d3ee;padding:1px 4px;border-radius:3px">[x]</code><br>Or use <code style="background:#0d1117;color:#22d3ee;padding:1px 4px;border-radius:3px">cat pp ls</code> to auto-checkbox every line</div>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders — no sync needed</div>
