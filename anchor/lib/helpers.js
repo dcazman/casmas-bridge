@@ -77,29 +77,39 @@ const CAT = {
   'pw':'password','pass':'password'
 };
 
-// parseCat: supports comma-separated types: "cat wt,wp" → two notes
+// parseCat: supports comma-separated types and ls modifier
+// "cat pp ls" → personal-project, each line gets [ ] prepended
+// "cat wt,wp" → two notes
 function parseCat(raw) {
   const lines = raw.split('\n'); const secs = []; let cur = null;
   for (const line of lines) {
-    const m = line.match(/^cat\s+(\S+)/i);
+    const m = line.match(/^cat\s+(\S+)(.*)?$/i);
     if (m) {
       if (cur && cur.lines.length) secs.push(cur);
-      const keys = m[1].split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-      if (keys.length > 1) {
-        for (let ki = 0; ki < keys.length; ki++) {
-          const t = CAT[keys[ki]] || (ALL_TYPES.includes(keys[ki]) ? keys[ki] : 'random');
-          cur = { type: t, lines: [] };
-          if (ki < keys.length - 1) secs.push(cur);
+      const tokens = m[1].split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+      const rest = (m[2] || '').trim().toLowerCase();
+      const isList = rest === 'ls' || rest === 'list';
+      if (tokens.length > 1) {
+        for (let ki = 0; ki < tokens.length; ki++) {
+          const t = CAT[tokens[ki]] || (ALL_TYPES.includes(tokens[ki]) ? tokens[ki] : 'random');
+          cur = { type: t, lines: [], isList };
+          if (ki < tokens.length - 1) secs.push(cur);
         }
       } else {
-        const k = keys[0];
-        cur = { type: CAT[k] || (ALL_TYPES.includes(k) ? k : 'random'), lines: [] };
+        const k = tokens[0];
+        cur = { type: CAT[k] || (ALL_TYPES.includes(k) ? k : 'random'), lines: [], isList };
       }
     } else if (cur && line.trim()) {
       cur.lines.push(line);
     }
   }
   if (cur && cur.lines.length) secs.push(cur);
+  // Apply ls formatting — prepend [ ] to every line that doesn't already have it
+  for (const sec of secs) {
+    if (sec.isList) {
+      sec.lines = sec.lines.map(l => /^\s*\[.\]/.test(l) ? l : '[ ] ' + l.trim());
+    }
+  }
   return secs.filter(s => s.lines.length > 0);
 }
 

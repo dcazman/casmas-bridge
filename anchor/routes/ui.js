@@ -391,8 +391,12 @@ router.get('/', (req, res) => {
             <div class="cmd-group">
               <div class="cmd-label">How to use cat</div>
               <code>cat pp</code><br>
-              <span style="color:#64748b">my note goes here</span><br>
-              <span style="color:#475569;font-size:.75rem">First line = cat command, rest = note content. Comma-split for multiple: <code>cat wt,wp</code></span>
+              <span style="color:#64748b">my note goes here</span><br><br>
+              <code>cat pp ls</code><br>
+              <span style="color:#64748b">Helinox Chair Zero</span><br>
+              <span style="color:#64748b">Nemo Fillo Pillow</span><br>
+              <span style="color:#475569;font-size:.75rem">Add <code>ls</code> after any cat to auto-format as a checklist. Each line becomes [ ] item.</span><br>
+              <span style="color:#475569;font-size:.75rem">Comma-split for multiple types: <code>cat wt,wp</code></span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Work</div>
