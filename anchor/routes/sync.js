@@ -123,6 +123,11 @@ router.post('/', async (req, res) => {
 ${guide ? 'GUIDE:\n' + guide : ''}
 Classify each note. Split multi-topic notes. Never use type 'brain-dump'.
 
+CONFIDENCE RULE: Rate your confidence 1-10 before committing to a type.
+- 7 or above → commit to your best guess, set uncertain=false
+- 6 or below → set uncertain=true (the note goes to random for manual review)
+A recipe, research note, or how-to guide you recognize is always a 7+. Only truly cryptic or garbled notes score below 6.
+
 REMINDERS: If a note contains reminder intent — phrases like "remind me", "remind dan", "don't forget", "remember to", "don't let me forget" — set remind_at to an ISO 8601 datetime string parsed from the note text (America/New_York timezone). Use today's date as the base for relative dates. If no specific time is given use null.
 
 Return ONLY a JSON array. Each object must have: source_id, type, formatted, tags, open_loops, uncertain, proposed_type, remind_at (string or null).
@@ -152,7 +157,6 @@ No markdown. No explanation. Only the JSON array.`;
       return res.json({ ok: true, processed: 0, flagged: regularIds.length, engine: USE_OLLAMA ? 'ollama' : 'anthropic' });
     }
 
-    // Uncertain notes become random/processed — no review status
     const flagUncertain = db.prepare("UPDATE notes SET status='processed', type='random' WHERE id=?");
     const ins = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags,open_loops) VALUES (?,?,?,?,?,?)');
 
