@@ -40,19 +40,15 @@ function renderNote(n) {
   const isList    = n.type === 'list';
   const isRemind  = n.type === 'remind';
   const isOpenLoop = n.type === 'open-loop';
-
   const numBadge = (isRemind && n.remind_num != null)
     ? `<span class="remind-num" title="Reminder #${n.remind_num} — type: done ${n.remind_num} or snooze ${n.remind_num}">#${n.remind_num}</span>`
     : '';
-
   const remindBadge = isRemind && n.remind_at
     ? `<span style="font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 7px;border-radius:20px;border:1px solid #f472b630">🔔 ${new Date(n.remind_at).toLocaleString()}</span>`
     : (isRemind ? '<span style="font-size:.7rem;color:#f472b6;opacity:.5">🔔 no alarm set</span>' : '');
-
   const openLoopBadge = isOpenLoop
     ? '<span style="font-size:.7rem;color:#fb923c;background:#1a0a00;padding:2px 7px;border-radius:20px;border:1px solid #fb923c40">🔓 open loop — in daily email</span>'
     : '';
-
   const quickActions = (isRemind && n.remind_num != null)
     ? `<div class="remind-actions">
         <button class="btn-done" onclick="quickDone(${n.remind_num},${n.id})">✓ done ${n.remind_num}</button>
@@ -60,7 +56,6 @@ function renderNote(n) {
         <button class="btn-snooze-pick" onclick="quickSnoozePick(${n.remind_num},${n.id})">📅 snooze to…</button>
       </div>`
     : '';
-
   const rawText = n.formatted || n.raw_input || '';
   const collapsible = !ip;
   const formattedContent = isList
@@ -69,7 +64,6 @@ function renderNote(n) {
     : '<div class="formatted' + (collapsible ? ' fmt-collapse' : '') + '" id="fmt-'+n.id+'">' + esc(rawText) + '</div>'
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
   const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
-
   return `<div class="note${ip?' note-pending':''}${isRemind&&n.remind_num!=null?' note-remind':''}${isOpenLoop?' note-openloop':''}" id="note-${n.id}">
     <div class="note-meta">
       ${numBadge}
@@ -139,7 +133,6 @@ router.post('/remind-cmd', (req, res) => {
 router.get('/', (req, res) => {
   const { q, type, tag, sort } = req.query;
   const notes = queryNotes(q, type, tag, sort, false);
-
   const { count: pc, estimatedTokens: pt } = getPending();
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
   const as  = shouldSync();
@@ -153,7 +146,6 @@ router.get('/', (req, res) => {
   const otd = d => db.prepare("SELECT * FROM notes WHERE date(datetime(created_at,'localtime'))=? LIMIT 3").all(d.toLocaleDateString('en-CA'));
   const yn=otd(ya), sn=otd(sa), mn=otd(ma);
   const hasOTD = yn.length||sn.length||mn.length;
-
   const TG = [
     {l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},
     {l:'Personal',t:['personal','personal-task','personal-decision']},
@@ -282,12 +274,10 @@ router.get('/', (req, res) => {
     .btn-snooze:hover{background:#2e1a5e;border-color:#a78bfa}
     .btn-snooze-pick{background:#1a2232;color:#60a5fa;border:1px solid #60a5fa40;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
     .btn-snooze-pick:hover{background:#1e3a5f;border-color:#60a5fa}
-    /* ── Weather panel ── */
     .wx-panel{background:#0d1117;border-radius:10px;padding:14px 16px}
     .wx-main{display:flex;align-items:flex-end;gap:16px;margin-bottom:10px}
     .wx-temp{font-size:2.8rem;font-weight:700;color:#f0f9ff;line-height:1}
     .wx-feels{font-size:.8rem;color:#475569;margin-top:2px}
-    .wx-right{flex:1}
     .wx-row{display:flex;gap:16px;flex-wrap:wrap}
     .wx-stat{display:flex;flex-direction:column;align-items:center;background:#161b27;border:1px solid #1e2d45;border-radius:8px;padding:8px 12px;min-width:72px}
     .wx-stat-val{font-size:1rem;font-weight:600;color:#e2e8f0}
@@ -323,7 +313,6 @@ router.get('/', (req, res) => {
         </div>
         <div class="status" id="ns"></div>
       </div>
-
       <div class="panel">
         <h2 onclick="tp('sb','sc')"><span class="dot" style="background:#f59e0b"></span>Sync Queue<span class="chev" id="sc">▼</span></h2>
         <div id="sb" class="collapsed">
@@ -345,7 +334,6 @@ router.get('/', (req, res) => {
           <div class="loading" id="sl">⏳ Classifying...</div>
         </div>
       </div>
-
       <div class="panel">
         <h2 onclick="tp('nb','nc')"><span class="dot" style="background:#34d399"></span>Notes<span class="chev" id="nc">▼</span></h2>
         <div id="nb" class="collapsed">
@@ -369,16 +357,13 @@ router.get('/', (req, res) => {
         </div>
       </div>
     </div>
-
     <div style="display:flex;flex-direction:column;gap:20px">
-
       ${hasWeather ? `<div class="panel" id="wxPanel">
         <h2><span class="dot" style="background:#38bdf8"></span>🌤 Casmas Weather
           <button class="wx-refresh" onclick="loadWeather()" title="Refresh">↻</button>
         </h2>
         <div id="wxBody"><div class="wx-loading">Loading...</div></div>
       </div>` : ''}
-
       <div class="panel">
         <h2 onclick="tp('cb','cc')"><span class="dot" style="background:#a78bfa"></span>Ask Anchor<span class="chev" id="cc">▼</span></h2>
         <div id="cb" class="collapsed">
@@ -400,7 +385,6 @@ router.get('/', (req, res) => {
           </div>
         </div>
       </div>
-
       <div class="panel">
         <h2 onclick="tp('refb','refc')"><span class="dot" style="background:#22d3ee"></span>📖 Commands<span class="chev" id="refc">▼</span></h2>
         <div id="refb" class="collapsed">
@@ -430,7 +414,6 @@ router.get('/', (req, res) => {
           </div>
         </div>
       </div>
-
       ${hasOTD?`<div class="panel">
         <h2><span class="dot" style="background:#fb923c"></span>🕰 On This Day</h2>
         ${yn.length?'<div class="otd-lbl">1 year ago</div>'+yn.map(renderNote).join(''):''}
@@ -439,14 +422,11 @@ router.get('/', (req, res) => {
       </div>`:''}
     </div>
   </div>
-
   <script>
     function renderTimestamps(){document.querySelectorAll('.note-date[data-ts]').forEach(el=>{const ts=el.getAttribute('data-ts');if(ts){const u=ts.includes('T')?ts:ts.replace(' ','T')+'Z';el.textContent=new Date(u).toLocaleString();}});}
     renderTimestamps();
     function clock(){const el=document.getElementById('hdrTime');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}
     clock();setInterval(clock,30000);
-
-    // ── Weather panel ──────────────────────────────────────────
     async function loadWeather(){
       const body=document.getElementById('wxBody');if(!body)return;
       try{
@@ -454,25 +434,29 @@ router.get('/', (req, res) => {
         if(!d.ok){body.innerHTML='<div class="wx-error">Unavailable</div>';return;}
         const feels=d.feelsF!=null&&d.feelsF!==d.tempF?'<div class="wx-feels">feels '+d.feelsF+'°F</div>':'';
         const gust=d.gustMph?d.windMph+' / '+d.gustMph:d.windMph||'—';
+        const hiLo=d.highF!=null&&d.lowF!=null?d.highF+'° / '+d.lowF+'°':'—';
+        const precipColor=d.precipChance>60?'#f87171':d.precipChance>30?'#fbbf24':'#4ade80';
         body.innerHTML=\`
           <div class="wx-panel">
             <div class="wx-main">
               <div><div class="wx-temp">\${d.tempF!=null?d.tempF+'°':'—'}</div>\${feels}</div>
+              \${d.forecastConditions||d.conditions?'<div style="font-size:.85rem;color:#94a3b8;margin-left:auto;text-align:right">'+(d.forecastConditions||d.conditions)+'</div>':''}
             </div>
             <div class="wx-row">
               <div class="wx-stat"><span class="wx-stat-val">\${d.humidity!=null?d.humidity+'%':'—'}</span><span class="wx-stat-lbl">Humidity</span></div>
               <div class="wx-stat"><span class="wx-stat-val">\${gust} mph</span><span class="wx-stat-lbl">Wind \${d.windDir||''}</span></div>
               <div class="wx-stat"><span class="wx-stat-val">\${d.pressureMb||'—'}</span><span class="wx-stat-lbl">Pressure mb</span></div>
               <div class="wx-stat"><span class="wx-stat-val">UV \${d.uv||'—'}</span><span class="wx-stat-lbl">Index</span></div>
-              \${d.rainIn?'<div class="wx-stat"><span class="wx-stat-val">'+d.rainIn+'"</span><span class="wx-stat-lbl">Rain today</span></div>':''}
-              \${d.lightning?'<div class="wx-stat"><span class="wx-stat-val">⚡ '+d.lightning+'</span><span class="wx-stat-lbl">Strikes</span></div>':''}
+              <div class="wx-stat"><span class="wx-stat-val">\${hiLo}</span><span class="wx-stat-lbl">Hi / Lo</span></div>
+              <div class="wx-stat"><span class="wx-stat-val" style="color:\${precipColor}">\${d.precipChance!=null?d.precipChance+'%':'—'}</span><span class="wx-stat-lbl">Rain chance</span></div>
+              \${d.rainToday?'<div class="wx-stat"><span class="wx-stat-val">'+d.rainToday+'"</span><span class="wx-stat-lbl">Rain today</span></div>':''}
+              \${d.lightning?'<div class="wx-stat"><span class="wx-stat-val">⚡ '+d.lightning+'</span><span class="wx-stat-lbl">Strikes/hr</span></div>':''}
             </div>
             <div class="wx-time">Updated \${d.time} · Casmas station</div>
           </div>\`;
       }catch(e){body.innerHTML='<div class="wx-error">Could not load weather</div>';}
     }
     if(document.getElementById('wxBody')){loadWeather();setInterval(loadWeather,600000);}
-
     function fileSelected(i){const n=i.files[0]?i.files[0].name:'';document.getElementById('fn').textContent=n;document.getElementById('cfi').style.display=n?'inline':'none';}
     function clearFile(){document.getElementById('fi').value='';document.getElementById('fn').textContent='';document.getElementById('cfi').style.display='none';}
     async function submitNote(){
@@ -498,13 +482,9 @@ router.get('/', (req, res) => {
     async function pullBridge(){
       const s=document.getElementById('bs');s.textContent='⏳ Syncing...';
       try{
-        const r=await fetch('/pull-bridge?force=1',{method:'POST'});
-        const d=await r.json();
-        if(d.ok){
-          const applied=d.applyLog&&d.applyLog.length?' — code applied, restarting…':'';
-          s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped'+applied;
-          setTimeout(()=>location.reload(),2500);
-        }else{s.textContent='✗ '+(d.error||'Failed');}
+        const r=await fetch('/pull-bridge?force=1',{method:'POST'});const d=await r.json();
+        if(d.ok){const applied=d.applyLog&&d.applyLog.length?' — code applied, restarting…':'';s.textContent='✓ '+d.ingested+' ingested, '+d.skipped+' skipped'+applied;setTimeout(()=>location.reload(),2500);}
+        else{s.textContent='✗ '+(d.error||'Failed');}
       }catch(e){s.textContent='✗ Failed';}
     }
     async function runRebuild(){
@@ -512,8 +492,7 @@ router.get('/', (req, res) => {
       const s=document.getElementById('bs');s.textContent='⏳ Rebuilding...';
       const btn=document.querySelector('.btn-rebuild');if(btn)btn.disabled=true;
       try{
-        const r=await fetch('/pull-bridge/rebuild',{method:'POST'});
-        const d=await r.json();
+        const r=await fetch('/pull-bridge/rebuild',{method:'POST'});const d=await r.json();
         if(d.ok){s.textContent='✓ Rebuild done — reloading in 5s…';setTimeout(()=>location.reload(),5000);}
         else{s.textContent='✗ '+(d.error||'Rebuild failed');}
       }catch(e){s.textContent='✗ Request failed (reload manually)';}
