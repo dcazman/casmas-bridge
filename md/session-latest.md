@@ -1,5 +1,5 @@
 # Anchor — Session Context
-**Generated:** 4/12/2026, 7:00:05 AM
+**Generated:** 4/12/2026, 12:48:41 PM
 **Pending notes:** 0 | **Last sync:** 4/11/2026, 11:07:37 PM
 
 ## 🔔 Active Reminders
@@ -10,11 +10,6 @@
 
 ## 🔓 Open Loops (manual)
 • Omv pihole
-• Apply for federal natural disaster for saddle Brook house damage
-
-## 💼 Recent Work Notes (7 days)
-• [work-idea] 4/11/2026 — Code Index — universal repo search (powered by Rooster/Ollama)
-• [work-task] 4/9/2026 — GCP project last-activity report script
 
 ## 📋 Anchor Quick Reference
 **UI:** anchor.thecasmas.com
