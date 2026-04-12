@@ -37,7 +37,7 @@ function renderNote(n) {
   n = decryptNote(n);
   const color = typeColor(n.type), ip = n.status==='pending';
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
-  const isList    = n.type === 'list';
+  const isList    = n.type === 'list' || /^\s*\[.\]/m.test(n.formatted || n.raw_input || '');
   const isRemind  = n.type === 'remind';
   const isOpenLoop = n.type === 'open-loop';
   const numBadge = (isRemind && n.remind_num != null)
@@ -153,7 +153,7 @@ router.get('/', (req, res) => {
     {l:'Finance',t:['finance-task','finance-idea','finance-project']},
     {l:'Family',t:['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw']},
     {l:'Pets',t:['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster']},
-    {l:'System',t:['pi','list','remind','random','open-loop','calendar','anchor','employment','claude-handoff']}
+    {l:'System',t:['pi','remind','random','open-loop','calendar','anchor','employment','claude-handoff']}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
@@ -416,8 +416,9 @@ router.get('/', (req, res) => {
             </div>
             <div class="cmd-group">
               <div class="cmd-label">System</div>
-              <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat ls</code> list &nbsp;|&nbsp; <code>cat re</code> remind &nbsp;|&nbsp; <code>cat r</code> random<br>
-              <code>cat ol</code> open-loop &nbsp;|&nbsp; <code>cat cal</code> calendar &nbsp;|&nbsp; <code>cat ch</code> claude-handoff
+              <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat re</code> remind &nbsp;|&nbsp; <code>cat r</code> random<br>
+              <code>cat ol</code> open-loop &nbsp;|&nbsp; <code>cat cal</code> calendar &nbsp;|&nbsp; <code>cat ch</code> claude-handoff<br>
+              <span style="color:#475569;font-size:.75rem">💡 add [ ] / [x] lines to any note for checkboxes</span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders — no sync needed</div>
