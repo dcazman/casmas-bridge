@@ -2,18 +2,12 @@
 /**
  * weather.js — Tempest weather integration for Anchor
  * Station: 192111 (Casmas weather, Lincolnton NC)
- * API docs: https://apidocs.tempestwx.com/reference/quick-start
  *
  * Token stored in secrets table under key 'tempest_token' (encrypted).
- * All functions are safe to call without a token — they return null silently.
- * buildDigestEmail() calls getTempestBlock() and prepends if non-null.
+ * All functions safe to call without a token — return null silently.
  *
- * NOTE: /observations/station/{id} returns named fields in obs objects,
- * not positional arrays. Fields: air_temperature, relative_humidity,
- * wind_avg, wind_gust, wind_direction, sea_level_pressure, uv,
- * precip_accum_local_day, feels_like, epoch, etc.
- * Units depend on station_units in response — default is metric.
- * We convert as needed (C→F, m/s→mph, mb is already mb).
+ * IMPORTANT: API always returns metric units (C, m/s) regardless of
+ * station_units setting — convert unconditionally to imperial for display.
  */
 
 const { db } = require('./db');
@@ -60,14 +54,13 @@ async function fetchObservation(token) {
   const data = await resp.json();
   const obs = data?.obs?.[0];
   if (!obs) throw new Error('No observation data returned');
-  // Return both the obs object and station_units for unit conversion
-  return { obs, units: data.station_units || {} };
+  return obs;
 }
 
-// ── Unit converters ───────────────────────────────────────────────────────────
+// ── Unit converters (API always returns metric) ───────────────────────────────
 
-function toF(c) { return c != null ? (c * 9/5 + 32) : null; }
-function msToMph(ms) { return ms != null ? ms * 2.237 : null; }
+function toF(c)      { return c   != null ? Math.round(c * 9/5 + 32)     : null; }
+function msToMph(ms) { return ms  != null ? Math.round(ms * 2.237)        : null; }
 
 function windDir(deg) {
   if (deg == null) return '';
@@ -77,40 +70,21 @@ function windDir(deg) {
 
 // ── Format observation into a text block ──────────────────────────────────────
 
-function formatObservation(obs, units) {
-  // Station endpoint returns named fields
-  const tempUnit = units.units_temp || 'c';
-  const windUnit = units.units_wind || 'mps';
-
-  // Temperature — convert C→F if needed
-  let tempRaw   = obs.air_temperature;
-  let feelsRaw  = obs.feels_like;
-  if (tempUnit === 'c' || tempUnit === 'metric') {
-    tempRaw  = toF(tempRaw);
-    feelsRaw = toF(feelsRaw);
-  }
-
-  // Wind — convert m/s→mph if needed
-  let windAvgRaw  = obs.wind_avg;
-  let windGustRaw = obs.wind_gust;
-  if (windUnit === 'mps' || windUnit === 'metric') {
-    windAvgRaw  = msToMph(windAvgRaw);
-    windGustRaw = msToMph(windGustRaw);
-  }
-
-  const tempF      = tempRaw   != null ? `${Math.round(tempRaw)}°F`       : '—';
-  const feelsLike  = feelsRaw  != null ? `${Math.round(feelsRaw)}°F`      : null;
-  const humidity   = obs.relative_humidity != null ? `${Math.round(obs.relative_humidity)}%` : '—';
-  const windAvg    = windAvgRaw  != null ? `${Math.round(windAvgRaw)} mph` : '—';
-  const windGust   = windGustRaw != null ? `${Math.round(windGustRaw)} mph`: null;
+function formatObservation(obs) {
+  const tempF      = obs.air_temperature    != null ? `${toF(obs.air_temperature)}°F`   : '—';
+  const feelsF     = obs.feels_like         != null ? `${toF(obs.feels_like)}°F`         : null;
+  const humidity   = obs.relative_humidity  != null ? `${Math.round(obs.relative_humidity)}%` : '—';
+  const windAvg    = obs.wind_avg           != null ? `${msToMph(obs.wind_avg)} mph`     : '—';
+  const windGust   = obs.wind_gust          != null && obs.wind_gust > 0
+    ? `${msToMph(obs.wind_gust)} mph` : null;
   const windDirStr = windDir(obs.wind_direction);
   const pressure   = obs.sea_level_pressure != null ? `${obs.sea_level_pressure.toFixed(1)} mb` : '—';
-  const uv         = obs.uv != null ? obs.uv.toFixed(1) : '—';
+  const uv         = obs.uv                 != null ? obs.uv.toFixed(1)                  : '—';
   const rain       = obs.precip_accum_local_day != null && obs.precip_accum_local_day > 0
     ? `${obs.precip_accum_local_day.toFixed(2)}"` : null;
 
   return [
-    `🌡  ${tempF}${feelsLike ? ` (feels ${feelsLike})` : ''}  💧 ${humidity}`,
+    `🌡  ${tempF}${feelsF ? ` (feels ${feelsF})` : ''}  💧 ${humidity}`,
     `💨  ${windAvg} ${windDirStr}${windGust ? ` gusting ${windGust}` : ''}`,
     `📊  ${pressure}  ☀️  UV ${uv}${rain ? `  🌧 ${rain} rain today` : ''}`
   ].join('\n');
@@ -125,8 +99,8 @@ async function getTempestBlock() {
       console.log('[weather] no tempest_token in secrets — skipping');
       return null;
     }
-    const { obs, units } = await fetchObservation(token);
-    const block = formatObservation(obs, units);
+    const obs   = await fetchObservation(token);
+    const block = formatObservation(obs);
     const tz    = { timeZone: 'America/New_York' };
     const epoch = obs.timestamp || obs.epoch;
     const time  = epoch
