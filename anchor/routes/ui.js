@@ -389,6 +389,12 @@ router.get('/', (req, res) => {
         <div id="refb" class="collapsed">
           <div class="cmd-ref">
             <div class="cmd-group">
+              <div class="cmd-label">How to use cat</div>
+              <code>cat pp</code><br>
+              <span style="color:#64748b">my note goes here</span><br>
+              <span style="color:#475569;font-size:.75rem">First line = cat command, rest = note content. Comma-split for multiple: <code>cat wt,wp</code></span>
+            </div>
+            <div class="cmd-group">
               <div class="cmd-label">Work</div>
               <code>cat wt</code> task &nbsp;|&nbsp; <code>cat wd</code> decision &nbsp;|&nbsp; <code>cat wi</code> idea<br>
               <code>cat wp</code> project &nbsp;|&nbsp; <code>cat wm</code> meeting &nbsp;|&nbsp; <code>cat wpw</code> password
