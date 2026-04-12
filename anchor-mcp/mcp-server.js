@@ -65,7 +65,7 @@ function sh(cmd, opts = {}) {
 const REBUILD_SERVICES = ['anchor'];
 
 function createMcpServer(caller) {
-  const server = new McpServer({ name: 'anchor', version: '1.8.0' });
+  const server = new McpServer({ name: 'anchor', version: '1.9.0' });
 
   server.tool('add_note',
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
@@ -177,6 +177,28 @@ function createMcpServer(caller) {
     }
   );
 
+  server.tool('str_replace',
+    'Replace a unique string in a file in the casmas-bridge repo. old_str must appear exactly once.',
+    {
+      path: z.string().describe('Relative path within the repo, e.g. "anchor/routes/ui.js"'),
+      old_str: z.string().describe('Exact string to find and replace (must be unique in the file)'),
+      new_str: z.string().describe('Replacement string (empty string to delete)')
+    },
+    async ({ path: relPath, old_str, new_str }) => {
+      const fullPath = `${REPO_PATH}/${relPath}`;
+      let content;
+      try { content = await readFile(fullPath, 'utf8'); }
+      catch (err) { return { content: [{ type: 'text', text: `Read error: ${err.message}` }] }; }
+
+      const count = content.split(old_str).length - 1;
+      if (count === 0) return { content: [{ type: 'text', text: `Error: old_str not found in ${relPath}` }] };
+      if (count > 1)  return { content: [{ type: 'text', text: `Error: old_str found ${count} times in ${relPath} — must be unique` }] };
+
+      await writeFile(fullPath, content.replace(old_str, new_str), 'utf8');
+      return { content: [{ type: 'text', text: `Patched: ${relPath}` }] };
+    }
+  );
+
   server.tool('git_commit_push',
     'Stage all changes, commit, and push the casmas-bridge repo to GitHub.',
     { message: z.string().describe('Commit message') },
@@ -204,12 +226,8 @@ function createMcpServer(caller) {
         let steps = [];
 
         if (REBUILD_SERVICES.includes(service)) {
-          // Sync JS source only — exclude data, backup, .env, Dockerfile, package.json
-          // These are all Node.js files so a container restart picks them up
           await sh(`rsync -a --exclude='data/' --exclude='backup/' --exclude='.env' --exclude='Dockerfile' --exclude='package.json' --exclude='package-lock.json' ${repoPath}/ ${prodPath}/`);
           steps.push('Source files synced.');
-
-          // Simple restart — Node re-requires all files on startup
           await sh(`docker restart anchor`, { timeout: 30000 });
           steps.push('Container restarted.');
           steps.push('Done — no image rebuild needed for JS-only changes.');
