@@ -358,10 +358,11 @@ router.get('/', (req, res) => {
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${hasWeather ? `<div class="panel" id="wxPanel">
-        <h2><span class="dot" style="background:#38bdf8"></span>🌤 Casmas Weather
-          <button class="wx-refresh" onclick="loadWeather()" title="Refresh">↻</button>
+        <h2 onclick="toggleWx()"><span class="dot" style="background:#38bdf8"></span>🌤 Casmas Weather
+          <button class="wx-refresh" onclick="event.stopPropagation();loadWeather()" title="Refresh">↻</button>
+          <span class="chev" id="wxChev">▼</span>
         </h2>
-        <div id="wxBody"><div class="wx-loading">Loading...</div></div>
+        <div id="wxBody" class="collapsed"></div>
       </div>` : ''}
       <div class="panel">
         <h2 onclick="tp('cb','cc')"><span class="dot" style="background:#a78bfa"></span>Ask Anchor<span class="chev" id="cc">▼</span></h2>
@@ -461,6 +462,7 @@ router.get('/', (req, res) => {
     clock();setInterval(clock,30000);
     async function loadWeather(){
       const body=document.getElementById('wxBody');if(!body)return;
+      if(body.innerHTML.trim()==='')body.innerHTML='<div class="wx-loading">Loading...</div>';
       try{
         const r=await fetch('/weather');const d=await r.json();
         if(!d.ok){body.innerHTML='<div class="wx-error">Unavailable</div>';return;}
@@ -488,7 +490,14 @@ router.get('/', (req, res) => {
           </div>\`;
       }catch(e){body.innerHTML='<div class="wx-error">Could not load weather</div>';}
     }
-    if(document.getElementById('wxBody')){loadWeather();setInterval(loadWeather,600000);}
+    function toggleWx(){
+      const body=document.getElementById('wxBody'),chev=document.getElementById('wxChev');
+      const collapsed=body.classList.contains('collapsed');
+      body.classList.toggle('collapsed',!collapsed);
+      if(chev)chev.classList.toggle('open',collapsed);
+      if(collapsed&&body.innerHTML.trim()===''){loadWeather();}
+    }
+    if(document.getElementById('wxBody')){setInterval(()=>{if(!document.getElementById('wxBody')?.classList.contains('collapsed'))loadWeather();},600000);}
     function fileSelected(i){const n=i.files[0]?i.files[0].name:'';document.getElementById('fn').textContent=n;document.getElementById('cfi').style.display=n?'inline':'none';}
     function clearFile(){document.getElementById('fi').value='';document.getElementById('fn').textContent='';document.getElementById('cfi').style.display='none';}
     async function submitNote(){
