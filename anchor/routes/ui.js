@@ -148,7 +148,7 @@ router.get('/', (req, res) => {
   const hasOTD = yn.length||sn.length||mn.length;
   const TG = [
     {l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},
-    {l:'Personal',t:['personal','personal-task','personal-decision']},
+    {l:'Personal',t:['personal','personal-task','personal-decision','recipe','password']},
     {l:'Home',t:['home','home-task','home-decision']},
     {l:'Kids',t:['kids','kids-task']},
     {l:'Health',t:['health','health-task']},
@@ -396,7 +396,8 @@ router.get('/', (req, res) => {
               <code>cat ho</code> home &nbsp;|&nbsp; <code>cat ht</code> home-task<br>
               <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
               <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
-              <code>cat ol</code> open-loop 🔓 &nbsp;|&nbsp; <code>cat ls</code> list &nbsp;|&nbsp; <code>cat s</code> summary
+              <code>cat ol</code> open-loop 🔓 &nbsp;|&nbsp; <code>cat ls</code> list &nbsp;|&nbsp; <code>cat s</code> summary<br>
+              <code>cat rec</code> recipe &nbsp;|&nbsp; <code>cat pw</code> password
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders — no sync needed</div>
