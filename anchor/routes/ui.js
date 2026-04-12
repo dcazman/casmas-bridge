@@ -147,14 +147,13 @@ router.get('/', (req, res) => {
   const yn=otd(ya), sn=otd(sa), mn=otd(ma);
   const hasOTD = yn.length||sn.length||mn.length;
   const TG = [
-    {l:'Work',t:['work','work-task','work-decision','work-idea','meeting']},
-    {l:'Personal',t:['personal','personal-task','personal-decision','recipe','password']},
-    {l:'Home',t:['home','home-task','home-decision']},
-    {l:'Kids',t:['kids','kids-task']},
-    {l:'Health',t:['health','health-task']},
-    {l:'Finance',t:['finance','finance-task']},
-    {l:'Universal',t:['social','calendar','email','idea','open-loop','pi','random','brain-dump']},
-    {l:'Utility',t:['remind','list','summary']}
+    {l:'Work',t:['work-task','work-decision','work-idea','work-project','work-meeting','work-password']},
+    {l:'Personal',t:['personal-task','personal-decision','personal-idea','personal-project','personal-recipe','personal-password','personal-meeting']},
+    {l:'Health',t:['health-task','health-idea','health-project']},
+    {l:'Finance',t:['finance-task','finance-idea','finance-project']},
+    {l:'Family',t:['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw']},
+    {l:'Pets',t:['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster']},
+    {l:'System',t:['pi','list','remind','random','open-loop','calendar','anchor','employment','claude-handoff']}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
@@ -390,14 +389,35 @@ router.get('/', (req, res) => {
         <div id="refb" class="collapsed">
           <div class="cmd-ref">
             <div class="cmd-group">
-              <div class="cmd-label">Categories</div>
-              <code>cat w</code> work &nbsp;|&nbsp; <code>cat wt</code> task &nbsp;|&nbsp; <code>cat wd</code> decision<br>
-              <code>cat p</code> personal &nbsp;|&nbsp; <code>cat pt</code> personal-task<br>
-              <code>cat ho</code> home &nbsp;|&nbsp; <code>cat ht</code> home-task<br>
-              <code>cat k</code> kids &nbsp;|&nbsp; <code>cat h</code> health &nbsp;|&nbsp; <code>cat f</code> finance<br>
-              <code>cat i</code> idea &nbsp;|&nbsp; <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat bd</code> brain-dump<br>
-              <code>cat ol</code> open-loop 🔓 &nbsp;|&nbsp; <code>cat ls</code> list &nbsp;|&nbsp; <code>cat s</code> summary<br>
-              <code>cat rec</code> recipe &nbsp;|&nbsp; <code>cat pw</code> password
+              <div class="cmd-label">Work</div>
+              <code>cat wt</code> task &nbsp;|&nbsp; <code>cat wd</code> decision &nbsp;|&nbsp; <code>cat wi</code> idea<br>
+              <code>cat wp</code> project &nbsp;|&nbsp; <code>cat wm</code> meeting &nbsp;|&nbsp; <code>cat wpw</code> password
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Personal</div>
+              <code>cat pt</code> task &nbsp;|&nbsp; <code>cat pd</code> decision &nbsp;|&nbsp; <code>cat pid</code> idea<br>
+              <code>cat pp</code> project &nbsp;|&nbsp; <code>cat pm</code> meeting &nbsp;|&nbsp; <code>cat rec</code> recipe &nbsp;|&nbsp; <code>cat ppw</code> password
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Health &amp; Finance</div>
+              <code>cat ht</code> h-task &nbsp;|&nbsp; <code>cat hid</code> h-idea &nbsp;|&nbsp; <code>cat hpr</code> h-project<br>
+              <code>cat ft</code> f-task &nbsp;|&nbsp; <code>cat fid</code> f-idea &nbsp;|&nbsp; <code>cat fpr</code> f-project
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Family</div>
+              <code>cat kw</code> Kathie &nbsp;|&nbsp; <code>cat zs</code> Zach &nbsp;|&nbsp; <code>cat es</code> Ethan<br>
+              <code>cat afl</code> Andy &nbsp;|&nbsp; <code>cat ma</code> Maureen &nbsp;|&nbsp; <code>cat ka</code> Kathy-Aunt<br>
+              <code>cat ms</code> Micky &nbsp;|&nbsp; <code>cat lb</code> Lee &nbsp;|&nbsp; <code>cat csl</code> Charity
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Pets</div>
+              <code>cat kd</code> Kevin &nbsp;|&nbsp; <code>cat mc</code> Mat &nbsp;|&nbsp; <code>cat pcc</code> Phil &nbsp;|&nbsp; <code>cat acc</code> Ace<br>
+              <code>cat liz</code> Herschel &nbsp;|&nbsp; <code>cat hen</code> hens &nbsp;|&nbsp; <code>cat hhr</code> hey-hey-Rooster
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">System</div>
+              <code>cat pi</code> pi &nbsp;|&nbsp; <code>cat ls</code> list &nbsp;|&nbsp; <code>cat re</code> remind &nbsp;|&nbsp; <code>cat r</code> random<br>
+              <code>cat ol</code> open-loop &nbsp;|&nbsp; <code>cat cal</code> calendar &nbsp;|&nbsp; <code>cat ch</code> claude-handoff
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders — no sync needed</div>
