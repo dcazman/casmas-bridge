@@ -59,8 +59,8 @@ async function fetchObservation(token) {
 
 // ── Unit converters (API always returns metric) ───────────────────────────────
 
-function toF(c)      { return c   != null ? Math.round(c * 9/5 + 32)     : null; }
-function msToMph(ms) { return ms  != null ? Math.round(ms * 2.237)        : null; }
+function toF(c)      { return c   != null ? Math.round(c * 9/5 + 32) : null; }
+function msToMph(ms) { return ms  != null ? Math.round(ms * 2.237)   : null; }
 
 function windDir(deg) {
   if (deg == null) return '';
@@ -68,7 +68,33 @@ function windDir(deg) {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
-// ── Format observation into a text block ──────────────────────────────────────
+// ── Raw structured data for UI panel ─────────────────────────────────────────
+
+async function getTempestRaw(token) {
+  const obs   = await fetchObservation(token);
+  const epoch = obs.timestamp || obs.epoch;
+  const tz    = { timeZone: 'America/New_York' };
+  const time  = epoch
+    ? new Date(epoch * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz })
+    : 'just now';
+
+  return {
+    time,
+    tempF:     toF(obs.air_temperature),
+    feelsF:    toF(obs.feels_like),
+    humidity:  obs.relative_humidity != null ? Math.round(obs.relative_humidity) : null,
+    windMph:   msToMph(obs.wind_avg),
+    gustMph:   obs.wind_gust != null && obs.wind_gust > 0 ? msToMph(obs.wind_gust) : null,
+    windDir:   windDir(obs.wind_direction),
+    pressureMb: obs.sea_level_pressure != null ? obs.sea_level_pressure.toFixed(1) : null,
+    uv:        obs.uv != null ? obs.uv.toFixed(1) : null,
+    rainIn:    obs.precip_accum_local_day != null && obs.precip_accum_local_day > 0
+               ? obs.precip_accum_local_day.toFixed(2) : null,
+    lightning: obs.strike_count != null && obs.strike_count > 0 ? obs.strike_count : null,
+  };
+}
+
+// ── Plain text block for digest email ────────────────────────────────────────
 
 function formatObservation(obs) {
   const tempF      = obs.air_temperature    != null ? `${toF(obs.air_temperature)}°F`   : '—';
@@ -113,4 +139,4 @@ async function getTempestBlock() {
   }
 }
 
-module.exports = { getTempestToken, setTempestToken, getTempestBlock };
+module.exports = { getTempestToken, setTempestToken, getTempestBlock, getTempestRaw };

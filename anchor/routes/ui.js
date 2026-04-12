@@ -6,6 +6,7 @@ const path = require('path');
 const { db, decryptNote, getPending, getLastSync, shouldSync } = require('../lib/db');
 const { esc, typeColor, ALL_TYPES } = require('../lib/helpers');
 const { emailEnabled } = require('./bridge');
+const { getTempestToken } = require('../lib/weather');
 
 const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
@@ -144,6 +145,7 @@ router.get('/', (req, res) => {
   const as  = shouldSync();
   const useOllama = process.env.USE_OLLAMA === 'true';
   const engineLabel = useOllama ? '🐓 Rooster (local)' : '🤖 Anthropic API';
+  const hasWeather = !!getTempestToken();
   const now = new Date();
   const ya = new Date(now); ya.setFullYear(now.getFullYear()-1);
   const sa = new Date(now); sa.setMonth(now.getMonth()-6);
@@ -280,6 +282,21 @@ router.get('/', (req, res) => {
     .btn-snooze:hover{background:#2e1a5e;border-color:#a78bfa}
     .btn-snooze-pick{background:#1a2232;color:#60a5fa;border:1px solid #60a5fa40;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
     .btn-snooze-pick:hover{background:#1e3a5f;border-color:#60a5fa}
+    /* ── Weather panel ── */
+    .wx-panel{background:#0d1117;border-radius:10px;padding:14px 16px}
+    .wx-main{display:flex;align-items:flex-end;gap:16px;margin-bottom:10px}
+    .wx-temp{font-size:2.8rem;font-weight:700;color:#f0f9ff;line-height:1}
+    .wx-feels{font-size:.8rem;color:#475569;margin-top:2px}
+    .wx-right{flex:1}
+    .wx-row{display:flex;gap:16px;flex-wrap:wrap}
+    .wx-stat{display:flex;flex-direction:column;align-items:center;background:#161b27;border:1px solid #1e2d45;border-radius:8px;padding:8px 12px;min-width:72px}
+    .wx-stat-val{font-size:1rem;font-weight:600;color:#e2e8f0}
+    .wx-stat-lbl{font-size:.68rem;color:#475569;text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
+    .wx-time{font-size:.72rem;color:#334155;margin-top:10px;text-align:right}
+    .wx-refresh{background:none;border:none;color:#334155;cursor:pointer;font-size:.75rem;padding:2px 6px;border-radius:4px}
+    .wx-refresh:hover{color:#60a5fa}
+    .wx-loading{color:#334155;font-size:.85rem;padding:8px 0}
+    .wx-error{color:#475569;font-size:.82rem;padding:8px 0}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -354,6 +371,14 @@ router.get('/', (req, res) => {
     </div>
 
     <div style="display:flex;flex-direction:column;gap:20px">
+
+      ${hasWeather ? `<div class="panel" id="wxPanel">
+        <h2><span class="dot" style="background:#38bdf8"></span>🌤 Casmas Weather
+          <button class="wx-refresh" onclick="loadWeather()" title="Refresh">↻</button>
+        </h2>
+        <div id="wxBody"><div class="wx-loading">Loading...</div></div>
+      </div>` : ''}
+
       <div class="panel">
         <h2 onclick="tp('cb','cc')"><span class="dot" style="background:#a78bfa"></span>Ask Anchor<span class="chev" id="cc">▼</span></h2>
         <div id="cb" class="collapsed">
@@ -420,6 +445,34 @@ router.get('/', (req, res) => {
     renderTimestamps();
     function clock(){const el=document.getElementById('hdrTime');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}
     clock();setInterval(clock,30000);
+
+    // ── Weather panel ──────────────────────────────────────────
+    async function loadWeather(){
+      const body=document.getElementById('wxBody');if(!body)return;
+      try{
+        const r=await fetch('/weather');const d=await r.json();
+        if(!d.ok){body.innerHTML='<div class="wx-error">Unavailable</div>';return;}
+        const feels=d.feelsF!=null&&d.feelsF!==d.tempF?'<div class="wx-feels">feels '+d.feelsF+'°F</div>':'';
+        const gust=d.gustMph?d.windMph+' / '+d.gustMph:d.windMph||'—';
+        body.innerHTML=\`
+          <div class="wx-panel">
+            <div class="wx-main">
+              <div><div class="wx-temp">\${d.tempF!=null?d.tempF+'°':'—'}</div>\${feels}</div>
+            </div>
+            <div class="wx-row">
+              <div class="wx-stat"><span class="wx-stat-val">\${d.humidity!=null?d.humidity+'%':'—'}</span><span class="wx-stat-lbl">Humidity</span></div>
+              <div class="wx-stat"><span class="wx-stat-val">\${gust} mph</span><span class="wx-stat-lbl">Wind \${d.windDir||''}</span></div>
+              <div class="wx-stat"><span class="wx-stat-val">\${d.pressureMb||'—'}</span><span class="wx-stat-lbl">Pressure mb</span></div>
+              <div class="wx-stat"><span class="wx-stat-val">UV \${d.uv||'—'}</span><span class="wx-stat-lbl">Index</span></div>
+              \${d.rainIn?'<div class="wx-stat"><span class="wx-stat-val">'+d.rainIn+'"</span><span class="wx-stat-lbl">Rain today</span></div>':''}
+              \${d.lightning?'<div class="wx-stat"><span class="wx-stat-val">⚡ '+d.lightning+'</span><span class="wx-stat-lbl">Strikes</span></div>':''}
+            </div>
+            <div class="wx-time">Updated \${d.time} · Casmas station</div>
+          </div>\`;
+      }catch(e){body.innerHTML='<div class="wx-error">Could not load weather</div>';}
+    }
+    if(document.getElementById('wxBody')){loadWeather();setInterval(loadWeather,600000);}
+
     function fileSelected(i){const n=i.files[0]?i.files[0].name:'';document.getElementById('fn').textContent=n;document.getElementById('cfi').style.display=n?'inline':'none';}
     function clearFile(){document.getElementById('fi').value='';document.getElementById('fn').textContent='';document.getElementById('cfi').style.display='none';}
     async function submitNote(){

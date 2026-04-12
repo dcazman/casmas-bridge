@@ -28,7 +28,7 @@ app.use('/pull-bridge', bridgeRouter);
 app.use('/groom',       groomRouter);
 app.use('/mcp',         mcpRouter);
 
-// POST /alert — on-demand digest email (buildDigestEmail is async due to weather)
+// POST /alert — on-demand digest email
 app.post('/alert', async (req, res) => {
   try {
     const { subject, body } = await buildDigestEmail();
@@ -36,6 +36,20 @@ app.post('/alert', async (req, res) => {
     res.json(r);
   } catch (e) {
     res.json({ ok: false, error: e.message });
+  }
+});
+
+// GET /weather — current Tempest observation as JSON for UI panel
+app.get('/weather', async (req, res) => {
+  try {
+    const token = getTempestToken();
+    if (!token) return res.json({ ok: false, reason: 'no_token' });
+    const { getTempestRaw } = require('./lib/weather');
+    const data = await getTempestRaw(token);
+    res.json({ ok: true, ...data });
+  } catch (e) {
+    console.warn('[weather] /weather route error:', e.message);
+    res.json({ ok: false, reason: 'error', error: e.message });
   }
 });
 
@@ -51,7 +65,6 @@ app.post('/settings/tempest', async (req, res) => {
   if (!token || !token.trim()) return res.json({ ok: false, error: 'token required' });
   try {
     setTempestToken(token.trim());
-    // Test the token immediately
     const block = await getTempestBlock();
     res.json({ ok: true, test: block || 'Token saved but no observation returned' });
   } catch (e) {
