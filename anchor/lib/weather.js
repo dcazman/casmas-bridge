@@ -6,16 +6,20 @@
  * Token stored in secrets table under key 'tempest_token' (encrypted).
  * All functions safe to call without a token — return null silently.
  *
- * IMPORTANT: API always returns metric units (C, m/s) regardless of
- * station_units setting — convert unconditionally to imperial for display.
+ * Uses better_forecast endpoint which returns current_conditions + forecast.
+ * Units requested in imperial directly — no manual conversion needed.
+ * Observation endpoint kept as fallback reference only.
  */
 
 const { db } = require('./db');
 const { encrypt, decrypt } = require('./crypto');
 
-const STATION_ID = '192111';
-const API_BASE   = 'https://swd.weatherflow.com/swd/rest';
-const TIMEOUT_MS = 5000;
+const STATION_ID  = '192111';
+const API_BASE    = 'https://swd.weatherflow.com/swd/rest';
+const TIMEOUT_MS  = 6000;
+
+// Unit params — request imperial directly from forecast API
+const UNIT_PARAMS = 'units_temp=f&units_wind=mph&units_pressure=mb&units_precip=in&units_distance=mi';
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 
@@ -45,22 +49,18 @@ async function fetchWithTimeout(url, ms) {
   }
 }
 
-// ── Observation fetcher ───────────────────────────────────────────────────────
+// ── Forecast fetcher ──────────────────────────────────────────────────────────
 
-async function fetchObservation(token) {
-  const url = `${API_BASE}/observations/station/${STATION_ID}?token=${token}`;
+async function fetchForecast(token) {
+  const url = `${API_BASE}/better_forecast?station_id=${STATION_ID}&${UNIT_PARAMS}&token=${token}`;
   const resp = await fetchWithTimeout(url, TIMEOUT_MS);
-  if (!resp.ok) throw new Error(`Tempest API HTTP ${resp.status}`);
+  if (!resp.ok) throw new Error(`Tempest forecast API HTTP ${resp.status}`);
   const data = await resp.json();
-  const obs = data?.obs?.[0];
-  if (!obs) throw new Error('No observation data returned');
-  return obs;
+  if (!data.current_conditions) throw new Error('No current_conditions in forecast response');
+  return data;
 }
 
-// ── Unit converters (API always returns metric) ───────────────────────────────
-
-function toF(c)      { return c   != null ? Math.round(c * 9/5 + 32) : null; }
-function msToMph(ms) { return ms  != null ? Math.round(ms * 2.237)   : null; }
+// ── Wind direction helper ─────────────────────────────────────────────────────
 
 function windDir(deg) {
   if (deg == null) return '';
@@ -68,55 +68,53 @@ function windDir(deg) {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
-// ── Raw structured data for UI panel ─────────────────────────────────────────
+// ── Structured data for UI panel ──────────────────────────────────────────────
 
 async function getTempestRaw(token) {
-  const obs   = await fetchObservation(token);
-  const epoch = obs.timestamp || obs.epoch;
-  const tz    = { timeZone: 'America/New_York' };
-  const time  = epoch
-    ? new Date(epoch * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz })
+  const data = await fetchForecast(token);
+  const cc   = data.current_conditions;
+  const tz   = { timeZone: 'America/New_York' };
+
+  // Today's daily forecast (first entry)
+  const today = data.forecast?.daily?.[0] || {};
+
+  // Today's hourly — find remaining hours for max precip chance
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  const hourly   = (data.forecast?.hourly || []).filter(h => h.time >= nowEpoch);
+  const maxPrecipChance = hourly.length
+    ? Math.max(...hourly.slice(0, 12).map(h => h.precip_probability || 0))
+    : (today.precip_probability || 0);
+
+  const time = cc.time
+    ? new Date(cc.time * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz })
     : 'just now';
 
   return {
     time,
-    tempF:     toF(obs.air_temperature),
-    feelsF:    toF(obs.feels_like),
-    humidity:  obs.relative_humidity != null ? Math.round(obs.relative_humidity) : null,
-    windMph:   msToMph(obs.wind_avg),
-    gustMph:   obs.wind_gust != null && obs.wind_gust > 0 ? msToMph(obs.wind_gust) : null,
-    windDir:   windDir(obs.wind_direction),
-    pressureMb: obs.sea_level_pressure != null ? obs.sea_level_pressure.toFixed(1) : null,
-    uv:        obs.uv != null ? obs.uv.toFixed(1) : null,
-    rainIn:    obs.precip_accum_local_day != null && obs.precip_accum_local_day > 0
-               ? obs.precip_accum_local_day.toFixed(2) : null,
-    lightning: obs.strike_count != null && obs.strike_count > 0 ? obs.strike_count : null,
+    // Current conditions (already in °F / mph from unit params)
+    tempF:       cc.air_temperature       != null ? Math.round(cc.air_temperature)   : null,
+    feelsF:      cc.feels_like            != null ? Math.round(cc.feels_like)         : null,
+    humidity:    cc.relative_humidity     != null ? Math.round(cc.relative_humidity)  : null,
+    windMph:     cc.wind_avg              != null ? Math.round(cc.wind_avg)           : null,
+    gustMph:     cc.wind_gust            != null && cc.wind_gust > 0 ? Math.round(cc.wind_gust) : null,
+    windDir:     windDir(cc.wind_direction),
+    pressureMb:  cc.sea_level_pressure    != null ? cc.sea_level_pressure.toFixed(1)  : null,
+    uv:          cc.uv                    != null ? cc.uv.toFixed(1)                  : null,
+    rainToday:   cc.precip_accum_local_day != null && cc.precip_accum_local_day > 0
+                 ? cc.precip_accum_local_day.toFixed(2) : null,
+    lightning:   cc.lightning_strike_count_last_1hr != null && cc.lightning_strike_count_last_1hr > 0
+                 ? cc.lightning_strike_count_last_1hr : null,
+    conditions:  cc.conditions || null,
+    // Today's forecast
+    highF:       today.air_temp_high      != null ? Math.round(today.air_temp_high)   : null,
+    lowF:        today.air_temp_low       != null ? Math.round(today.air_temp_low)    : null,
+    precipChance: maxPrecipChance,
+    precipType:  today.precip_type        || null,
+    forecastConditions: today.conditions  || null,
   };
 }
 
 // ── Plain text block for digest email ────────────────────────────────────────
-
-function formatObservation(obs) {
-  const tempF      = obs.air_temperature    != null ? `${toF(obs.air_temperature)}°F`   : '—';
-  const feelsF     = obs.feels_like         != null ? `${toF(obs.feels_like)}°F`         : null;
-  const humidity   = obs.relative_humidity  != null ? `${Math.round(obs.relative_humidity)}%` : '—';
-  const windAvg    = obs.wind_avg           != null ? `${msToMph(obs.wind_avg)} mph`     : '—';
-  const windGust   = obs.wind_gust          != null && obs.wind_gust > 0
-    ? `${msToMph(obs.wind_gust)} mph` : null;
-  const windDirStr = windDir(obs.wind_direction);
-  const pressure   = obs.sea_level_pressure != null ? `${obs.sea_level_pressure.toFixed(1)} mb` : '—';
-  const uv         = obs.uv                 != null ? obs.uv.toFixed(1)                  : '—';
-  const rain       = obs.precip_accum_local_day != null && obs.precip_accum_local_day > 0
-    ? `${obs.precip_accum_local_day.toFixed(2)}"` : null;
-
-  return [
-    `🌡  ${tempF}${feelsF ? ` (feels ${feelsF})` : ''}  💧 ${humidity}`,
-    `💨  ${windAvg} ${windDirStr}${windGust ? ` gusting ${windGust}` : ''}`,
-    `📊  ${pressure}  ☀️  UV ${uv}${rain ? `  🌧 ${rain} rain today` : ''}`
-  ].join('\n');
-}
-
-// ── Main export — safe, never throws ─────────────────────────────────────────
 
 async function getTempestBlock() {
   try {
@@ -125,14 +123,24 @@ async function getTempestBlock() {
       console.log('[weather] no tempest_token in secrets — skipping');
       return null;
     }
-    const obs   = await fetchObservation(token);
-    const block = formatObservation(obs);
-    const tz    = { timeZone: 'America/New_York' };
-    const epoch = obs.timestamp || obs.epoch;
-    const time  = epoch
-      ? new Date(epoch * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz })
-      : 'just now';
-    return `🌤 Casmas Weather (as of ${time})\n${block}`;
+    const d = await getTempestRaw(token);
+    const tz = { timeZone: 'America/New_York' };
+
+    const feels   = d.feelsF != null && d.feelsF !== d.tempF ? ` (feels ${d.feelsF}°F)` : '';
+    const gust    = d.gustMph ? ` gusting ${d.gustMph} mph` : '';
+    const rain    = d.rainToday ? `  🌧 ${d.rainToday}" today` : '';
+    const hiLo    = (d.highF != null && d.lowF != null) ? `H:${d.highF}° L:${d.lowF}°` : '';
+    const precip  = d.precipChance > 0 ? `🌧 ${d.precipChance}% chance of rain` : '☀️ No rain expected';
+    const cond    = d.forecastConditions || d.conditions || '';
+
+    let block = `🌤 Casmas Weather (as of ${d.time})\n`;
+    block += `🌡  ${d.tempF != null ? d.tempF+'°F' : '—'}${feels}  💧 ${d.humidity != null ? d.humidity+'%' : '—'}\n`;
+    block += `💨  ${d.windMph != null ? d.windMph+' mph' : '—'} ${d.windDir}${gust}\n`;
+    block += `📊  ${d.pressureMb || '—'} mb  ☀️  UV ${d.uv || '—'}${rain}\n`;
+    if (hiLo || cond) block += `📅  Today: ${[hiLo, cond].filter(Boolean).join(' · ')}\n`;
+    block += `${precip}`;
+
+    return block;
   } catch (e) {
     console.warn('[weather] getTempestBlock failed:', e.message, '— skipping weather in digest');
     return null;
