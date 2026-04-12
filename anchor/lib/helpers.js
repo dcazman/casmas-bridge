@@ -37,7 +37,8 @@ const ALL_TYPES = [
   'open-loop',
   'anchor','anchor-task',
   'employment','work-claude-handoff','system-summary',
-  'remind','list','summary'
+  'remind','list','summary',
+  'recipe','password'
 ];
 
 const WORK_TYPES = ['work','work-task','work-decision','work-idea','meeting','calendar','email'];
@@ -54,7 +55,9 @@ const CAT = {
   's':'summary','sum':'summary','summ':'summary',
   'a':'anchor','at':'anchor-task',
   'rem':'remind','re':'remind','ls':'list','li':'list',
-  'emp':'employment'
+  'emp':'employment',
+  'rec':'recipe','rcp':'recipe',
+  'pw':'password','pass':'password'
 };
 
 // parseCat: supports comma-separated types: "cat w,at" → two notes
@@ -64,16 +67,13 @@ function parseCat(raw) {
     const m = line.match(/^cat\s+(\S+)/i);
     if (m) {
       if (cur && cur.lines.length) secs.push(cur);
-      // Comma-split: "cat w,at" → two sections
       const keys = m[1].toLowerCase().split(',').map(k => k.trim()).filter(Boolean);
       if (keys.length > 1) {
-        // Each key gets its own section; subsequent lines flow into the last one
         for (let ki = 0; ki < keys.length; ki++) {
           const t = CAT[keys[ki]] || (ALL_TYPES.includes(keys[ki]) ? keys[ki] : 'brain-dump');
           cur = { type: t, lines: [] };
-          if (ki < keys.length - 1) secs.push(cur); // push empty placeholder for all but last
+          if (ki < keys.length - 1) secs.push(cur);
         }
-        // cur is now the last type's section — lines accumulate there
       } else {
         const k = keys[0];
         cur = { type: CAT[k] || (ALL_TYPES.includes(k) ? k : 'brain-dump'), lines: [] };
@@ -83,7 +83,6 @@ function parseCat(raw) {
     }
   }
   if (cur && cur.lines.length) secs.push(cur);
-  // Remove empty placeholder sections (from comma-split with no lines)
   return secs.filter(s => s.lines.length > 0);
 }
 
@@ -99,7 +98,8 @@ const COLORS = {
   'open-loop':'#fb923c',
   'anchor':'#34d399','anchor-task':'#10b981',
   'employment':'#94a3b8','work-claude-handoff':'#94a3b8','system-summary':'#94a3b8',
-  'remind':'#f472b6','list':'#22d3ee'
+  'remind':'#f472b6','list':'#22d3ee',
+  'recipe':'#fb923c','password':'#f87171'
 };
 function typeColor(t) { return COLORS[t] || '#60a5fa'; }
 
