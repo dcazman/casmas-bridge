@@ -13,7 +13,7 @@ const USE_OLLAMA  = process.env.USE_OLLAMA === 'true';
 const OLLAMA_PROMPT_PATH = '/bridge/md/ollama-system-prompt.md';
 
 // Types that should never be reclassified by the sync engine
-const PROTECTED_TYPES = new Set(['list', 'pi', 'summary', 'anchor']);
+const PROTECTED_TYPES = new Set(['list', 'pi', 'summary', 'anchor', 'employment', 'claude-handoff']);
 
 function loadOllamaPrompt() {
   try { return fs.readFileSync(OLLAMA_PROMPT_PATH, 'utf8').trim(); }
