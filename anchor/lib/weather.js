@@ -6,15 +6,22 @@
  *
  * Token stored in secrets table under key 'tempest_token' (encrypted).
  * All functions are safe to call without a token — they return null silently.
- * buildDigestEmail() should call getTempestBlock() and prepend if non-null.
+ * buildDigestEmail() calls getTempestBlock() and prepends if non-null.
+ *
+ * NOTE: /observations/station/{id} returns named fields in obs objects,
+ * not positional arrays. Fields: air_temperature, relative_humidity,
+ * wind_avg, wind_gust, wind_direction, sea_level_pressure, uv,
+ * precip_accum_local_day, feels_like, epoch, etc.
+ * Units depend on station_units in response — default is metric.
+ * We convert as needed (C→F, m/s→mph, mb is already mb).
  */
 
 const { db } = require('./db');
 const { encrypt, decrypt } = require('./crypto');
 
-const STATION_ID  = '192111';
-const API_BASE    = 'https://swd.weatherflow.com/swd/rest';
-const TIMEOUT_MS  = 5000;
+const STATION_ID = '192111';
+const API_BASE   = 'https://swd.weatherflow.com/swd/rest';
+const TIMEOUT_MS = 5000;
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 
@@ -51,13 +58,16 @@ async function fetchObservation(token) {
   const resp = await fetchWithTimeout(url, TIMEOUT_MS);
   if (!resp.ok) throw new Error(`Tempest API HTTP ${resp.status}`);
   const data = await resp.json();
-  // API returns obs array — first element is most recent
   const obs = data?.obs?.[0];
   if (!obs) throw new Error('No observation data returned');
-  return obs;
+  // Return both the obs object and station_units for unit conversion
+  return { obs, units: data.station_units || {} };
 }
 
-// ── Wind direction helper ─────────────────────────────────────────────────────
+// ── Unit converters ───────────────────────────────────────────────────────────
+
+function toF(c) { return c != null ? (c * 9/5 + 32) : null; }
+function msToMph(ms) { return ms != null ? ms * 2.237 : null; }
 
 function windDir(deg) {
   if (deg == null) return '';
@@ -67,29 +77,43 @@ function windDir(deg) {
 
 // ── Format observation into a text block ──────────────────────────────────────
 
-function formatObservation(obs) {
-  // Tempest obs fields (indices from API docs):
-  // [0] epoch, [2] wind_avg mph, [3] wind_gust mph, [4] wind_dir deg
-  // [6] pressure mb, [7] temp F (air_temperature), [8] humidity %
-  // [9] lux, [10] uv, [11] solar_radiation, [12] rain_accumulated mm
-  // [13] precip_type, [18] feels_like F, [19] dew_point F, [20] wet_bulb F
+function formatObservation(obs, units) {
+  // Station endpoint returns named fields
+  const tempUnit = units.units_temp || 'c';
+  const windUnit = units.units_wind || 'mps';
 
-  const tempF       = obs[7]  != null ? `${Math.round(obs[7])}°F`          : '—';
-  const feelsLike   = obs[18] != null ? `${Math.round(obs[18])}°F`         : null;
-  const humidity    = obs[8]  != null ? `${Math.round(obs[8])}%`           : '—';
-  const windAvg     = obs[2]  != null ? `${Math.round(obs[2])} mph`        : '—';
-  const windGust    = obs[3]  != null ? `${Math.round(obs[3])} mph`        : null;
-  const windDirStr  = obs[4]  != null ? windDir(obs[4])                    : '';
-  const pressure    = obs[6]  != null ? `${obs[6].toFixed(1)} mb`          : '—';
-  const uv          = obs[10] != null ? obs[10].toFixed(1)                 : '—';
-  const rain        = obs[12] != null && obs[12] > 0 ? `${obs[12].toFixed(1)} mm` : null;
+  // Temperature — convert C→F if needed
+  let tempRaw   = obs.air_temperature;
+  let feelsRaw  = obs.feels_like;
+  if (tempUnit === 'c' || tempUnit === 'metric') {
+    tempRaw  = toF(tempRaw);
+    feelsRaw = toF(feelsRaw);
+  }
 
-  let lines = [];
-  lines.push(`🌡  ${tempF}${feelsLike ? ` (feels ${feelsLike})` : ''}  💧 ${humidity}`);
-  lines.push(`💨  ${windAvg} ${windDirStr}${windGust ? ` gusting ${windGust}` : ''}`);
-  lines.push(`📊  ${pressure}  ☀️  UV ${uv}${rain ? `  🌧 ${rain} rain` : ''}`);
+  // Wind — convert m/s→mph if needed
+  let windAvgRaw  = obs.wind_avg;
+  let windGustRaw = obs.wind_gust;
+  if (windUnit === 'mps' || windUnit === 'metric') {
+    windAvgRaw  = msToMph(windAvgRaw);
+    windGustRaw = msToMph(windGustRaw);
+  }
 
-  return lines.join('\n');
+  const tempF      = tempRaw   != null ? `${Math.round(tempRaw)}°F`       : '—';
+  const feelsLike  = feelsRaw  != null ? `${Math.round(feelsRaw)}°F`      : null;
+  const humidity   = obs.relative_humidity != null ? `${Math.round(obs.relative_humidity)}%` : '—';
+  const windAvg    = windAvgRaw  != null ? `${Math.round(windAvgRaw)} mph` : '—';
+  const windGust   = windGustRaw != null ? `${Math.round(windGustRaw)} mph`: null;
+  const windDirStr = windDir(obs.wind_direction);
+  const pressure   = obs.sea_level_pressure != null ? `${obs.sea_level_pressure.toFixed(1)} mb` : '—';
+  const uv         = obs.uv != null ? obs.uv.toFixed(1) : '—';
+  const rain       = obs.precip_accum_local_day != null && obs.precip_accum_local_day > 0
+    ? `${obs.precip_accum_local_day.toFixed(2)}"` : null;
+
+  return [
+    `🌡  ${tempF}${feelsLike ? ` (feels ${feelsLike})` : ''}  💧 ${humidity}`,
+    `💨  ${windAvg} ${windDirStr}${windGust ? ` gusting ${windGust}` : ''}`,
+    `📊  ${pressure}  ☀️  UV ${uv}${rain ? `  🌧 ${rain} rain today` : ''}`
+  ].join('\n');
 }
 
 // ── Main export — safe, never throws ─────────────────────────────────────────
@@ -101,10 +125,13 @@ async function getTempestBlock() {
       console.log('[weather] no tempest_token in secrets — skipping');
       return null;
     }
-    const obs   = await fetchObservation(token);
-    const block = formatObservation(obs);
+    const { obs, units } = await fetchObservation(token);
+    const block = formatObservation(obs, units);
     const tz    = { timeZone: 'America/New_York' };
-    const time  = new Date(obs[0] * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
+    const epoch = obs.timestamp || obs.epoch;
+    const time  = epoch
+      ? new Date(epoch * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz })
+      : 'just now';
     return `🌤 Casmas Weather (as of ${time})\n${block}`;
   } catch (e) {
     console.warn('[weather] getTempestBlock failed:', e.message, '— skipping weather in digest');
