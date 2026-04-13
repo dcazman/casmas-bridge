@@ -1,5 +1,5 @@
 # Anchor — Session Context
-**Generated:** 4/13/2026, 11:46:04 AM
+**Generated:** 4/13/2026, 12:04:35 PM
 **Pending notes:** 0 | **Last sync:** 4/12/2026, 5:49:23 PM
 
 ## 🔔 Active Reminders
@@ -9,7 +9,7 @@
 15) auto policy — due 5/15/2026, 11:00:00 AM
 
 ## 🔓 Open Loops (manual)
-• Apply for federal natural disaster for saddle Brook house damage
+• Loop #2: Apply for federal natural disaster for saddle Brook house damage
 
 ## 📋 Anchor Quick Reference
 **UI:** anchor.thecasmas.com
