@@ -81,7 +81,7 @@ const CAT = {
 // "cat pp ls" → personal-project, each line gets [ ] prepended
 // "cat wt,wp" → two notes
 function parseCat(raw) {
-  const lines = raw.split('\n'); const secs = []; let cur = null;
+  const lines = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'); const secs = []; let cur = null;
   for (const line of lines) {
     const m = line.match(/^cat\s+(\S+)(.*)?$/i);
     if (m) {
