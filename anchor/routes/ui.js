@@ -37,7 +37,8 @@ function renderNote(n) {
   n = decryptNote(n);
   const color = typeColor(n.type), ip = n.status==='pending';
   const opts = ALL_TYPES.map(t => '<option value="'+t+'"'+(t===n.type?' selected':'')+'>'+t+'</option>').join('');
-  const isList    = n.type === 'list' || /^\s*\[.\]/m.test(n.formatted || n.raw_input || '');
+  const isList    = n.type === 'list' || /^\s*\[.\]/m.test(n.formatted || '') || /^\s*\[.\]/m.test(n.raw_input || '');
+  const listSrc   = (n.formatted && /^\s*\[.\]/m.test(n.formatted)) ? n.formatted : (n.raw_input || n.formatted || '');
   const isRemind  = n.type === 'remind';
   const isOpenLoop = n.type === 'open-loop';
   const numBadge = (isRemind && n.remind_num != null)
@@ -59,7 +60,7 @@ function renderNote(n) {
   const rawText = n.formatted || n.raw_input || '';
   const collapsible = !ip;
   const formattedContent = isList
-    ? '<div class="list-wrap' + (collapsible ? ' list-collapse' : '') + '" id="fmt-'+n.id+'">' + renderListContent(n.formatted || n.raw_input, n.id) + '</div>'
+    ? '<div class="list-wrap' + (collapsible ? ' list-collapse' : '') + '" id="fmt-'+n.id+'">' + renderListContent(listSrc, n.id) + '</div>'
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '')
     : '<div class="formatted' + (collapsible ? ' fmt-collapse' : '') + '" id="fmt-'+n.id+'">' + esc(rawText) + '</div>'
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
@@ -153,7 +154,7 @@ router.get('/', (req, res) => {
     {l:'Finance',t:['finance-task','finance-idea','finance-project']},
     {l:'Family',t:['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw']},
     {l:'Pets',t:['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster']},
-    {l:'System',t:['pi','remind','random','open-loop','calendar','anchor','employment','claude-handoff']}
+    {l:'System',t:['pi','remind','random','list','open-loop','calendar','anchor','employment','claude-handoff']}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
@@ -667,8 +668,9 @@ router.get('/', (req, res) => {
         const span=chkEl.parentElement?.querySelector('span');
         if(span){span.style.textDecoration=checked?'line-through':'';span.style.color=checked?'#475569':'';}
         const r=await fetch('/notes/'+noteId);const d=await r.json();if(!d.ok)return;
-        const lines=(d.formatted||'').split('\\n');
+        const lines=(d.formatted||d.raw_input||'').split('\\n');
         const items=lines.filter(l=>l.trim());
+        if(lineIndex>=items.length){console.error('toggleListItem: lineIndex out of bounds',lineIndex,items.length);return;}
         items[lineIndex]=(checked?'[x] ':'[ ] ')+items[lineIndex].replace(/^\[.\]\s*/,'');
         await fetch('/notes/'+noteId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:items.join('\\n')})});
       }catch(e){console.error('toggleListItem failed',e);}

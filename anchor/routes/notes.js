@@ -138,7 +138,7 @@ router.get('/:id', (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM notes WHERE id=?').get(id);
     if (!row) return res.json({ ok: false, error: 'Not found' });
-    res.json({ ok: true, formatted: decrypt(row.formatted) || '', type: row.type });
+    res.json({ ok: true, formatted: decrypt(row.formatted) || '', raw_input: decrypt(row.raw_input) || '', type: row.type });
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
