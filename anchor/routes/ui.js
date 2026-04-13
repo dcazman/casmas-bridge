@@ -391,62 +391,37 @@ router.get('/', (req, res) => {
           <div class="cmd-ref">
             <div class="cmd-group">
               <div class="cmd-label">Work</div>
-              <code>wt</code> task &nbsp;&nbsp; <code>wp</code> project<br>
-              <code>wd</code> decision &nbsp;&nbsp; <code>wm</code> meeting<br>
-              <code>wi</code> idea &nbsp;&nbsp; <code>wpw</code> password
+              <code>wt</code> task &nbsp; <code>wp</code> project &nbsp; <code>wd</code> decision &nbsp; <code>wm</code> meeting &nbsp; <code>wi</code> idea &nbsp; <code>wpw</code> password
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Personal</div>
-              <code>pt</code> task &nbsp;&nbsp; <code>pm</code> meeting<br>
-              <code>pd</code> decision &nbsp;&nbsp; <code>rec</code> recipe<br>
-              <code>pid</code> idea &nbsp;&nbsp; <code>ppw</code> password<br>
-              <code>pp</code> project
+              <code>pt</code> task &nbsp; <code>pp</code> project &nbsp; <code>pd</code> decision &nbsp; <code>pm</code> meeting &nbsp; <code>pid</code> idea &nbsp; <code>rec</code> recipe &nbsp; <code>ppw</code> password
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Health</div>
-              <code>ht</code> task<br>
-              <code>hid</code> idea<br>
-              <code>hpr</code> project
-            </div>
-            <div class="cmd-group">
-              <div class="cmd-label">Finance</div>
-              <code>ft</code> task<br>
-              <code>fid</code> idea<br>
-              <code>fpr</code> project
+              <div class="cmd-label">Health &amp; Finance</div>
+              <code>ht</code> task &nbsp; <code>hid</code> idea &nbsp; <code>hpr</code> project &nbsp;&nbsp;&nbsp; <code>ft</code> task &nbsp; <code>fid</code> idea &nbsp; <code>fpr</code> project
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Family</div>
-              <code>kw</code> Kathie &nbsp;&nbsp; <code>afl</code> Andy &nbsp;&nbsp; <code>lb</code> Lee<br>
-              <code>zs</code> Zach &nbsp;&nbsp; <code>ma</code> Maureen &nbsp;&nbsp; <code>csl</code> Charity<br>
-              <code>es</code> Ethan &nbsp;&nbsp; <code>ka</code> Kathy-Aunt<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>ms</code> Micky
+              <code>kw</code> Kathie &nbsp; <code>zs</code> Zach &nbsp; <code>es</code> Ethan &nbsp; <code>afl</code> Andy &nbsp; <code>ma</code> Maureen &nbsp; <code>ka</code> Kathy-Aunt<br>
+              <code>ms</code> Micky &nbsp; <code>lb</code> Lee &nbsp; <code>csl</code> Charity
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Pets</div>
-              <code>kd</code> Kevin &nbsp;&nbsp; <code>acc</code> Ace<br>
-              <code>mc</code> Mat &nbsp;&nbsp; <code>liz</code> Herschel<br>
-              <code>pcc</code> Phil &nbsp;&nbsp; <code>hen</code> hens<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>hhr</code> hey-hey-Rooster
+              <code>kd</code> Kevin &nbsp; <code>mc</code> Mat &nbsp; <code>pcc</code> Phil &nbsp; <code>acc</code> Ace &nbsp; <code>liz</code> Herschel &nbsp; <code>hen</code> hens &nbsp; <code>hhr</code> hey-hey-Rooster
             </div>
             <div class="cmd-group">
               <div class="cmd-label">System</div>
-              <code>pi</code> personal-info &nbsp;&nbsp; <code>cal</code> calendar<br>
-              <code>ls</code> list &nbsp;&nbsp; <code>anc</code> anchor<br>
-              <code>re</code> remind &nbsp;&nbsp; <code>emp</code> employment<br>
-              <code>r</code> random &nbsp;&nbsp; <code>ch</code> claude-handoff<br>
-              <code>ol</code> open-loop
+              <code>pi</code> personal-info &nbsp; <code>ls</code> list &nbsp; <code>re</code> remind &nbsp; <code>r</code> random &nbsp; <code>ol</code> open-loop &nbsp; <code>cal</code> calendar &nbsp; <code>anc</code> anchor &nbsp; <code>emp</code> employment &nbsp; <code>ch</code> claude-handoff
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Notes</div>
-              <span style="color:#94a3b8">Any line with <code>[ ]</code> or <code>[x]</code> becomes a checklist</span><br>
-              <span style="color:#94a3b8">Add <code>ls</code> after any cat to auto-checkbox lines</span><br>
-              <span style="color:#94a3b8">Comma-split: <code>cat wt,wp</code> creates two notes</span>
+              <div class="cmd-label">Tips</div>
+              <span style="color:#94a3b8">Lines with <code>[ ]</code> or <code>[x]</code> auto-render as checklist &nbsp;|&nbsp; <code>cat pp ls</code> auto-checkboxes every line &nbsp;|&nbsp; <code>cat wt,wp</code> creates two notes</span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Reminders</div>
-              <code>remind</code> or <code>re</code> or <code>todo</code><br>
-              <span style="color:#64748b">call dentist, monday 9am</span><br>
-              <code>done N</code> &nbsp;&nbsp; <code>snooze N</code> &nbsp;&nbsp; <code>snooze N friday 3pm</code>
+              <code>remind</code> or <code>re</code> or <code>todo</code> &nbsp; then: &nbsp; <span style="color:#64748b">call dentist, monday 9am</span><br>
+              <code>done N</code> &nbsp; <code>snooze N</code> &nbsp; <code>snooze N friday 3pm</code>
             </div>
           </div>
         </div>
