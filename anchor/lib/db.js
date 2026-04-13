@@ -31,6 +31,24 @@ db.exec(`
   `ALTER TABLE notes ADD COLUMN loop_num INTEGER DEFAULT NULL`,
 ].forEach(sql => { try { db.exec(sql); } catch {} });
 
+// ── Backfill loop_num for pre-feature open-loop notes ─────────
+(function backfillLoopNums() {
+  try {
+    const unnumbered = db.prepare(
+      "SELECT id FROM notes WHERE type='open-loop' AND loop_num IS NULL ORDER BY created_at ASC"
+    ).all();
+    if (!unnumbered.length) return;
+    const row = db.prepare("SELECT value FROM secrets WHERE key='loop_counter'").get();
+    let counter = row ? parseInt(row.value) : 0;
+    for (const note of unnumbered) {
+      counter++;
+      db.prepare('UPDATE notes SET loop_num=? WHERE id=?').run(counter, note.id);
+    }
+    db.prepare("INSERT OR REPLACE INTO secrets (key,value) VALUES ('loop_counter',?)").run(String(counter));
+    console.log(`[db] backfilled loop_num for ${unnumbered.length} open-loop note(s)`);
+  } catch (e) { console.error('[db] loop_num backfill error:', e.message); }
+})();
+
 // ── API key bootstrap ──────────────────────────────────────────
 (function bootstrap() {
   const fromEnv = process.env.ANTHROPIC_API_KEY;
