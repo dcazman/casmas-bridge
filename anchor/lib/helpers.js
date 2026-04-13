@@ -77,17 +77,22 @@ const CAT = {
   'pw':'password','pass':'password'
 };
 
-// parseCat: supports comma-separated types and ls modifier
-// "cat pp ls" → personal-project, each line gets [ ] prepended
-// "cat wt,wp" → two notes
+// parseCat: 'cat' prefix is optional — bare shorthand works too
+// "pp\ndo stuff"  ==  "cat pp\ndo stuff"
+// "pp ls\nitem"   ==  "cat pp ls\nitem"  → personal-project with [ ] checkboxes
+// "wt,wp\ntext"   ==  "cat wt,wp\ntext"  → two notes
 function parseCat(raw) {
   const lines = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'); const secs = []; let cur = null;
   for (const line of lines) {
     const m = line.match(/^cat\s+(\S+)(.*)?$/i);
-    if (m) {
+    const bare = !m ? line.match(/^([a-zA-Z0-9_-]+)((?:\s+(?:ls|list))?)\s*$/) : null;
+    const isTypeMarker = m || (bare && (CAT[bare[1].toLowerCase()] || ALL_TYPES.includes(bare[1].toLowerCase())));
+    if (isTypeMarker) {
+      const mKey = m ? m[1] : bare[1];
+      const mMod = m ? (m[2] || '') : (bare[2] || '');
       if (cur && cur.lines.length) secs.push(cur);
-      const tokens = m[1].split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-      const rest = (m[2] || '').trim().toLowerCase();
+      const tokens = mKey.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+      const rest = mMod.trim().toLowerCase();
       const isList = rest === 'ls' || rest === 'list';
       if (tokens.length > 1) {
         for (let ki = 0; ki < tokens.length; ki++) {
