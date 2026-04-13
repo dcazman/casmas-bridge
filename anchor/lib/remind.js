@@ -53,6 +53,15 @@ function nextRemindNum() {
   } catch { return null; }
 }
 
+function nextLoopNum() {
+  try {
+    const row = db.prepare("SELECT value FROM secrets WHERE key='loop_counter'").get();
+    const next = row ? parseInt(row.value) + 1 : 1;
+    db.prepare("INSERT OR REPLACE INTO secrets (key,value) VALUES ('loop_counter',?)").run(String(next));
+    return next;
+  } catch { return null; }
+}
+
 // ── Remind line parser ────────────────────────────────────────────────────────
 
 function parseRemindLine(body) {
@@ -153,7 +162,7 @@ function parseReminderDate(str) {
 // ── Command processor ─────────────────────────────────────────────────────────
 
 function isReminderCommand(text) {
-  return /\b(done|snooze|change)\s+\d+/i.test((text || '').trim());
+  return /\b(done|snooze|change|close)\s+\d+/i.test((text || '').trim());
 }
 
 function processCommands(text) {
@@ -165,6 +174,19 @@ function processCommands(text) {
     const doneM   = seg.match(/^done\s+(\d+)$/i);
     const snoozeM = seg.match(/^snooze\s+(\d+)(?:\s+(.+))?$/i);
     const changeM = seg.match(/^change\s+(\d+)\s+to\s+(.+)$/i);
+
+    const closeM = seg.match(/^close\s+(\d+)$/i);
+    if (closeM) {
+      const num = parseInt(closeM[1]);
+      const note = db.prepare("SELECT * FROM notes WHERE type='open-loop' AND loop_num=?").get(num);
+      if (note) {
+        db.prepare("UPDATE notes SET type='closed-loop', status='processed' WHERE id=?").run(note.id);
+        results.push({ cmd: 'close', num, ok: true });
+      } else {
+        results.push({ cmd: 'close', num, ok: false, error: 'not found' });
+      }
+      continue;
+    }
 
     if (doneM) {
       const id = parseInt(doneM[1]);
@@ -222,7 +244,7 @@ function cmdBlock(ref) {
   if (ref != null) {
     return `Reply in Anchor (Add Note → Sync Now):\n  done ${ref}  ·  snooze ${ref}  ·  snooze ${ref} friday 3pm  ·  change ${ref} to new text`;
   }
-  return `Reply in Anchor (Add Note → Sync Now):\n  done N  ·  snooze N  ·  snooze N friday 3pm  ·  change N to new text`;
+  return `Reply in Anchor (Add Note → Sync Now):\n  done N  ·  snooze N  ·  snooze N friday 3pm  ·  change N to new text  ·  close N (open loops)`;
 }
 
 // ── Digest email builder (shared by 7AM cron and on-demand alert) ─────────────
@@ -284,8 +306,9 @@ async function buildDigestEmail() {
   if (openLoopNotes.length) {
     body += `🔓 Open Loops\n`;
     for (const n of openLoopNotes) {
+      const num  = n.loop_num ? `#${n.loop_num}` : '•';
       const text = (n.formatted || n.raw_input || '').split('\n')[0].trim().substring(0, 90);
-      body += `  • ${text}\n`;
+      body += `  ${num} ${text}\n`;
     }
     body += '\n';
   }
@@ -364,4 +387,4 @@ function startScheduler() {
   console.log('[remind] scheduler ready');
 }
 
-module.exports = { startScheduler, buildDigestEmail, processCommands, isReminderCommand, nextRemindNum, parseReminderDate, parseRemindLine };
+module.exports = { startScheduler, buildDigestEmail, processCommands, isReminderCommand, nextRemindNum, nextLoopNum, parseReminderDate, parseRemindLine };

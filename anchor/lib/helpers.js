@@ -41,7 +41,7 @@ const ALL_TYPES = [
   // Pets
   'Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster',
   // System
-  'pi','list','remind','random','open-loop','calendar','anchor','employment','claude-handoff',
+  'pi','list','remind','random','open-loop','closed-loop','calendar','anchor','employment','claude-handoff',
   // Legacy (keep for backwards compat — don't create new)
   'work','personal','home','home-task','home-decision','kids','kids-task',
   'health','finance','social','email','idea','brain-dump',
@@ -134,7 +134,7 @@ const COLORS = {
   'Ace-Cat':'#67e8f9','Herschel-Lizard':'#a5f3fc','hens':'#34d399','hey-hey-Rooster':'#4ade80',
   // System
   'pi':'#fcd34d','list':'#22d3ee','remind':'#f472b6','random':'#94a3b8',
-  'open-loop':'#fb923c','calendar':'#c084fc','anchor':'#34d399',
+  'open-loop':'#fb923c','closed-loop':'#6b7280','calendar':'#c084fc','anchor':'#34d399',
   'employment':'#94a3b8','claude-handoff':'#60a5fa',
   // Legacy
   'work':'#38bdf8','personal':'#e879f9','home':'#fdba74','home-task':'#f97316',

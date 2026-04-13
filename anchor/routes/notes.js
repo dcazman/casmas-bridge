@@ -5,7 +5,7 @@ const router  = express.Router();
 const { db, getPending, getApiKey } = require('../lib/db');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { fetchUrl, extractText, parseCat } = require('../lib/helpers');
-const { parseReminderDate, parseRemindLine, nextRemindNum } = require('../lib/remind');
+const { parseReminderDate, parseRemindLine, nextRemindNum, nextLoopNum } = require('../lib/remind');
 const { decryptNote } = require('../lib/db');
 
 const IMAGE_RE = /\.(jpe?g|png|gif|webp)$/i;
@@ -106,7 +106,14 @@ router.post('/', upload.single('file'), async (req, res) => {
           const enc = encrypt(t);
           const existing = db.prepare("SELECT id FROM notes WHERE formatted=? LIMIT 1").get(enc);
           if (!existing) {
-            ins.run(sec.type, 'processed', enc, enc);
+            if (sec.type === 'open-loop') {
+              const loopNum = nextLoopNum();
+              const prefixed = `Loop #${loopNum}: ${t}`;
+              const encPrefixed = encrypt(prefixed);
+              db.prepare("INSERT INTO notes (type,status,raw_input,formatted,loop_num) VALUES (?,?,?,?,?)").run(sec.type, 'processed', encPrefixed, encPrefixed, loopNum);
+            } else {
+              ins.run(sec.type, 'processed', enc, enc);
+            }
             inserted++;
           }
         }
