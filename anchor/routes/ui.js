@@ -390,59 +390,63 @@ router.get('/', (req, res) => {
         <div id="refb" class="collapsed">
           <div class="cmd-ref">
             <div class="cmd-group">
-              <div class="cmd-label">How to use cat</div>
-              <code>cat pp</code><br>
-              <span style="color:#64748b">my note goes here</span><br><br>
-              <code>cat pp ls</code><br>
-              <span style="color:#64748b">Helinox Chair Zero</span><br>
-              <span style="color:#64748b">Nemo Fillo Pillow</span><br>
-              <span style="color:#475569;font-size:.75rem">Add <code>ls</code> after any cat to auto-format as a checklist. Each line becomes [ ] item.</span><br>
-              <span style="color:#475569;font-size:.75rem">Comma-split for multiple types: <code>cat wt,wp</code></span>
-            </div>
-            <div class="cmd-group">
               <div class="cmd-label">Work</div>
-              <code>cat wt</code> task &nbsp;|&nbsp; <code>cat wd</code> decision &nbsp;|&nbsp; <code>cat wi</code> idea<br>
-              <code>cat wp</code> project &nbsp;|&nbsp; <code>cat wm</code> meeting &nbsp;|&nbsp; <code>cat wpw</code> password
+              <code>wt</code> task &nbsp;&nbsp; <code>wp</code> project<br>
+              <code>wd</code> decision &nbsp;&nbsp; <code>wm</code> meeting<br>
+              <code>wi</code> idea &nbsp;&nbsp; <code>wpw</code> password
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Personal</div>
-              <code>cat pt</code> task &nbsp;|&nbsp; <code>cat pd</code> decision &nbsp;|&nbsp; <code>cat pid</code> idea<br>
-              <code>cat pp</code> project &nbsp;|&nbsp; <code>cat pm</code> meeting &nbsp;|&nbsp; <code>cat rec</code> recipe &nbsp;|&nbsp; <code>cat ppw</code> password
+              <code>pt</code> task &nbsp;&nbsp; <code>pm</code> meeting<br>
+              <code>pd</code> decision &nbsp;&nbsp; <code>rec</code> recipe<br>
+              <code>pid</code> idea &nbsp;&nbsp; <code>ppw</code> password<br>
+              <code>pp</code> project
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Health &amp; Finance</div>
-              <code>cat ht</code> h-task &nbsp;|&nbsp; <code>cat hid</code> h-idea &nbsp;|&nbsp; <code>cat hpr</code> h-project<br>
-              <code>cat ft</code> f-task &nbsp;|&nbsp; <code>cat fid</code> f-idea &nbsp;|&nbsp; <code>cat fpr</code> f-project
+              <div class="cmd-label">Health</div>
+              <code>ht</code> task<br>
+              <code>hid</code> idea<br>
+              <code>hpr</code> project
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Finance</div>
+              <code>ft</code> task<br>
+              <code>fid</code> idea<br>
+              <code>fpr</code> project
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Family</div>
-              <code>cat kw</code> Kathie &nbsp;|&nbsp; <code>cat zs</code> Zach &nbsp;|&nbsp; <code>cat es</code> Ethan<br>
-              <code>cat afl</code> Andy &nbsp;|&nbsp; <code>cat ma</code> Maureen &nbsp;|&nbsp; <code>cat ka</code> Kathy-Aunt<br>
-              <code>cat ms</code> Micky &nbsp;|&nbsp; <code>cat lb</code> Lee &nbsp;|&nbsp; <code>cat csl</code> Charity
+              <code>kw</code> Kathie &nbsp;&nbsp; <code>afl</code> Andy &nbsp;&nbsp; <code>lb</code> Lee<br>
+              <code>zs</code> Zach &nbsp;&nbsp; <code>ma</code> Maureen &nbsp;&nbsp; <code>csl</code> Charity<br>
+              <code>es</code> Ethan &nbsp;&nbsp; <code>ka</code> Kathy-Aunt<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>ms</code> Micky
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Pets</div>
-              <code>cat kd</code> Kevin &nbsp;|&nbsp; <code>cat mc</code> Mat &nbsp;|&nbsp; <code>cat pcc</code> Phil &nbsp;|&nbsp; <code>cat acc</code> Ace<br>
-              <code>cat liz</code> Herschel &nbsp;|&nbsp; <code>cat hen</code> hens &nbsp;|&nbsp; <code>cat hhr</code> hey-hey-Rooster
+              <code>kd</code> Kevin &nbsp;&nbsp; <code>acc</code> Ace<br>
+              <code>mc</code> Mat &nbsp;&nbsp; <code>liz</code> Herschel<br>
+              <code>pcc</code> Phil &nbsp;&nbsp; <code>hen</code> hens<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>hhr</code> hey-hey-Rooster
             </div>
             <div class="cmd-group">
               <div class="cmd-label">System</div>
-              <code>cat pi</code> personal-info &nbsp;|&nbsp; <code>cat pid</code> personal-idea &nbsp;|&nbsp; <code>cat re</code> remind &nbsp;|&nbsp; <code>cat r</code> random<br>
-              <code>cat ol</code> open-loop &nbsp;|&nbsp; <code>cat cal</code> calendar &nbsp;|&nbsp; <code>cat ch</code> claude-handoff<br>
-              <div style="color:#475569;font-size:.75rem;margin-top:4px;line-height:1.5">✅ Any note becomes a checklist if lines start with <code style="background:#0d1117;color:#22d3ee;padding:1px 4px;border-radius:3px">[ ]</code> or <code style="background:#0d1117;color:#22d3ee;padding:1px 4px;border-radius:3px">[x]</code><br>Or use <code style="background:#0d1117;color:#22d3ee;padding:1px 4px;border-radius:3px">cat pp ls</code> to auto-checkbox every line</div>
+              <code>pi</code> personal-info &nbsp;&nbsp; <code>cal</code> calendar<br>
+              <code>ls</code> list &nbsp;&nbsp; <code>anc</code> anchor<br>
+              <code>re</code> remind &nbsp;&nbsp; <code>emp</code> employment<br>
+              <code>r</code> random &nbsp;&nbsp; <code>ch</code> claude-handoff<br>
+              <code>ol</code> open-loop
             </div>
             <div class="cmd-group">
-              <div class="cmd-label">Reminders — no sync needed</div>
-              <code>remind</code> or <code>r</code> or <code>todo</code><br>
+              <div class="cmd-label">Notes</div>
+              <span style="color:#94a3b8">Any line with <code>[ ]</code> or <code>[x]</code> becomes a checklist</span><br>
+              <span style="color:#94a3b8">Add <code>ls</code> after any cat to auto-checkbox lines</span><br>
+              <span style="color:#94a3b8">Comma-split: <code>cat wt,wp</code> creates two notes</span>
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Reminders</div>
+              <code>remind</code> or <code>re</code> or <code>todo</code><br>
               <span style="color:#64748b">call dentist, monday 9am</span><br>
-              <span style="color:#64748b">pick up kids (no date = +7 days)</span>
-            </div>
-            <div class="cmd-group">
-              <div class="cmd-label">Reminder commands — no sync needed</div>
-              <code>done N</code> — delete reminder<br>
-              <code>snooze N</code> — push 1 week<br>
-              <code>snooze N friday 3pm</code> — push to time<br>
-              <code>change N to new text thursday</code>
+              <code>done N</code> &nbsp;&nbsp; <code>snooze N</code> &nbsp;&nbsp; <code>snooze N friday 3pm</code>
             </div>
           </div>
         </div>
