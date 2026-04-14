@@ -33,10 +33,88 @@ async function extractImage(file) {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10*1024*1024 } });
 
+// Infer a project/topic label from type + text content
+function inferLabel(type, text) {
+  const t = (text || '').toLowerCase();
+  // Skip types that are already self-labeling
+  const selfLabeled = ['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt',
+    'Micky-Stepmother','Lee-Brother','Charity-SisterInLaw','Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat',
+    'Herschel-Lizard','hens','hey-hey-Rooster','claude-handoff','work-claude-handoff','system-summary'];
+  if (selfLabeled.includes(type)) return null;
+
+  // Personal project detection (applies to personal-*, work-*, random, list, pi, remind, open-loop, anchor, etc.)
+  if (/casmas.?bridge|anchor\s*2\.0|anchor.?mcp|anchor.*note.*system|note.*system.*anchor/.test(t)) return 'casmas-bridge';
+  if (/code.?index|codeindex|rooster.*embed|embed.*rooster|vector.*search|semantic.*search.*repo|repo.*embed/.test(t)) return 'code-index';
+  if (/drivecopy|drive.?copy|copy.*drive.*job|google.*drive.*copy|argocd.*drive|drive.*k8s/.test(t)) return 'drivecopy';
+  if (/ollama\b|mac mini.*m4|m4 pro.*ram|local.*llm.*hardware|buy.*mac|dedicated.*llm/.test(t)) return 'ollama-hw';
+  if (/driveactions|drive.?doc.?actions|docactions/.test(t)) return 'driveactions';
+  if (/gutils|google.?utils|gamadv|gam\b.*google|google.*\bgam\b/.test(t)) return 'google-utils';
+  if (/argocd|argo.?cd/.test(t)) return 'argocd';
+  if (/statuspage/.test(t)) return 'statuspage';
+  if (/alexa.*anchor|siri.*anchor|voice.*anchor|anchor.*alexa|anchor.*siri|lambda.*anchor|shortcut.*anchor/.test(t)) return 'voice-anchor';
+  if (/plex|sonarr|radarr|sabnzbd|bazarr|nzbd|home.*media.*server|media.*arr/.test(t)) return 'home-media';
+  if (/proxmox|truenas|openmediavault|\bomv\b|homelab|home.?lab|nas\b/.test(t)) return 'homelab';
+  if (/got.?your.?back|gyb\b/.test(t)) return 'gyb';
+
+  // Work-specific
+  if (type.startsWith('work-')) {
+    if (/sonos/.test(t)) return 'sonos';
+    if (/onboard|offboard|new hire|termination|provisioning|deprovisioning/.test(t)) return 'hr-it';
+    if (/google workspace|gsuite|gam\b|gmail.*admin|google.*admin/.test(t)) return 'google-workspace';
+    if (/network|switch|firewall|vlan|vpn|infra|server|vm\b|virtual machine|subnet/.test(t)) return 'infrastructure';
+    if (/jira|helpdesk|service desk|support.*ticket|ticket.*support/.test(t)) return 'it-support';
+    if (/budget|cost|spend|license|renewal|invoice|vendor|contract/.test(t)) return 'budget';
+    if (/security|sso|saml|okta|mfa|2fa|zero.?trust|phishing/.test(t)) return 'security';
+    if (/slack|zoom|teams|comms|communication/.test(t)) return 'comms';
+    return 'work-general';
+  }
+
+  // Health
+  if (type.startsWith('health-')) {
+    if (/weight|diet|calor|food|eat|meal|nutrition|macro/.test(t)) return 'diet';
+    if (/workout|gym|exercise|run|walk|bike|lift|strength|cardio|steps/.test(t)) return 'fitness';
+    if (/sleep|rest|insomnia/.test(t)) return 'sleep';
+    if (/doctor|dentist|appoint|medical|rx\b|prescription|medication|symptoms/.test(t)) return 'medical';
+    if (/mental|stress|anxiety|mood|depress|therapy/.test(t)) return 'mental-health';
+    return 'general-health';
+  }
+
+  // Finance
+  if (type.startsWith('finance-')) {
+    if (/tax|irs|w2|1099|deduct|filing/.test(t)) return 'taxes';
+    if (/invest|stock|retire|401k|\bira\b|brokerage|etf|index fund|vanguard/.test(t)) return 'investing';
+    if (/mortgage|home.loan|refi|refinanc/.test(t)) return 'mortgage';
+    if (/budget|spend|bill|subscription|expense/.test(t)) return 'budget';
+    if (/insurance/.test(t)) return 'insurance';
+    return 'general-finance';
+  }
+
+  return null;
+}
+
 // POST /note  or  POST /notes
 router.post('/', upload.single('file'), async (req, res) => {
   try {
     let raw = (req.body.raw||'').trim();
+
+    // Temporary admin: bulk-label all processed notes by keyword inference
+    if (raw === '__BULKLABEL__') {
+      const allNotes = db.prepare("SELECT * FROM notes WHERE status='processed'").all().map(decryptNote);
+      const labeled = [], skipped = [], unchanged = [];
+      for (const note of allNotes) {
+        const text = note.formatted || note.raw_input || '';
+        const inferred = inferLabel(note.type, text);
+        if (!inferred) {
+          skipped.push({ id: note.id, type: note.type });
+          continue;
+        }
+        if (note.tags === inferred) { unchanged.push({ id: note.id, type: note.type, label: inferred }); continue; }
+        db.prepare("UPDATE notes SET tags=? WHERE id=?").run(encrypt(inferred), note.id);
+        labeled.push({ id: note.id, type: note.type, label: inferred, prev: note.tags || '' });
+      }
+      return res.json({ ok: false, error: JSON.stringify({ labeled, skipped, unchanged, total: allNotes.length }) });
+    }
+
     if (req.file) {
       const isImg = /^image\//i.test(req.file.mimetype) || IMAGE_RE.test(req.file.originalname);
       const e = isImg ? await extractImage(req.file) : await extractText(req.file);
