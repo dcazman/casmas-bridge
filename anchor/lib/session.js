@@ -5,6 +5,9 @@ const { db, decryptNote, getPending, getLastSync } = require('./db');
 
 const BRIDGE_PATH  = '/bridge';
 const SESSION_FILE = BRIDGE_PATH + '/md/session-latest.md';
+const DB_SRC     = '/data/notes.db';
+const BACKUP_DIR = BRIDGE_PATH + '/anchor-backup';
+const BACKUP_DB  = BACKUP_DIR + '/notes.db';
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -161,14 +164,20 @@ function pushSessionMd() {
   try {
     const content = generateSessionMd();
     fs.writeFileSync(SESSION_FILE, content, 'utf8');
+    // Backup encrypted database into git repo
+    if (fs.existsSync(DB_SRC)) {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      fs.copyFileSync(DB_SRC, BACKUP_DB);
+      try { gitExec('git add anchor-backup/notes.db'); } catch (_) {}
+    }
     gitExec('git add md/session-latest.md');
     try {
-      gitExec('git commit -m "anchor: auto-update session-latest.md"');
+      gitExec('git commit -m "anchor: backup notes.db + update session"');
       gitExec('git push');
-      console.log('[session] pushed session-latest.md');
+      console.log('[session] pushed session-latest.md + notes.db backup');
     } catch (e) {
       if (e.message && e.message.includes('nothing to commit')) {
-        console.log('[session] session-latest.md unchanged, no push needed');
+        console.log('[session] nothing changed, no push needed');
         return { ok: true, note: 'no changes' };
       }
       throw e;
