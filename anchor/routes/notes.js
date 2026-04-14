@@ -38,6 +38,18 @@ router.post('/', upload.single('file'), async (req, res) => {
   try {
     let raw = (req.body.raw||'').trim();
 
+    // TEMP MIGRATE TAGS — remove after running once
+    if (raw === '__MIGRATETAGS__') {
+      const rows = db.prepare("SELECT id,tags FROM notes WHERE tags IS NOT NULL AND tags != '' AND tags LIKE '%:%:%'").all();
+      let count = 0;
+      for (const r of rows) {
+        const plain = decrypt(r.tags);
+        if (plain && plain !== r.tags) { db.prepare('UPDATE notes SET tags=? WHERE id=?').run(plain, r.id); count++; }
+      }
+      return res.json({ ok: false, error: JSON.stringify({ migrated: count, total: rows.length }) });
+    }
+    // END TEMP MIGRATE TAGS
+
     if (req.file) {
       const isImg = /^image\//i.test(req.file.mimetype) || IMAGE_RE.test(req.file.originalname);
       const e = isImg ? await extractImage(req.file) : await extractText(req.file);
@@ -204,19 +216,5 @@ router.patch('/:id/remind', (req, res) => {
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
-
-// TEMP MIGRATE TAGS — remove after running once
-router.post('/', (req, _res, next) => {
-  if ((req.body.raw||'') !== '__MIGRATETAGS__') return next();
-  const { decrypt } = require('../lib/crypto');
-  const rows = db.prepare("SELECT id,tags FROM notes WHERE tags IS NOT NULL AND tags != '' AND tags LIKE '%:%:%'").all();
-  let count = 0;
-  for (const r of rows) {
-    const plain = decrypt(r.tags);
-    if (plain && plain !== r.tags) { db.prepare('UPDATE notes SET tags=? WHERE id=?').run(plain, r.id); count++; }
-  }
-  return _res.json({ ok: false, error: JSON.stringify({ migrated: count, total: rows.length }) });
-}, (req, res) => res.json({ ok: false, error: 'passthrough' }));
-// END TEMP MIGRATE TAGS
 
 module.exports = router;
