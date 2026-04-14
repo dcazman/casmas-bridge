@@ -81,12 +81,13 @@ function renderNote(n) {
     ${quickActions}
     <div class="note-edit" id="edit-${n.id}" style="display:none">
       <textarea class="edit-ta" id="etxt-${n.id}">${esc(n.formatted||n.raw_input)}</textarea>
+      <input type="text" class="edit-tags" id="etags-${n.id}" placeholder="Labels (comma-separated, e.g. casmas-bridge, code-index)" value="${esc(n.tags||'')}">
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="btn btn-primary" style="padding:5px 12px;font-size:.85rem" onclick="saveEdit(${n.id})">Save</button>
         <button class="btn btn-secondary" style="padding:5px 12px;font-size:.85rem" onclick="cancelEdit(${n.id})">Cancel</button>
       </div>
     </div>
-    ${n.tags&&!ip?'<div class="note-tags">'+esc(n.tags).split(',').map(t=>'<span class="tag">'+t.trim()+'</span>').join('')+'</div>':''}
+    ${n.tags&&!ip?'<div class="note-tags">'+n.tags.split(',').map(t=>{const ts=t.trim();return '<span class="tag" data-tag="'+esc(ts)+'" onclick="filterByTag(this.dataset.tag)" title="Filter by label">'+esc(ts)+'</span>';}).join('')+'</div>':''}
     ${n.open_loops?'<div class="note-loops">🔁 '+esc(n.open_loops)+'</div>':''}
     <div class="note-rc">
       <select class="rc-sel" onchange="reclassify(${n.id},this.value)"><option value="">↩ reclassify...</option>${opts}</select>
@@ -111,9 +112,9 @@ function queryNotes(q, type, tag, sort, showReminders) {
 }
 
 router.get('/notes-html', (req, res) => {
-  const { q, type, sort, reminders } = req.query;
+  const { q, type, tag, sort, reminders } = req.query;
   const showReminders = reminders === '1' || type === 'remind';
-  const notes = queryNotes(q, type, '', sort, showReminders);
+  const notes = queryNotes(q, type, tag||'', sort, showReminders);
   res.send(notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>');
 });
 
@@ -240,8 +241,11 @@ router.get('/', (req, res) => {
     .list-items{font-size:.95rem;line-height:1.7;color:#cbd5e1}
     .note-edit{margin-top:8px}
     .edit-ta{width:100%;height:100px;background:#0d1117;color:#e2e8f0;border:1px solid #60a5fa;border-radius:8px;padding:10px;font-size:.92rem;font-family:inherit;resize:vertical}
+    .edit-tags{width:100%;background:#0d1117;color:#e2e8f0;border:1px solid #60a5fa40;border-radius:6px;padding:6px 10px;font-size:.82rem;font-family:inherit;margin-top:6px;box-sizing:border-box}
+    .edit-tags::placeholder{color:#334155}
     .note-tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
-    .tag{font-size:.75rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:20px}
+    .tag{font-size:.75rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:20px;cursor:pointer;transition:background .15s}
+    .tag:hover{background:#264a7a}
     .note-loops{margin-top:8px;font-size:.88rem;color:#fbbf24;background:#292208;padding:8px 12px;border-radius:6px;border-left:3px solid #fbbf24}
     .note-rc{margin-top:8px;display:flex;align-items:center;gap:8px}
     .rc-sel{background:#0d1117;color:#475569;border:1px solid #1e2d45;border-radius:6px;padding:3px 8px;font-size:.78rem;cursor:pointer}
@@ -340,6 +344,7 @@ router.get('/', (req, res) => {
           <div class="search-row">
             <input type="text" id="sq" placeholder="Search..." value="${esc(q||'')}">
             <select id="st"><option value="">All types</option>${typeOpts}</select>
+            <input type="text" id="stag" placeholder="Label..." value="${esc(tag||'')}" title="Filter by label (click a tag badge to fill)" style="max-width:130px">
             <select id="so">
               <option value="newest" ${ss('newest')}>Newest</option>
               <option value="oldest" ${ss('oldest')}>Oldest</option>
@@ -621,9 +626,10 @@ router.get('/', (req, res) => {
     document.getElementById('sq')?.addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(doSearch,350);});
     document.getElementById('st')?.addEventListener('change',()=>{_showReminders=false;document.getElementById('remindToggle').classList.remove('active');document.getElementById('remindToggle').textContent='🔔 Reminders';doSearch();});
     document.getElementById('so')?.addEventListener('change',doSearch);
+    function filterByTag(tag){const el=document.getElementById('stag');if(el){el.value=tag;doSearch();}}
     function doSearch(){
-      const q=document.getElementById('sq')?.value||'',t=document.getElementById('st')?.value||'',s=document.getElementById('so')?.value||'';
-      const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);
+      const q=document.getElementById('sq')?.value||'',t=document.getElementById('st')?.value||'',s=document.getElementById('so')?.value||'',tg=document.getElementById('stag')?.value||'';
+      const p=new URLSearchParams();if(q)p.set('q',q);if(t)p.set('type',t);if(s)p.set('sort',s);if(tg)p.set('tag',tg);
       if(_showReminders&&!t)p.set('reminders','1');
       fetch('/notes-html?'+p.toString()).then(r=>r.text()).then(html=>{
         const nl=document.querySelector('.notes-list');if(nl){nl.innerHTML=html;renderTimestamps();}
@@ -650,11 +656,24 @@ router.get('/', (req, res) => {
     }
     async function saveEdit(id){
       const c=document.getElementById('etxt-'+id).value.trim();if(!c)return;
+      const tags=(document.getElementById('etags-'+id)?.value||'').trim();
       try{
-        const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c})});
+        const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c,tags})});
         const d=await r.json();
-        if(d.ok){const fmt=document.getElementById('fmt-'+id);if(fmt){fmt.textContent=c;fmt.style.display='block';}document.getElementById('edit-'+id).style.display='none';const editBtn=document.querySelector('#note-'+id+' .btn-icon');if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}}
-        else alert('Save failed');
+        if(d.ok){
+          const fmt=document.getElementById('fmt-'+id);if(fmt){fmt.textContent=c;fmt.style.display='block';}
+          document.getElementById('edit-'+id).style.display='none';
+          const noteEl=document.getElementById('note-'+id);
+          if(noteEl){
+            let tagsDiv=noteEl.querySelector('.note-tags');
+            if(tags){
+              const esc2=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+              const badges=tags.split(',').map(t=>{const ts=t.trim();return '<span class="tag" data-tag="'+esc2(ts)+'" onclick="filterByTag(this.dataset.tag)" title="Filter by label">'+esc2(ts)+'</span>';}).join('');
+              if(tagsDiv){tagsDiv.innerHTML=badges;}else{tagsDiv=document.createElement('div');tagsDiv.className='note-tags';tagsDiv.innerHTML=badges;const rc=noteEl.querySelector('.note-rc');if(rc)noteEl.insertBefore(tagsDiv,rc);else noteEl.appendChild(tagsDiv);}
+            }else if(tagsDiv){tagsDiv.remove();}
+          }
+          const editBtn=document.querySelector('#note-'+id+' .btn-icon');if(editBtn){const orig=editBtn.textContent;editBtn.textContent='✓';setTimeout(()=>editBtn.textContent=orig,1200);}
+        }else alert('Save failed');
       }catch(e){alert('Save failed');}
     }
     async function deleteNote(id){

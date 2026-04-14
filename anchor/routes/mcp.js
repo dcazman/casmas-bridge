@@ -10,10 +10,11 @@ function filterCaller(notes, caller) { return caller === 'work' ? notes.filter(n
 
 router.post('/notes', (req, res) => {
   if (!isMcp(req)) return res.status(403).json({ error: 'Forbidden' });
-  const { type, limit=20, sort='newest', caller } = req.body;
+  const { type, limit=20, sort='newest', label, caller } = req.body;
   const so = { 'newest': 'ORDER BY created_at DESC', 'oldest': 'ORDER BY created_at ASC', 'open-loops': "ORDER BY (open_loops IS NOT NULL AND open_loops!='') DESC,created_at DESC" };
   let q = "SELECT * FROM notes WHERE status='processed'"; const p = [];
-  if (type) { q += ' AND type=?'; p.push(type); }
+  if (type)  { q += ' AND type=?'; p.push(type); }
+  if (label) { q += ' AND tags LIKE ?'; p.push('%'+label+'%'); }
   q += ' ' + (so[sort]||so['newest']) + ' LIMIT ?'; p.push(limit);
   const notes = db.prepare(q).all(...p).map(decryptNote);
   const f = filterCaller(notes, caller);

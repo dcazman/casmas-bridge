@@ -155,16 +155,22 @@ router.delete('/:id', (req, res) => {
 router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (!id) return res.json({ ok: false, error: 'Invalid id' });
-  const { formatted, type } = req.body;
+  const { formatted, type, tags } = req.body;
   try {
     const { ALL_TYPES } = require('../lib/helpers');
-    if (formatted !== undefined && type && ALL_TYPES.includes(type)) {
-      // Both content edit + reclassify
+    const hasFmt  = formatted !== undefined;
+    const hasType = type && ALL_TYPES.includes(type);
+    const hasTags = tags !== undefined;
+    if (hasFmt && hasType && hasTags) {
+      db.prepare("UPDATE notes SET formatted=?, type=?, tags=?, status='processed' WHERE id=?").run(encrypt(formatted), type, encrypt(tags), id);
+    } else if (hasFmt && hasType) {
       db.prepare("UPDATE notes SET formatted=?, type=?, status='processed' WHERE id=?").run(encrypt(formatted), type, id);
-    } else if (formatted !== undefined) {
+    } else if (hasFmt && hasTags) {
+      db.prepare("UPDATE notes SET formatted=?, tags=?, status='processed' WHERE id=?").run(encrypt(formatted), encrypt(tags), id);
+    } else if (hasFmt) {
       // Content edit only — also clear review status
       db.prepare("UPDATE notes SET formatted=?, status='processed' WHERE id=?").run(encrypt(formatted), id);
-    } else if (type && ALL_TYPES.includes(type)) {
+    } else if (hasType) {
       if (type === 'remind') {
         // Reclassify to remind — parse remind_at from existing content
         const note = decryptNote(db.prepare('SELECT * FROM notes WHERE id=?').get(id));
@@ -177,6 +183,8 @@ router.put('/:id', (req, res) => {
       } else {
         db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
       }
+    } else if (hasTags) {
+      db.prepare("UPDATE notes SET tags=?, status='processed' WHERE id=?").run(encrypt(tags), id);
     }
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }

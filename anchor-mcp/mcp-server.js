@@ -81,10 +81,11 @@ function createMcpServer(caller) {
     {
       type: z.string().optional().describe('Filter by category'),
       limit: z.number().optional().describe('Max notes to return (default 20)'),
-      sort: z.enum(['newest', 'oldest', 'open-loops']).optional().describe('Sort order')
+      sort: z.enum(['newest', 'oldest', 'open-loops']).optional().describe('Sort order'),
+      label: z.string().optional().describe('Filter by label/tag (e.g. "casmas-bridge")')
     },
-    async ({ type, limit = 20, sort = 'newest' }) => {
-      const data = await anchorPost('/mcp/notes', { type, limit, sort, caller }, caller);
+    async ({ type, limit = 20, sort = 'newest', label }) => {
+      const data = await anchorPost('/mcp/notes', { type, limit, sort, label, caller }, caller);
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     }
   );
