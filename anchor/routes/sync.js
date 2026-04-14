@@ -171,7 +171,7 @@ No markdown. No explanation. Only the JSON array.`;
         }
         if (!seen.has(sid)) {
           const changes = db.prepare("UPDATE notes SET type=?,status='processed',formatted=?,tags=?,open_loops=? WHERE id=?")
-            .run(it.type, encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || ''), sid).changes;
+            .run(it.type, encrypt(it.formatted), it.tags || '', encrypt(it.open_loops || ''), sid).changes;
           if (changes === 0) console.warn(`[sync] UPDATE matched 0 rows for source_id=${sid}`);
           seen.add(sid);
           if (it.remind_at) {
@@ -179,7 +179,7 @@ No markdown. No explanation. Only the JSON array.`;
             db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?').run(it.remind_at, num, sid);
           }
         } else {
-          const newId = ins.run(it.type, 'processed', encrypt(it.formatted), encrypt(it.formatted), encrypt(it.tags || ''), encrypt(it.open_loops || '')).lastInsertRowid;
+          const newId = ins.run(it.type, 'processed', encrypt(it.formatted), encrypt(it.formatted), it.tags || '', encrypt(it.open_loops || '')).lastInsertRowid;
           if (it.remind_at) {
             const num = nextRemindNum();
             db.prepare('UPDATE notes SET remind_at=?,remind_sent=0,remind_num=? WHERE id=?').run(it.remind_at, num, newId);

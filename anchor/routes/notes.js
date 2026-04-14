@@ -107,14 +107,14 @@ router.post('/', upload.single('file'), async (req, res) => {
           const enc = encrypt(t);
           const existing = db.prepare("SELECT id FROM notes WHERE formatted=? LIMIT 1").get(enc);
           if (!existing) {
-            const encTag = sec.label ? encrypt(sec.label) : '';
+            const tag = sec.label || '';
             if (sec.type === 'open-loop') {
               const loopNum = nextLoopNum();
               const prefixed = `Loop #${loopNum}: ${t}`;
               const encPrefixed = encrypt(prefixed);
-              db.prepare("INSERT INTO notes (type,status,raw_input,formatted,loop_num,tags) VALUES (?,?,?,?,?,?)").run(sec.type, 'processed', encPrefixed, encPrefixed, loopNum, encTag);
+              db.prepare("INSERT INTO notes (type,status,raw_input,formatted,loop_num,tags) VALUES (?,?,?,?,?,?)").run(sec.type, 'processed', encPrefixed, encPrefixed, loopNum, tag);
             } else {
-              ins.run(sec.type, 'processed', enc, enc, encTag);
+              ins.run(sec.type, 'processed', enc, enc, tag);
             }
             inserted++;
           }
@@ -164,11 +164,11 @@ router.put('/:id', (req, res) => {
     const hasType = type && ALL_TYPES.includes(type);
     const hasTags = tags !== undefined;
     if (hasFmt && hasType && hasTags) {
-      db.prepare("UPDATE notes SET formatted=?, type=?, tags=?, status='processed' WHERE id=?").run(encrypt(formatted), type, encrypt(tags), id);
+      db.prepare("UPDATE notes SET formatted=?, type=?, tags=?, status='processed' WHERE id=?").run(encrypt(formatted), type, tags, id);
     } else if (hasFmt && hasType) {
       db.prepare("UPDATE notes SET formatted=?, type=?, status='processed' WHERE id=?").run(encrypt(formatted), type, id);
     } else if (hasFmt && hasTags) {
-      db.prepare("UPDATE notes SET formatted=?, tags=?, status='processed' WHERE id=?").run(encrypt(formatted), encrypt(tags), id);
+      db.prepare("UPDATE notes SET formatted=?, tags=?, status='processed' WHERE id=?").run(encrypt(formatted), tags, id);
     } else if (hasFmt) {
       // Content edit only — also clear review status
       db.prepare("UPDATE notes SET formatted=?, status='processed' WHERE id=?").run(encrypt(formatted), id);
@@ -186,7 +186,7 @@ router.put('/:id', (req, res) => {
         db.prepare("UPDATE notes SET type=?, status='processed' WHERE id=?").run(type, id);
       }
     } else if (hasTags) {
-      db.prepare("UPDATE notes SET tags=?, status='processed' WHERE id=?").run(encrypt(tags), id);
+      db.prepare("UPDATE notes SET tags=?, status='processed' WHERE id=?").run(tags, id);
     }
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
@@ -204,5 +204,19 @@ router.patch('/:id/remind', (req, res) => {
     res.json({ ok: true });
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
+
+// TEMP MIGRATE TAGS — remove after running once
+router.post('/', (req, _res, next) => {
+  if ((req.body.raw||'') !== '__MIGRATETAGS__') return next();
+  const { decrypt } = require('../lib/crypto');
+  const rows = db.prepare("SELECT id,tags FROM notes WHERE tags IS NOT NULL AND tags != '' AND tags LIKE '%:%:%'").all();
+  let count = 0;
+  for (const r of rows) {
+    const plain = decrypt(r.tags);
+    if (plain && plain !== r.tags) { db.prepare('UPDATE notes SET tags=? WHERE id=?').run(plain, r.id); count++; }
+  }
+  return _res.json({ ok: false, error: JSON.stringify({ migrated: count, total: rows.length }) });
+}, (req, res) => res.json({ ok: false, error: 'passthrough' }));
+// END TEMP MIGRATE TAGS
 
 module.exports = router;
