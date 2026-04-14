@@ -97,6 +97,19 @@ router.post('/', upload.single('file'), async (req, res) => {
   try {
     let raw = (req.body.raw||'').trim();
 
+    // Temporary admin: apply explicit id→label map
+    if (raw.startsWith('__SETLABELS__:')) {
+      const map = JSON.parse(raw.slice('__SETLABELS__:'.length));
+      const results = [];
+      for (const [idStr, label] of Object.entries(map)) {
+        const id = parseInt(idStr);
+        const enc = label ? encrypt(label) : '';
+        db.prepare("UPDATE notes SET tags=? WHERE id=?").run(enc, id);
+        results.push({ id, label });
+      }
+      return res.json({ ok: false, error: JSON.stringify({ patched: results, count: results.length }) });
+    }
+
     // Temporary admin: bulk-label all processed notes by keyword inference
     if (raw === '__BULKLABEL__') {
       const allNotes = db.prepare("SELECT * FROM notes WHERE status='processed'").all().map(decryptNote);
