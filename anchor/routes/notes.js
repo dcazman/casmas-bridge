@@ -33,29 +33,6 @@ async function extractImage(file) {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10*1024*1024 } });
 
-// TEMP ADMIN INTERCEPT
-router.post('/', (req, res, next) => {
-  if ((req.body.raw||'').startsWith('__SETLABELS__:')) {
-    const json = (req.body.raw||'').replace('__SETLABELS__:', '').trim();
-    try {
-      const map = JSON.parse(json);
-      const stmt = db.prepare("UPDATE notes SET tags=? WHERE id=?");
-      const { encrypt } = require('../lib/crypto');
-      const results = [];
-      db.transaction(() => {
-        for (const [id, label] of Object.entries(map)) {
-          const enc = encrypt(label);
-          stmt.run(enc, parseInt(id));
-          results.push({ id: parseInt(id), label });
-        }
-      })();
-      return res.json({ ok: false, error: JSON.stringify({ count: results.length, results }) });
-    } catch(e) { return res.json({ ok: false, error: 'SETLABELS parse error: ' + e.message }); }
-  }
-  next();
-});
-// END TEMP ADMIN INTERCEPT
-
 // POST /note  or  POST /notes
 router.post('/', upload.single('file'), async (req, res) => {
   try {
