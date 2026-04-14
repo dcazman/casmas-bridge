@@ -105,7 +105,9 @@ function parseCat(raw) {
         cur = { type: CAT[k] || (ALL_TYPES.includes(k) ? k : 'random'), lines: [], isList };
       }
     } else if (cur && line.trim()) {
-      cur.lines.push(line);
+      const labelM = line.trim().match(/^@(\S+)$/);
+      if (labelM) { cur.label = labelM[1]; }
+      else { cur.lines.push(line); }
     }
   }
   if (cur && cur.lines.length) secs.push(cur);

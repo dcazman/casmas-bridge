@@ -85,7 +85,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     const secs = parseCat(raw);
     if (secs.length > 0) {
-      const ins = db.prepare('INSERT INTO notes (type,status,raw_input,formatted) VALUES (?,?,?,?)');
+      const ins = db.prepare('INSERT INTO notes (type,status,raw_input,formatted,tags) VALUES (?,?,?,?,?)');
       let inserted = 0;
       db.transaction(s => {
         for (const sec of s) {
@@ -107,13 +107,14 @@ router.post('/', upload.single('file'), async (req, res) => {
           const enc = encrypt(t);
           const existing = db.prepare("SELECT id FROM notes WHERE formatted=? LIMIT 1").get(enc);
           if (!existing) {
+            const encTag = sec.label ? encrypt(sec.label) : '';
             if (sec.type === 'open-loop') {
               const loopNum = nextLoopNum();
               const prefixed = `Loop #${loopNum}: ${t}`;
               const encPrefixed = encrypt(prefixed);
-              db.prepare("INSERT INTO notes (type,status,raw_input,formatted,loop_num) VALUES (?,?,?,?,?)").run(sec.type, 'processed', encPrefixed, encPrefixed, loopNum);
+              db.prepare("INSERT INTO notes (type,status,raw_input,formatted,loop_num,tags) VALUES (?,?,?,?,?,?)").run(sec.type, 'processed', encPrefixed, encPrefixed, loopNum, encTag);
             } else {
-              ins.run(sec.type, 'processed', enc, enc);
+              ins.run(sec.type, 'processed', enc, enc, encTag);
             }
             inserted++;
           }
