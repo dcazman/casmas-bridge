@@ -135,7 +135,7 @@ router.post('/remind-cmd', (req, res) => {
 router.get('/', (req, res) => {
   const { q, type, tag, sort } = req.query;
   const notes = queryNotes(q, type, tag, sort, false);
-  const { count: pc, estimatedTokens: pt } = getPending();
+  const { count: pc } = getPending();
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
   const as  = shouldSync();
   const useOllama = process.env.USE_OLLAMA === 'true';
@@ -321,7 +321,7 @@ router.get('/', (req, res) => {
         <h2 onclick="tp('sb','sc')"><span class="dot" style="background:#f59e0b"></span>Sync Queue<span class="chev" id="sc">▼</span></h2>
         <div id="sb" class="collapsed">
           <div class="sync-bar">
-            <span class="sync-ct"><strong id="pc">${pc}</strong> pending (~${pt} tokens)</span>
+            <span class="sync-ct"><strong id="pc">${pc}</strong> pending</span>
             ${as?'<span class="sync-auto">⚡ auto-sync recommended</span>':''}
             <span class="sync-last">Last: ${lss}</span>
             <button class="btn-sync" id="syncBtn" onclick="runSync()" ${pc===0?'disabled':''}>Sync Now</button>
