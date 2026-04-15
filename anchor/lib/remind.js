@@ -207,6 +207,12 @@ function processCommands(text) {
       if (note) {
         const newDate = parseReminderDate(when).toISOString();
         db.prepare('UPDATE notes SET remind_at=?, remind_sent=0 WHERE id=?').run(newDate, note.id);
+        // Strip trailing date tokens — badge is the single source of truth for the date
+        const cur = decrypt(note.formatted) || '';
+        const stripped = cur.replace(/(,?\s*(?:(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}(?::\d{2})?\s*(?:am|pm)|tom(?:orrow)?|\d+\s*(?:week|day)s?).*)$/i, '').trim();
+        if (stripped && stripped !== cur) {
+          db.prepare('UPDATE notes SET formatted=? WHERE id=?').run(encrypt(stripped), note.id);
+        }
         results.push({ cmd: 'snooze', num: id, ok: true, newDate });
       } else {
         results.push({ cmd: 'snooze', num: id, ok: false, error: 'not found' });
