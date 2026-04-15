@@ -656,6 +656,7 @@ router.get('/', (req, res) => {
         const r=await fetch('/notes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formatted:c,tags})});
         const d=await r.json();
         if(d.ok){
+          if(/^\s*\[.\]/m.test(c)){location.reload();return;}
           const fmt=document.getElementById('fmt-'+id);if(fmt){fmt.textContent=c;fmt.style.display='block';}
           document.getElementById('edit-'+id).style.display='none';
           const noteEl=document.getElementById('note-'+id);
