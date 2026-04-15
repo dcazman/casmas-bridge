@@ -1,9 +1,10 @@
 # Anchor — Session Context
-**Generated:** 4/15/2026, 6:55:57 PM
+**Generated:** 4/15/2026, 7:30:02 PM
 **Pending notes:** 0 | **Last sync:** 4/12/2026, 5:49:23 PM
 
 ## 🔔 Active Reminders
 7) make doc apt — due 4/10/2026, 11:00:00 AM ✓sent
+19) call Mrs Reynolds’s tomorrow — due 4/16/2026, 10:00:00 AM
 18) plumber tomorrow — due 4/16/2026, 11:00:00 AM
 9) smoked meat — due 4/16/2026, 4:00:00 PM
 17) animals to vet — due 4/22/2026, 9:00:00 AM
