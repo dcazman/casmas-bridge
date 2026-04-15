@@ -60,6 +60,18 @@ async function fetchForecast(token) {
   return data;
 }
 
+// ── Icon → emoji map ─────────────────────────────────────────────────────────
+
+const ICON_EMOJI = {
+  'clear-day':'☀️','clear-night':'🌙',
+  'partly-cloudy-day':'⛅','partly-cloudy-night':'⛅',
+  'cloudy':'☁️',
+  'rainy':'🌧','possibly-rainy-day':'🌧','possibly-rainy-night':'🌧',
+  'thunderstorm':'⛈','possibly-thunderstorm-day':'⛈','possibly-thunderstorm-night':'⛈',
+  'snowy':'❄️','possibly-snowy-day':'🌨','possibly-snowy-night':'🌨',
+  'foggy':'🌫','windy':'💨','tornado':'🌪️',
+};
+
 // ── Wind direction helper ─────────────────────────────────────────────────────
 
 function windDir(deg) {
@@ -111,6 +123,15 @@ async function getTempestRaw(token) {
     precipChance: maxPrecipChance,
     precipType:  today.precip_type        || null,
     forecastConditions: today.conditions  || null,
+    // 3-day outlook (days 1–3, today is index 0)
+    forecast: (data.forecast?.daily || []).slice(1, 4).map(d => ({
+      dayName:      new Date(d.day_start_local * 1000).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' }),
+      highF:        d.air_temp_high != null ? Math.round(d.air_temp_high) : null,
+      lowF:         d.air_temp_low  != null ? Math.round(d.air_temp_low)  : null,
+      conditions:   d.conditions    || null,
+      emoji:        ICON_EMOJI[d.icon] || null,
+      precipChance: d.precip_probability ?? 0,
+    })),
   };
 }
 
@@ -139,6 +160,18 @@ async function getTempestBlock() {
     block += `📊  ${d.pressureMb || '—'} mb  ☀️  UV ${d.uv || '—'}${rain}\n`;
     if (hiLo || cond) block += `📅  Today: ${[hiLo, cond].filter(Boolean).join(' · ')}\n`;
     block += `${precip}`;
+
+    // 3-day outlook
+    if (d.forecast && d.forecast.length) {
+      const lines = d.forecast.map((f, i) => {
+        const em     = f.emoji ? f.emoji + ' ' : '';
+        const prefix = i === 0 ? '📅 ' : '   ';
+        const hi     = f.highF != null ? f.highF + '°' : '—';
+        const lo     = f.lowF  != null ? f.lowF  + '°' : '—';
+        return `${prefix}${f.dayName}: ${em}H:${hi} L:${lo} · ${f.conditions || ''} · ${f.precipChance}% rain`;
+      });
+      block += '\n' + lines.join('\n');
+    }
 
     return block;
   } catch (e) {

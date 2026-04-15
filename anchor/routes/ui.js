@@ -291,6 +291,13 @@ router.get('/', (req, res) => {
     .wx-refresh:hover{color:#60a5fa}
     .wx-loading{color:#334155;font-size:.85rem;padding:8px 0}
     .wx-error{color:#475569;font-size:.82rem;padding:8px 0}
+    .wx-fc{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .wx-fday{flex:1;min-width:90px;background:#161b27;border:1px solid #1e2d45;border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+    .wx-fday-name{font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.4px}
+    .wx-fday-icon{font-size:1.1rem;line-height:1.4}
+    .wx-fday-hl{font-size:.9rem;font-weight:600;color:#e2e8f0}
+    .wx-fday-cond{font-size:.72rem;color:#94a3b8}
+    .wx-fday-rain{font-size:.72rem}
   </style></head><body>
   <div class="hdr">
     <img src="/apple-touch-icon.png" class="hdr-icon" alt="Anchor 2.0">
@@ -471,6 +478,7 @@ router.get('/', (req, res) => {
               \${d.rainToday?'<div class="wx-stat"><span class="wx-stat-val">'+d.rainToday+'"</span><span class="wx-stat-lbl">Rain today</span></div>':''}
               \${d.lightning?'<div class="wx-stat"><span class="wx-stat-val">⚡ '+d.lightning+'</span><span class="wx-stat-lbl">Strikes/hr</span></div>':''}
             </div>
+            \${(d.forecast||[]).length?'<div class="wx-fc">'+(d.forecast||[]).map(f=>{const rc=f.precipChance>60?'#f87171':f.precipChance>30?'#fbbf24':'#60a5fa';return '<div class="wx-fday"><span class="wx-fday-name">'+f.dayName+'</span><span class="wx-fday-icon">'+(f.emoji||'')+'</span><span class="wx-fday-hl">'+(f.highF!=null?f.highF+'°':'—')+' / '+(f.lowF!=null?f.lowF+'°':'—')+'</span><span class="wx-fday-cond">'+(f.conditions||'')+'</span><span class="wx-fday-rain" style="color:'+rc+'">'+f.precipChance+'% rain</span></div>';}).join('')+'</div>':''}
             <div class="wx-time">Updated \${d.time} · Casmas station</div>
           </div>\`;
       }catch(e){body.innerHTML='<div class="wx-error">Could not load weather</div>';}
