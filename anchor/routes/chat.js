@@ -30,7 +30,7 @@ router.post('/', async (req, res) => {
       const resp = await fetch(OLLAMA_URL + '/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama3.2:3b', stream: false, messages: [{ role: 'user', content: fullPrompt }] })
+        body: JSON.stringify({ model: 'mistral', stream: false, messages: [{ role: 'user', content: fullPrompt }] })
       });
       const data = await resp.json();
       res.json({ answer: data.message?.content || 'No response.', engine: 'rooster' });
