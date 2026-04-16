@@ -383,9 +383,9 @@ router.get('/', (req, res) => {
           <div class="chat-msgs" id="cm"><div class="msg ai">Ask me anything about your notes.</div></div>
           <div class="chat-in">
             <input type="text" id="ci" placeholder="What are my open loops?">
-            <button class="btn btn-primary" onclick="chat('haiku')">Ask</button>
+            <button id="ask-rooster-btn" class="btn btn-primary" onclick="chat('haiku')">Ask</button>
           </div>
-          <div class="chat-mr"><span class="model-lbl">Need Claude's brain?</span><button class="btn btn-opus" onclick="chat('claude')">Ask Claude ($)</button></div>
+          <div class="chat-mr"><button id="rooster-toggle-btn" onclick="toggleRooster()" style="font-size:.75rem;padding:3px 10px;border-radius:6px;border:none;cursor:pointer"></button><span class="model-lbl">Need Claude's brain?</span><button class="btn btn-opus" onclick="chat('claude')">Ask Claude ($)</button></div>
           <div class="loading" id="cl" style="margin-top:8px">⏳ Reading notes...</div>
           <div style="margin-top:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:#475569;font-size:.8rem" onclick="toggleHistory()">
@@ -598,7 +598,18 @@ router.get('/', (req, res) => {
       document.getElementById('cl').style.display='none';
       msgs.scrollTop=msgs.scrollHeight;
     }
-    document.getElementById('ci')?.addEventListener('keydown',e=>{if(e.key==='Enter')chat('haiku');});
+    const ROOSTER_KEY='rooster_enabled';
+    function isRoosterOn(){return localStorage.getItem(ROOSTER_KEY)!=='false';}
+    function updateRoosterUI(){
+      const on=isRoosterOn();
+      const tb=document.getElementById('rooster-toggle-btn');
+      const ab=document.getElementById('ask-rooster-btn');
+      if(tb){tb.textContent=on?'🐓 Rooster: ON':'🐓 Rooster: OFF';tb.style.background=on?'#14532d':'#374151';tb.style.color=on?'#4ade80':'#9ca3af';}
+      if(ab){ab.disabled=!on;ab.style.opacity=on?'1':'0.4';}
+    }
+    function toggleRooster(){localStorage.setItem(ROOSTER_KEY,isRoosterOn()?'false':'true');updateRoosterUI();}
+    updateRoosterUI();
+    document.getElementById('ci')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&isRoosterOn())chat('haiku');});
     document.getElementById('inp')?.addEventListener('paste',async function(e){
       const items=(e.clipboardData||window.clipboardData||{}).items||[];
       for(const item of items){
