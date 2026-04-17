@@ -1,5 +1,5 @@
 # Anchor — Session Context
-**Generated:** 4/17/2026, 7:00:08 AM
+**Generated:** 4/17/2026, 6:12:41 PM
 **Pending notes:** 0 | **Last sync:** 4/12/2026, 5:49:23 PM
 
 ## 🔔 Active Reminders
@@ -10,6 +10,8 @@
 
 ## 🔓 Open Loops (manual)
 • Loop #2: Apply for federal natural disaster for saddle Brook house damage
+• Loop #3: i need to get screws for pool slide.
+• Hello,
 
 ## 📋 Anchor Quick Reference
 **UI:** anchor.thecasmas.com
