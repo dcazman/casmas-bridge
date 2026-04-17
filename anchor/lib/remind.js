@@ -348,6 +348,14 @@ async function buildDigestEmail() {
 function startScheduler() {
   console.log('[remind] scheduler starting');
 
+  // Inbound email poller — every 30 minutes
+  const { pollInbound } = require('./inbound');
+  pollInbound(); // run once on startup
+  cron.schedule('*/30 * * * *', () => {
+    console.log('[inbound] polling...');
+    try { pollInbound(); } catch (e) { console.error('[inbound] poll error:', e.message); }
+  }, { timezone: 'America/New_York' });
+
   cron.schedule('0 7 * * *', async () => {
     console.log('[remind] 7AM digest running');
     try {

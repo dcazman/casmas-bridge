@@ -5,6 +5,7 @@ const SMTP_HOST    = process.env.SMTP_HOST  || '';
 const SMTP_PORT    = parseInt(process.env.SMTP_PORT || '465');
 const SMTP_USER    = process.env.SMTP_USER  || '';
 const SMTP_PASS    = process.env.SMTP_PASS  || '';
+const FROM_EMAIL   = process.env.FROM_EMAIL || SMTP_USER;
 const ALERT_EMAIL  = process.env.ALERT_EMAIL || SMTP_USER;
 const ALERT_EMAIL2 = process.env.ALERT_EMAIL2 || '';
 const emailEnabled = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
@@ -20,7 +21,7 @@ async function sendEmail(subject, body) {
       secure: SMTP_PORT === 465,
       auth: { user: SMTP_USER, pass: SMTP_PASS }
     });
-    await mailer.sendMail({ from: SMTP_USER, to: toList, subject, text: body });
+    await mailer.sendMail({ from: FROM_EMAIL, to: toList, subject, text: body });
     mailer.close();
     return { ok: true };
   } catch (e) {
