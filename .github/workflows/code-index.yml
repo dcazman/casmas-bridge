@@ -1,0 +1,205 @@
+name: Code Index
+
+# Drop this file into .github/workflows/ in any repo.
+# Requires: a self-hosted Actions runner on the machine that runs Rooster/Ollama.
+#   Install once at: github.com → Settings → Actions → Runners → New self-hosted runner
+#   All repos sharing that runner can use this workflow unchanged.
+#
+# Optional repo Variables (Settings → Variables → Actions):
+#   ROOSTER_URL   default: http://localhost:11434
+#   EMBED_MODEL   default: nomic-embed-code
+#
+# Output: .code-index/index.db committed back to the repo after each push.
+# Poller reads that file — it never needs to call Rooster itself.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.code-index/**'   # index commit must not re-trigger the workflow
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-index:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests --quiet
+
+      - name: Build index
+        env:
+          ROOSTER_URL: ${{ vars.ROOSTER_URL }}
+          EMBED_MODEL: ${{ vars.EMBED_MODEL }}
+        run: |
+          python - << 'PYEOF'
+          import os, sys, struct, sqlite3, hashlib, requests
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          ROOSTER_URL = os.environ.get("ROOSTER_URL") or "http://localhost:11434"
+          EMBED_MODEL = os.environ.get("EMBED_MODEL") or "nomic-embed-code"
+          REPO_NAME   = os.environ.get("GITHUB_REPOSITORY") or Path.cwd().name
+          COMMIT_SHA  = os.environ.get("GITHUB_SHA") or "local"
+
+          INDEX_DIR  = Path(".code-index")
+          INDEX_FILE = INDEX_DIR / "index.db"
+          MAX_FILE_BYTES  = 100_000
+          MAX_CHUNK_CHARS = 8_000
+
+          CODE_EXTS = {
+              ".py",".js",".ts",".tsx",".jsx",".go",".rs",".java",
+              ".cs",".cpp",".c",".h",".rb",".php",".swift",".kt",
+              ".sh",".bash",".ps1",".psm1",".psd1",
+              ".yml",".yaml",".toml",".tf",".hcl",
+              ".sql",".graphql",".proto",
+          }
+          SKIP_DIRS = {
+              ".git",".github","node_modules","__pycache__",".venv","venv",
+              "dist","build",".next",".nuxt","vendor","target",".code-index",
+              "bin","obj",
+          }
+
+          def load_ignore_patterns(root):
+              import fnmatch as _fnmatch; _fnmatch  # ensure imported
+              f = root / ".indexignore"
+              if not f.exists(): return []
+              pats = [l.strip() for l in f.read_text(encoding="utf-8").splitlines()
+                      if l.strip() and not l.strip().startswith("#")]
+              if pats: print(f"  .indexignore: {len(pats)} pattern(s)")
+              return pats
+
+          def is_ignored(rel, patterns):
+              import fnmatch
+              for p in patterns:
+                  if p.endswith("/"):
+                      if rel.startswith(p) or ("/" + p) in ("/" + rel): return True
+                  elif fnmatch.fnmatch(rel, p) or fnmatch.fnmatch(rel.split("/")[-1], p):
+                      return True
+              return False
+
+          def collect_files(root, ignore_patterns):
+              for p in sorted(root.rglob("*")):
+                  if not p.is_file(): continue
+                  rel = str(p.relative_to(root).as_posix())
+                  if any(part in SKIP_DIRS for part in p.relative_to(root).parts): continue
+                  if is_ignored(rel, ignore_patterns):
+                      print(f"  skip (.indexignore): {rel}"); continue
+                  if p.suffix.lower() not in CODE_EXTS: continue
+                  if p.stat().st_size > MAX_FILE_BYTES:
+                      print(f"  skip (too large): {rel}"); continue
+                  try:
+                      yield p, p.read_text(encoding="utf-8", errors="ignore")
+                  except Exception as e:
+                      print(f"  skip (read error): {rel} -- {e}")
+
+          def chunk_file(content):
+              lines = content.splitlines(keepends=True)
+              chunks, buf, buf_chars, start = [], [], 0, 1
+              for i, line in enumerate(lines, 1):
+                  buf.append(line); buf_chars += len(line)
+                  if buf_chars >= MAX_CHUNK_CHARS:
+                      chunks.append({"content": "".join(buf), "start_line": start, "end_line": i})
+                      buf, buf_chars, start = [], 0, i + 1
+              if buf:
+                  chunks.append({"content": "".join(buf), "start_line": start, "end_line": len(lines)})
+              return chunks or [{"content": content, "start_line": 1, "end_line": len(lines)}]
+
+          def get_embedding(text):
+              try:
+                  r = requests.post(f"{ROOSTER_URL}/api/embed",
+                                    json={"model": EMBED_MODEL, "input": text}, timeout=60)
+                  r.raise_for_status()
+                  embs = r.json().get("embeddings")
+                  return embs[0] if embs else None
+              except Exception as e:
+                  print(f"  embedding error: {e}", file=sys.stderr); return None
+
+          def chunk_id(repo, path, start, content):
+              return hashlib.sha256(f"{repo}:{path}:{start}:{content}".encode()).hexdigest()[:16]
+
+          INDEX_DIR.mkdir(exist_ok=True)
+          root = Path.cwd()
+          conn = sqlite3.connect(INDEX_FILE)
+          conn.executescript("""
+              CREATE TABLE IF NOT EXISTS chunks (
+                  id TEXT PRIMARY KEY, repo TEXT NOT NULL, file_path TEXT NOT NULL,
+                  chunk_type TEXT NOT NULL DEFAULT 'file', content TEXT NOT NULL,
+                  start_line INTEGER, end_line INTEGER,
+                  embedding BLOB, indexed_at TEXT NOT NULL
+              );
+              CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+              CREATE INDEX IF NOT EXISTS idx_file ON chunks (repo, file_path);
+          """)
+          conn.commit()
+
+          now = datetime.now(timezone.utc).isoformat()
+          new_chunks, total_files, indexed_paths = 0, 0, set()
+          ignore_patterns = load_ignore_patterns(root)
+
+          print(f"repo:  {REPO_NAME}  sha: {COMMIT_SHA[:8]}")
+          print(f"model: {EMBED_MODEL} @ {ROOSTER_URL}\n")
+
+          for path, content in collect_files(root, ignore_patterns):
+              rel = str(path.relative_to(root).as_posix())
+              indexed_paths.add(rel)
+              chunks = chunk_file(content)
+              total_files += 1
+              print(f"  {rel}  ({len(chunks)} chunk{'s' if len(chunks)!=1 else ''})")
+              for chunk in chunks:
+                  cid = chunk_id(REPO_NAME, rel, chunk["start_line"], chunk["content"])
+                  if conn.execute("SELECT 1 FROM chunks WHERE id=?", (cid,)).fetchone():
+                      continue
+                  emb = get_embedding(chunk["content"])
+                  emb_blob = struct.pack(f"<{len(emb)}f", *emb) if emb else None
+                  conn.execute(
+                      "INSERT OR REPLACE INTO chunks VALUES (?,?,?,?,?,?,?,?,?)",
+                      (cid, REPO_NAME, rel, "file",
+                       chunk["content"], chunk["start_line"], chunk["end_line"],
+                       emb_blob, now)
+                  )
+                  new_chunks += 1
+              conn.commit()
+
+          if indexed_paths:
+              ph = ",".join("?"*len(indexed_paths))
+              deleted = conn.execute(
+                  f"DELETE FROM chunks WHERE repo=? AND file_path NOT IN ({ph})",
+                  [REPO_NAME, *indexed_paths]
+              ).rowcount
+              if deleted: print(f"\npruned {deleted} stale chunk(s)")
+              conn.commit()
+
+          # Remove any chunks stored under a stale repo name alias (e.g. after a typo fix)
+          stale = conn.execute("DELETE FROM chunks WHERE repo != ?", (REPO_NAME,)).rowcount
+          if stale: print(f"  pruned {stale} stale-alias chunk(s)")
+          conn.commit()
+
+          for k, v in [("repo",REPO_NAME),("commit_sha",COMMIT_SHA),
+                        ("indexed_at",now),("embed_model",EMBED_MODEL)]:
+              conn.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", (k,v))
+          conn.commit(); conn.close()
+          print(f"\ndone: {total_files} file(s), {new_chunks} new chunk(s) → {INDEX_FILE}")
+          PYEOF
+
+      - name: Commit index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .code-index/
+          git diff --staged --quiet || git commit -m "chore: update code index [skip ci]"
+          git push
