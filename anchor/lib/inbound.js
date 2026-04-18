@@ -72,7 +72,13 @@ function insertNote(type, body, tags) {
 }
 
 function parseBody(rawBody) {
-  const lines = (rawBody || '').trim().split('\n').map(l => l.trim()).filter(Boolean);
+  // Strip email signature — everything from a line that is just "--" or "-- " onwards
+  const sigIndex = rawBody.split('\n').findIndex(l => /^--\s*$/.test(l));
+  const trimmed = sigIndex !== -1
+    ? rawBody.split('\n').slice(0, sigIndex).join('\n')
+    : rawBody;
+
+  const lines = trimmed.trim().split('\n').map(l => l.trim()).filter(Boolean);
   let tags = '';
   let bodyLines = lines;
 
@@ -114,10 +120,12 @@ function pollInbound() {
         if (!uids || !uids.length) { console.log('[inbound] no new messages'); imap.end(); return; }
 
         console.log(`[inbound] ${uids.length} message(s) found`);
-        const f = imap.fetch(uids, { bodies: '', markSeen: true });
+        const f = imap.fetch(uids, { bodies: '', markSeen: false });
 
-        f.on('message', (msg) => {
+        f.on('message', (msg, seqno) => {
           let rawEmail = '';
+          let uid = null;
+          msg.once('attributes', attrs => { uid = attrs.uid; });
           msg.on('body', (stream) => {
             stream.on('data', chunk => { rawEmail += chunk.toString('utf8'); });
             stream.once('end', async () => {
@@ -140,6 +148,11 @@ function pollInbound() {
                 }
 
                 insertNote(type, body, tags);
+
+                // Only mark seen after successful insert
+                if (uid) imap.addFlags(uid, ['\\Seen'], err => {
+                  if (err) console.warn('[inbound] mark seen error:', err.message);
+                });
               } catch (e) {
                 console.error('[inbound] parse error:', e.message);
               }
