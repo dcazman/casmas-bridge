@@ -180,7 +180,7 @@ function processCommands(text) {
       const num = parseInt(closeM[1]);
       const note = db.prepare("SELECT * FROM notes WHERE type='open-loop' AND loop_num=?").get(num);
       if (note) {
-        db.prepare("UPDATE notes SET type='closed-loop', status='processed' WHERE id=?").run(note.id);
+        db.prepare("DELETE FROM notes WHERE id=?").run(note.id);
         results.push({ cmd: 'close', num, ok: true });
       } else {
         results.push({ cmd: 'close', num, ok: false, error: 'not found' });
