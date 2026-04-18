@@ -17,10 +17,10 @@ function loadOllamaPrompt() {
 }
 
 router.post('/', async (req, res) => {
-  const { question, model, clientTime } = req.body;
+  const { question, model, clientTime, includeThoughts } = req.body;
   if (!question) return res.json({ answer: 'No question.' });
 
-  const notes  = chatContext(question);
+  const notes  = chatContext(question, !!includeThoughts);
   const forceCloud = model === 'claude';
 
   try {

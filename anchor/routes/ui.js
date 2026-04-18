@@ -7,6 +7,7 @@ const { db, decryptNote, getPending, getLastSync, shouldSync } = require('../lib
 const { esc, typeColor, ALL_TYPES } = require('../lib/helpers');
 const { emailEnabled } = require('./bridge');
 const { getTempestToken } = require('../lib/weather');
+const { encrypt, decrypt } = require('../lib/crypto');
 
 const ICON_PATH = path.join(__dirname, '../assets/anchor-icon.png');
 const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer.alloc(0);
@@ -41,6 +42,7 @@ function renderNote(n) {
   const listSrc   = (n.formatted && /^\s*\[.\]/m.test(n.formatted)) ? n.formatted : (n.raw_input || n.formatted || '');
   const isRemind  = n.type === 'remind';
   const isOpenLoop = n.type === 'open-loop';
+  const isThought = n.type === 'personal-thought';
   const numBadge = (isRemind && n.remind_num != null)
     ? `<span class="remind-num" title="Reminder #${n.remind_num} — type: done ${n.remind_num} or snooze ${n.remind_num}">#${n.remind_num}</span>`
     : '';
@@ -58,14 +60,24 @@ function renderNote(n) {
       </div>`
     : '';
   const rawText = n.formatted || n.raw_input || '';
-  const collapsible = !ip;
-  const formattedContent = isList
+  const collapsible = !ip && !isRemind && !isThought;
+  const formattedContent = isThought
+    ? `<div class="thought-lock" id="tlock-${n.id}">
+        <div class="thought-blur" id="tblur-${n.id}">
+          <span class="thought-blur-text">${esc(rawText)}</span>
+        </div>
+        <button class="btn-thought-unlock" onclick="unlockThought(${n.id})">🔒 Private — click to reveal</button>
+        <div class="thought-revealed" id="trevealed-${n.id}" style="display:none">
+          <div class="formatted">${esc(rawText)}</div>
+        </div>
+      </div>`
+    : isList
     ? '<div class="list-wrap' + (collapsible ? ' list-collapse' : '') + '" id="fmt-'+n.id+'">' + renderListContent(listSrc, n.id) + '</div>'
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '')
     : '<div class="formatted' + (collapsible ? ' fmt-collapse' : '') + '" id="fmt-'+n.id+'">' + esc(rawText) + '</div>'
       + (collapsible ? '<button class="btn-expand" id="exp-'+n.id+'" onclick="toggleExpand('+n.id+')">▼ more</button>' : '');
   const dateTs = isRemind && n.remind_at ? n.remind_at : n.created_at;
-  return `<div class="note${ip?' note-pending':''}${isRemind&&n.remind_num!=null?' note-remind':''}${isOpenLoop?' note-openloop':''}" id="note-${n.id}">
+  return `<div class="note${ip?' note-pending':''}${isRemind&&n.remind_num!=null?' note-remind':''}${isOpenLoop?' note-openloop':''}${isThought?' note-thought':''}" id="note-${n.id}">
     <div class="note-meta">
       ${numBadge}
       <span class="note-type" style="color:${color};border-color:${color}20;background:${color}15">${esc(n.type)}</span>
@@ -99,6 +111,27 @@ function renderNote(n) {
 router.get('/apple-touch-icon.png', (q,s) => { s.setHeader('Content-Type','image/png'); s.send(ICON_BUF); });
 router.get('/icon-192.png',         (q,s) => { s.setHeader('Content-Type','image/png'); s.send(ICON_BUF); });
 router.get('/manifest.json',        (q,s) => s.json({ name:'Anchor', short_name:'Anchor', description:"Dan's memory, context, and second brain", start_url:'/', display:'standalone', background_color:'#0d1117', theme_color:'#1e3a5f', icons:[{src:'/icon-192.png',sizes:'192x192',type:'image/png'}] }));
+
+// ── Thought password routes ────────────────────────────────────
+router.post('/thought-password-set', (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 4) return res.json({ ok: false, error: 'Password too short' });
+  try {
+    db.prepare("INSERT OR REPLACE INTO secrets (key,value) VALUES ('thought_password',?)").run(encrypt(password));
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+router.post('/thought-unlock', (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.json({ ok: false });
+  try {
+    const row = db.prepare("SELECT value FROM secrets WHERE key='thought_password'").get();
+    if (!row) return res.json({ ok: false, error: 'No password set — set one first in Settings' });
+    const stored = decrypt(row.value);
+    res.json({ ok: stored === password });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
 
 function queryNotes(q, type, tag, sort, showReminders) {
   let query = 'SELECT * FROM notes WHERE 1=1'; const params = [];
@@ -141,6 +174,7 @@ router.get('/', (req, res) => {
   const useOllama = process.env.USE_OLLAMA === 'true';
   const engineLabel = useOllama ? '🐓 Rooster (local)' : '🤖 Anthropic API';
   const hasWeather = !!getTempestToken();
+  const thoughtPwSet = !!db.prepare("SELECT value FROM secrets WHERE key='thought_password'").get();
   const now = new Date();
   const ya = new Date(now); ya.setFullYear(now.getFullYear()-1);
   const sa = new Date(now); sa.setMonth(now.getMonth()-6);
@@ -155,7 +189,8 @@ router.get('/', (req, res) => {
     {l:'Finance',t:['finance-task','finance-idea','finance-project']},
     {l:'Family',t:['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw']},
     {l:'Pets',t:['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster']},
-    {l:'System',t:['pi','remind','random','list','open-loop','calendar','anchor','employment','claude-handoff']}
+    {l:'System',t:['pi','remind','random','list','open-loop','calendar','anchor','employment','claude-handoff']},
+    {l:'Private',t:['personal-thought']}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
@@ -196,8 +231,8 @@ router.get('/', (req, res) => {
     .btn-sync:disabled{opacity:.4;cursor:not-allowed}
     textarea{width:100%;height:130px;background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8px;padding:12px;font-size:1rem;resize:vertical;font-family:inherit}
     textarea:focus{outline:none;border-color:#60a5fa}
-    input[type=text]{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8px;padding:8px 12px;font-size:.95rem;font-family:inherit}
-    input[type=text]:focus{outline:none;border-color:#60a5fa}
+    input[type=text],input[type=password]{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8px;padding:8px 12px;font-size:.95rem;font-family:inherit}
+    input[type=text]:focus,input[type=password]:focus{outline:none;border-color:#60a5fa}
     select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8px;padding:8px 12px;font-size:.95rem}
     .btn{padding:9px 20px;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer}
     .btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#3b82f6}
@@ -232,6 +267,7 @@ router.get('/', (req, res) => {
     .note-pending{border-color:#f59e0b30;background:#1a1500}
     .note-remind{border-color:#f472b630;background:#1a0a14}
     .note-openloop{border-color:#fb923c50;background:#1a0d00}
+    .note-thought{border-color:#7c3aed50;background:#0f0a1e}
     .note-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
     .note-type{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:20px;border:1px solid}
     .pending-badge{font-size:.7rem;color:#f59e0b;background:#292208;padding:2px 7px;border-radius:20px;border:1px solid #f59e0b30}
@@ -257,7 +293,7 @@ router.get('/', (req, res) => {
     .msg.ai.opus{border-left-color:#a78bfa}
     .msg.ai.rooster{border-left-color:#4ade80}
     .chat-in{display:flex;gap:8px}.chat-in input{flex:1}
-    .chat-mr{display:flex;align-items:center;gap:8px;margin-top:8px}
+    .chat-mr{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
     .model-lbl{font-size:.75rem;color:#475569}
     .groom-report{margin-top:8px;padding:10px 12px;background:#0d1117;border:1px solid #c084fc30;border-radius:8px;font-size:.82rem;color:#c4b5fd;white-space:pre-wrap;display:none}
     .otd-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:14px}
@@ -278,6 +314,15 @@ router.get('/', (req, res) => {
     .btn-snooze:hover{background:#2e1a5e;border-color:#a78bfa}
     .btn-snooze-pick{background:#1a2232;color:#60a5fa;border:1px solid #60a5fa40;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
     .btn-snooze-pick:hover{background:#1e3a5f;border-color:#60a5fa}
+    .thought-lock{position:relative;min-height:48px}
+    .thought-blur{filter:blur(5px);user-select:none;pointer-events:none;padding:6px 0}
+    .thought-blur-text{white-space:pre-wrap;font-size:.95rem;line-height:1.7;color:#cbd5e1}
+    .btn-thought-unlock{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1035;color:#a78bfa;border:1px solid #7c3aed;border-radius:8px;padding:6px 16px;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap;z-index:2}
+    .btn-thought-unlock:hover{background:#2e1a5e;border-color:#a78bfa}
+    .thought-revealed{margin-top:4px}
+    .btn-thought-include{background:#1e1035;color:#c084fc;border:1px solid #7c3aed40;font-size:.78rem;font-weight:600;padding:4px 12px;border-radius:6px;cursor:pointer}
+    .btn-thought-include:hover{background:#2e1a5e}
+    .btn-thought-include.active{background:#2e1a5e;color:#e9d5ff;border-color:#7c3aed}
     .wx-panel{background:#0d1117;border-radius:10px;padding:14px 16px}
     .wx-main{display:flex;align-items:flex-end;gap:16px;margin-bottom:10px}
     .wx-temp{font-size:2.8rem;font-weight:700;color:#f0f9ff;line-height:1}
@@ -368,6 +413,24 @@ router.get('/', (req, res) => {
           <div class="notes-list">${notes.length?notes.map(renderNote).join(''):'<div class="empty">No notes yet.</div>'}</div>
         </div>
       </div>
+      <div class="panel">
+        <h2 onclick="tp('tpwb','tpwc')"><span class="dot" style="background:#7c3aed"></span>🔒 Private Thoughts<span class="chev" id="tpwc">▼</span></h2>
+        <div id="tpwb" class="collapsed">
+          <div style="font-size:.85rem;color:#94a3b8;margin-bottom:12px">
+            ${thoughtPwSet
+              ? 'Password is set. Use <code style="color:#22d3ee">pth</code> alias to add private thoughts.'
+              : '<span style="color:#f87171">⚠ No password set yet.</span> Set one below to enable private thoughts.'}
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="password" id="tpw1" placeholder="${thoughtPwSet?'New password':'Set password'}" style="max-width:200px">
+            <input type="password" id="tpw2" placeholder="Confirm" style="max-width:160px">
+            <button class="btn btn-primary" style="padding:6px 14px;font-size:.85rem" onclick="setThoughtPassword()">
+              ${thoughtPwSet?'Change Password':'Set Password'}
+            </button>
+          </div>
+          <div class="status" id="tpws" style="margin-top:6px"></div>
+        </div>
+      </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${hasWeather ? `<div class="panel" id="wxPanel">
@@ -385,7 +448,12 @@ router.get('/', (req, res) => {
             <input type="text" id="ci" placeholder="What are my open loops?">
             <button id="ask-rooster-btn" class="btn btn-primary" onclick="chat('haiku')">Ask</button>
           </div>
-          <div class="chat-mr"><button id="rooster-toggle-btn" onclick="toggleRooster()" style="font-size:.75rem;padding:3px 10px;border-radius:6px;border:none;cursor:pointer"></button><span class="model-lbl">Need Claude's brain?</span><button class="btn btn-opus" onclick="chat('claude')">Ask Claude ($)</button></div>
+          <div class="chat-mr">
+            <button id="rooster-toggle-btn" onclick="toggleRooster()" style="font-size:.75rem;padding:3px 10px;border-radius:6px;border:none;cursor:pointer"></button>
+            <span class="model-lbl">Need Claude's brain?</span>
+            <button class="btn btn-opus" onclick="chat('claude')">Ask Claude ($)</button>
+            <button id="thoughtContextBtn" class="btn-thought-include" onclick="toggleThoughtContext()">🔒 Include private thoughts</button>
+          </div>
           <div class="loading" id="cl" style="margin-top:8px">⏳ Reading notes...</div>
           <div style="margin-top:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:#475569;font-size:.8rem" onclick="toggleHistory()">
@@ -426,6 +494,10 @@ router.get('/', (req, res) => {
             <div class="cmd-group">
               <div class="cmd-label">System</div>
               <code>pi</code> personal-info &nbsp; <code>ls</code> list &nbsp; <code>re</code> remind &nbsp; <code>r</code> random &nbsp; <code>ol</code> open-loop &nbsp; <code>cal</code> calendar &nbsp; <code>anc</code> anchor &nbsp; <code>emp</code> employment &nbsp; <code>ch</code> claude-handoff
+            </div>
+            <div class="cmd-group">
+              <div class="cmd-label">Private</div>
+              <code>pth</code> personal-thought &nbsp; <span style="color:#64748b">(blurred until unlocked, excluded from AI by default)</span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Tips</div>
@@ -579,6 +651,55 @@ router.get('/', (req, res) => {
     }
     function toggleHistory(){const box=document.getElementById('histBox'),chev=document.getElementById('histChev');const open=box.style.display!=='none';box.style.display=open?'none':'block';chev.textContent=open?'▶':'▼';if(!open)renderHistory();}
     function clearHistory(){if(confirm('Clear chat history?')){localStorage.removeItem(HIST_KEY);renderHistory();}}
+    // ── Thought password ─────────────────────────────────────────
+    async function setThoughtPassword(){
+      const p1=document.getElementById('tpw1').value,p2=document.getElementById('tpw2').value;
+      const s=document.getElementById('tpws');
+      if(!p1){s.textContent='Enter a password';s.style.color='#f87171';return;}
+      if(p1!==p2){s.textContent='Passwords do not match';s.style.color='#f87171';return;}
+      try{
+        const r=await fetch('/thought-password-set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p1})});
+        const d=await r.json();
+        if(d.ok){s.textContent='✓ Password saved';s.style.color='#4ade80';document.getElementById('tpw1').value='';document.getElementById('tpw2').value='';}
+        else{s.textContent='✗ '+(d.error||'Failed');s.style.color='#f87171';}
+      }catch(e){s.textContent='✗ Error';s.style.color='#f87171';}
+    }
+    // ── Thought note unlock (view) ───────────────────────────────
+    async function unlockThought(id){
+      const pw=prompt('🔒 Enter your private thought password:');
+      if(!pw)return;
+      try{
+        const r=await fetch('/thought-unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        const d=await r.json();
+        if(d.ok){
+          const blur=document.getElementById('tblur-'+id);if(blur)blur.style.display='none';
+          const btn=document.querySelector('#note-'+id+' .btn-thought-unlock');if(btn)btn.style.display='none';
+          const rev=document.getElementById('trevealed-'+id);if(rev)rev.style.display='block';
+        } else { alert('Wrong password.'); }
+      }catch(e){alert('Error.');}
+    }
+    // ── Chat: include private thoughts toggle ────────────────────
+    let _thoughtsIncluded=false;
+    async function toggleThoughtContext(){
+      if(_thoughtsIncluded){
+        _thoughtsIncluded=false;
+        const btn=document.getElementById('thoughtContextBtn');
+        if(btn){btn.textContent='🔒 Include private thoughts';btn.classList.remove('active');}
+        return;
+      }
+      const pw=prompt('Enter private thought password to include them in this Ask Anchor session:');
+      if(!pw)return;
+      try{
+        const r=await fetch('/thought-unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        const d=await r.json();
+        if(d.ok){
+          _thoughtsIncluded=true;
+          const btn=document.getElementById('thoughtContextBtn');
+          if(btn){btn.textContent='🟣 Thoughts included ✓';btn.classList.add('active');}
+        } else { alert('Wrong password.'); }
+      }catch(e){alert('Error.');}
+    }
+    // ── Chat ─────────────────────────────────────────────────────
     async function chat(model){
       const v=document.getElementById('ci').value.trim();if(!v)return;
       const msgs=document.getElementById('cm');
@@ -587,7 +708,7 @@ router.get('/', (req, res) => {
       document.getElementById('cl').style.display='block';
       msgs.scrollTop=msgs.scrollHeight;
       try{
-        const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:v,model,clientTime:new Date().toString()})});
+        const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:v,model,clientTime:new Date().toString(),includeThoughts:_thoughtsIncluded})});
         const d=await r.json();
         const isRooster=d.engine==='rooster';
         const cls=isRooster?'msg ai rooster':model==='claude'?'msg ai opus':'msg ai';
@@ -651,11 +772,15 @@ router.get('/', (req, res) => {
       }catch(e){s.textContent='✗';}
     }
     function startEdit(id){
+      const tlock=document.getElementById('tlock-'+id);
+      if(tlock)tlock.style.display='none';
       const fmt=document.getElementById('fmt-'+id),exp=document.getElementById('exp-'+id);
       if(fmt)fmt.style.display='none';if(exp)exp.style.display='none';
       document.getElementById('edit-'+id).style.display='block';
     }
     function cancelEdit(id){
+      const tlock=document.getElementById('tlock-'+id);
+      if(tlock)tlock.style.display='block';
       const fmt=document.getElementById('fmt-'+id),exp=document.getElementById('exp-'+id);
       if(fmt)fmt.style.display='block';if(exp)exp.style.display='block';
       document.getElementById('edit-'+id).style.display='none';
@@ -668,6 +793,12 @@ router.get('/', (req, res) => {
         const d=await r.json();
         if(d.ok){
           if(/^\s*\[.\]/m.test(c)){location.reload();return;}
+          const tlock=document.getElementById('tlock-'+id);
+          if(tlock){
+            const span=tlock.querySelector('.thought-blur-text');if(span)span.textContent=c;
+            const rev=tlock.querySelector('.thought-revealed .formatted');if(rev)rev.textContent=c;
+            tlock.style.display='block';
+          }
           const fmt=document.getElementById('fmt-'+id);if(fmt){fmt.textContent=c;fmt.style.display='block';}
           document.getElementById('edit-'+id).style.display='none';
           const noteEl=document.getElementById('note-'+id);
