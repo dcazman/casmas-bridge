@@ -149,9 +149,12 @@ function pollInbound() {
 
                 insertNote(type, body, tags);
 
-                // Only mark seen after successful insert
-                if (uid) imap.addFlags(uid, ['\\Seen'], err => {
-                  if (err) console.warn('[inbound] mark seen error:', err.message);
+                // Delete after successful insert
+                if (uid) imap.addFlags(uid, ['\\Deleted'], err => {
+                  if (err) console.warn('[inbound] delete flag error:', err.message);
+                  else imap.expunge(err2 => {
+                    if (err2) console.warn('[inbound] expunge error:', err2.message);
+                  });
                 });
               } catch (e) {
                 console.error('[inbound] parse error:', e.message);
