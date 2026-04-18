@@ -13,20 +13,36 @@ const ANCHOR_ADDR  = (process.env.ANCHOR_INBOUND || 'anchor@thecasmas.com').toLo
 
 const inboundEnabled = !!(IMAP_USER && IMAP_PASS);
 
-// Known Anchor types accepted as subject lines (case-insensitive)
-const VALID_TYPES = [
-  'task', 'idea', 'remind', 'reminder', 'todo',
-  'personal-project', 'open-loop', 'decision',
-  'health', 'finance', 'recipe', 'meeting', 'note'
-];
+// Cat code → internal type map
+const CAT_MAP = {
+  // Work
+  'wt': 'task', 'wp': 'personal-project', 'wd': 'decision', 'wm': 'meeting', 'wi': 'idea', 'wpw': 'password',
+  // Personal
+  'pt': 'task', 'pp': 'personal-project', 'pd': 'decision', 'pm': 'meeting', 'pid': 'idea', 'rec': 'recipe', 'ppw': 'password',
+  // Health
+  'ht': 'task', 'hid': 'idea', 'hpr': 'personal-project',
+  // Finance
+  'ft': 'task', 'fid': 'idea', 'fpr': 'personal-project',
+  // Family
+  'kw': 'personal-project', 'zs': 'personal-project', 'es': 'personal-project',
+  'afl': 'personal-project', 'ma': 'personal-project', 'ka': 'personal-project',
+  'ms': 'personal-project', 'lb': 'personal-project', 'csl': 'personal-project',
+  // Pets
+  'kd': 'personal-project', 'mc': 'personal-project', 'pcc': 'personal-project',
+  'acc': 'personal-project', 'liz': 'personal-project', 'hen': 'personal-project', 'hhr': 'personal-project',
+  // System
+  'pi': 'pi', 'ls': 'list', 're': 'remind', 'r': 'personal-project',
+  'ol': 'open-loop', 'cal': 'calendar', 'anc': 'anchor', 'emp': 'employment', 'ch': 'claude-handoff',
+  // Longhand aliases
+  'remind': 'remind', 'reminder': 'remind', 'todo': 'remind',
+  'task': 'task', 'idea': 'idea', 'decision': 'decision', 'meeting': 'meeting',
+  'recipe': 'recipe', 'note': 'personal-project', 'open-loop': 'open-loop', 'list': 'list'
+};
 
 // Normalize subject to internal type
 function resolveType(subject) {
   const s = (subject || '').trim().toLowerCase();
-  if (s === 'reminder' || s === 'todo') return 'remind';
-  if (s === 'note') return 'personal-project';
-  if (VALID_TYPES.includes(s)) return s;
-  return null;
+  return CAT_MAP[s] || null;
 }
 
 function insertNote(type, body, tags) {
