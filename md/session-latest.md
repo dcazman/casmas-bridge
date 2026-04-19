@@ -1,6 +1,6 @@
 # Anchor — Session Context
-**Generated:** 4/18/2026, 3:33:09 PM
-**Pending notes:** 0 | **Last sync:** 4/18/2026, 3:22:03 PM
+**Generated:** 4/18/2026, 11:10:00 PM
+**Pending notes:** 0 | **Last sync:** 4/18/2026, 5:28:39 PM
 
 ## 🔔 Active Reminders
 7) make doc apt — due 4/10/2026, 11:00:00 AM ✓sent
@@ -14,6 +14,7 @@
 • Loop #3: i need Ph down
 • Loop #4: Cancel aptive
 • Loop #6: Buy rice
+• Loop #7: @label support is broken — @label only works reliably in cat markup path. Needs a full audit and consistent imp
 
 ## 📋 Anchor Quick Reference
 **UI:** anchor.thecasmas.com
