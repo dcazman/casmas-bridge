@@ -227,6 +227,9 @@ function createMcpServer(caller) {
         const repoPath = `${REPO_PATH}/${service}`;
         let steps = [];
 
+        const { stdout: pullOut } = await sh(`git pull`, { cwd: REPO_PATH, env: gitEnv() });
+        steps.push('Git pull: ' + pullOut.trim().split('\n')[0]);
+
         if (REBUILD_SERVICES.includes(service)) {
           await sh(`rsync -a --exclude='data/' --exclude='backup/' --exclude='.env' --exclude='Dockerfile' --exclude='package.json' --exclude='package-lock.json' ${repoPath}/ ${prodPath}/`);
           steps.push('Source files synced.');
