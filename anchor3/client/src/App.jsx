@@ -5,8 +5,9 @@ import { SyncQueue } from './components/SyncQueue';
 import { AskAnchor } from './components/AskAnchor';
 import { Commands }  from './components/Commands';
 import { Weather }   from './components/Weather';
-import { Board }     from './components/Board';
-import { Modal }     from './components/Modal';
+import { Board }            from './components/Board';
+import { Modal }            from './components/Modal';
+import { PrivateThoughts }  from './components/PrivateThoughts';
 
 export function App() {
   const [notes,      setNotes]      = useState([]);
@@ -70,6 +71,7 @@ export function App() {
           onCardClick={setModal}
           onDelete={loadAll}
         />
+        <PrivateThoughts />
       </div>
       {modal && <Modal note={modal} onClose={closeModal} onMutate={refreshModal} />}
     </div>

@@ -80,6 +80,75 @@ app.post('/api/rebuild', (req, res) => {
   });
 });
 
+// ── Private Thoughts ─────────────────────────────────────────────────────────
+const pt = require('./lib/private');
+
+app.get('/api/private/status', (req, res) => {
+  const token = req.headers['x-pt-token'];
+  const session = pt.validate(token);
+  res.json({ ok: true, hasPassword: pt.hasPassword(), unlocked: !!session, aiEnabled: session?.aiEnabled || false });
+});
+
+app.post('/api/private/setup', (req, res) => {
+  try {
+    const { password, currentPassword } = req.body;
+    const token = pt.setup(password, currentPassword);
+    res.json({ ok: true, token });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/private/unlock', (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.json({ ok: false, error: 'Password required' });
+    const token = pt.unlock(password);
+    res.json({ ok: true, token });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/private/lock', (req, res) => {
+  pt.lock(req.headers['x-pt-token']);
+  res.json({ ok: true });
+});
+
+app.post('/api/private/ai-toggle', (req, res) => {
+  try {
+    const aiEnabled = pt.toggleAI(req.headers['x-pt-token']);
+    res.json({ ok: true, aiEnabled });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/private/notes', (req, res) => {
+  const session = pt.validate(req.headers['x-pt-token']);
+  if (!session) return res.status(401).json({ ok: false, error: 'Locked' });
+  const { db, decryptNote } = require('./lib/db');
+  const notes = db.prepare("SELECT * FROM notes WHERE type='private-thoughts' ORDER BY created_at DESC LIMIT 200").all().map(decryptNote);
+  res.json({ ok: true, notes });
+});
+
+app.post('/api/private/notes', (req, res) => {
+  const session = pt.validate(req.headers['x-pt-token']);
+  if (!session) return res.status(401).json({ ok: false, error: 'Locked' });
+  const { raw } = req.body;
+  if (!raw || !raw.trim()) return res.json({ ok: false, error: 'Empty note' });
+  const { db } = require('./lib/db');
+  const { encrypt } = require('./lib/crypto');
+  db.prepare("INSERT INTO notes (raw_input, formatted, status, type) VALUES (?,?,?,?)").run(
+    encrypt(raw), encrypt(raw), 'processed', 'private-thoughts'
+  );
+  res.json({ ok: true });
+});
+
+app.delete('/api/private/notes/:id', (req, res) => {
+  const session = pt.validate(req.headers['x-pt-token']);
+  if (!session) return res.status(401).json({ ok: false, error: 'Locked' });
+  const { db } = require('./lib/db');
+  const note = db.prepare("SELECT type FROM notes WHERE id=?").get(req.params.id);
+  if (!note || note.type !== 'private-thoughts') return res.json({ ok: false, error: 'Not found' });
+  db.prepare('DELETE FROM notes WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 app.get('/api/weather', async (req, res) => {
   try {
     const { getTempestToken, getTempestRaw } = require('./lib/weather');

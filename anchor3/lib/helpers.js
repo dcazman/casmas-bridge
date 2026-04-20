@@ -35,6 +35,7 @@ const ALL_TYPES = [
   'Maureen-Aunt', 'Kathy-Aunt', 'Micky-Stepmother', 'Lee-Brother', 'Charity-SisterInLaw',
   'Kevin-Dog', 'Mat-Cat', 'Phil-Cat', 'Ace-Cat', 'Herschel-Lizard', 'hens', 'hey-hey-Rooster',
   'pi', 'list', 'remind', 'random', 'open-loop', 'closed-loop', 'calendar', 'anchor', 'employment', 'claude-handoff',
+  'private-thoughts',
   'pending',
   'work', 'personal', 'home', 'home-task', 'home-decision', 'kids', 'kids-task',
   'health', 'finance', 'social', 'email', 'idea', 'brain-dump',
@@ -56,7 +57,8 @@ const CAT = {
   'liz': 'Herschel-Lizard', 'hen': 'hens', 'hhr': 'hey-hey-Rooster',
   'pi': 'pi', 'ls': 'list', 'li': 'list', 're': 'remind', 'r': 'random',
   'ol': 'open-loop', 'cal': 'calendar', 'anc': 'anchor', 'emp': 'employment', 'ch': 'claude-handoff',
-  'pw': 'password', 'pass': 'password'
+  'pw': 'password', 'pass': 'password',
+  'pvt': 'private-thoughts'
 };
 
 function parseCat(raw) {
@@ -117,7 +119,8 @@ const COLORS = {
   'work': '#38bdf8', 'personal': '#e879f9', 'home': '#fdba74', 'home-task': '#f97316',
   'kids': '#fde68a', 'kids-task': '#fbbf24', 'health': '#f87171', 'finance': '#4ade80',
   'social': '#86efac', 'email': '#67e8f9', 'idea': '#a78bfa', 'brain-dump': '#60a5fa',
-  'summary': '#fbbf24', 'anchor-task': '#10b981', 'recipe': '#fb923c', 'password': '#f87171'
+  'summary': '#fbbf24', 'anchor-task': '#10b981', 'recipe': '#fb923c', 'password': '#f87171',
+  'private-thoughts': '#a855f7'
 };
 
 function typeColor(t) { return COLORS[t] || '#60a5fa'; }

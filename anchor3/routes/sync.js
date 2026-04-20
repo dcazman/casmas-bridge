@@ -10,7 +10,7 @@ const MODEL_HAIKU = 'claude-haiku-4-5-20251001';
 const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://192.168.50.50:11434';
 const USE_OLLAMA  = process.env.USE_OLLAMA === 'true';
 
-const PROTECTED_TYPES = new Set(['list', 'pi', 'summary', 'anchor', 'employment', 'claude-handoff']);
+const PROTECTED_TYPES = new Set(['list', 'pi', 'summary', 'anchor', 'employment', 'claude-handoff', 'private-thoughts']);
 
 function extractJSON(raw) {
   let s = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();

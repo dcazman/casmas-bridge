@@ -1,7 +1,8 @@
 'use strict';
 const express = require('express');
 const router  = express.Router();
-const { getApiKey, chatContext } = require('../lib/db');
+const { getApiKey, chatContext, privateContext } = require('../lib/db');
+const { validate: ptValidate } = require('../lib/private');
 const { logUsage } = require('../lib/usage');
 
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001';
@@ -15,7 +16,13 @@ router.post('/', async (req, res) => {
   const { question, model, clientTime } = req.body;
   if (!question) return res.json({ answer: 'No question.' });
 
-  const notes     = chatContext(question);
+  const ptToken  = req.headers['x-pt-token'];
+  const ptSession = ptToken ? ptValidate(ptToken) : null;
+  let notes = chatContext(question);
+  if (ptSession && ptSession.aiEnabled) {
+    const pt = privateContext();
+    if (pt) notes += '\n\nPRIVATE THOUGHTS (shared by user):\n' + pt;
+  }
   const forceCloud = model === 'claude';
 
   try {

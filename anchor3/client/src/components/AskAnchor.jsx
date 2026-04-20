@@ -36,7 +36,8 @@ export function AskAnchor() {
     setMsgs(m => [...m, { role: 'user', text: q }]);
     setInput(''); setLoading(true);
     try {
-      const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, model, clientTime: new Date().toString() }) });
+      const ptToken = sessionStorage.getItem('pt_token') || '';
+      const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(ptToken ? { 'x-pt-token': ptToken } : {}) }, body: JSON.stringify({ question: q, model, clientTime: new Date().toString() }) });
       const d = await r.json();
       const engine = d.engine || model;
       setMsgs(m => [...m, { role: 'ai', text: d.answer, engine }]);

@@ -90,8 +90,15 @@ function shouldSync() {
   return (Date.now() - last.getTime()) / 3600000 >= 24 && count > 0;
 }
 
+function privateContext() {
+  return db.prepare("SELECT * FROM notes WHERE type='private-thoughts' AND status='processed' ORDER BY created_at DESC LIMIT 50")
+    .all().map(decryptNote)
+    .map(n => '[PRIVATE ' + n.created_at + '] ' + n.formatted)
+    .join('\n');
+}
+
 function chatContext(question) {
-  const all = db.prepare("SELECT * FROM notes WHERE status='processed' ORDER BY created_at DESC LIMIT 200").all().map(decryptNote);
+  const all = db.prepare("SELECT * FROM notes WHERE status='processed' AND type != 'private-thoughts' ORDER BY created_at DESC LIMIT 200").all().map(decryptNote);
   const words = question.toLowerCase().split(/\W+/).filter(w => w.length > 3);
   const scored = all.map(n => ({ ...n, score: words.reduce((s, w) => s + ((n.formatted || '').toLowerCase().includes(w) ? 1 : 0), 0) }));
   const rel = scored.filter(n => n.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
@@ -99,4 +106,4 @@ function chatContext(question) {
   return merged.map(n => '[' + n.created_at + '] (' + n.type + ') ' + n.formatted + (n.tags ? ' |tags:' + n.tags : '') + (n.open_loops ? ' |open:' + n.open_loops : '')).join('\n');
 }
 
-module.exports = { db, getApiKey, decryptNote, getPending, getLastSync, setLastSync, shouldSync, chatContext };
+module.exports = { db, getApiKey, decryptNote, getPending, getLastSync, setLastSync, shouldSync, chatContext, privateContext };

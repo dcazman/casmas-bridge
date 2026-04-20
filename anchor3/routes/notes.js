@@ -12,7 +12,7 @@ router.get('/', (req, res) => {
   try {
     const { sort } = req.query;
     const order = sort === 'oldest' ? 'ORDER BY created_at ASC' : 'ORDER BY created_at DESC';
-    const notes = db.prepare(`SELECT * FROM notes ${order} LIMIT 500`).all().map(decryptNote);
+    const notes = db.prepare(`SELECT * FROM notes WHERE type != 'private-thoughts' ${order} LIMIT 500`).all().map(decryptNote);
     res.json({ ok: true, notes });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
