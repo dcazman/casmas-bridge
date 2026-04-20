@@ -47,7 +47,7 @@ const WORK_TYPES = ['work-task', 'work-decision', 'work-idea', 'work-project', '
 const CAT = {
   'wt': 'work-task', 'wd': 'work-decision', 'wi': 'work-idea', 'wp': 'work-project',
   'wm': 'work-meeting', 'wpw': 'work-password',
-  'pt': 'personal-task', 'pd': 'personal-decision', 'pid': 'personal-idea', 'pp': 'personal-project',
+  'pst': 'personal-task', 'pd': 'personal-decision', 'pid': 'personal-idea', 'pp': 'personal-project',
   'rec': 'personal-recipe', 'rcp': 'personal-recipe', 'ppw': 'personal-password', 'pm': 'personal-meeting',
   'ht': 'health-task', 'hid': 'health-idea', 'hpr': 'health-project',
   'ft': 'finance-task', 'fid': 'finance-idea', 'fpr': 'finance-project',
@@ -58,7 +58,7 @@ const CAT = {
   'pi': 'pi', 'ls': 'list', 'li': 'list', 're': 'remind', 'r': 'random',
   'ol': 'open-loop', 'cal': 'calendar', 'anc': 'anchor', 'emp': 'employment', 'ch': 'claude-handoff',
   'pw': 'password', 'pass': 'password',
-  'pvt': 'private-thoughts'
+  'pt': 'private-thoughts'
 };
 
 function parseCat(raw) {
