@@ -1,6 +1,6 @@
 services:
   anchor-mcp:
-    build: /srv/mergerfs/warehouse/anchor-mcp
+    build: /srv/mergerfs/warehouse/casmas-bridge/anchor-mcp
     container_name: anchor-mcp
     restart: unless-stopped
     network_mode: host

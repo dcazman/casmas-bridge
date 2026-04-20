@@ -236,8 +236,9 @@ function createMcpServer(caller) {
         } else if (FULL_BUILD_SERVICES.includes(service)) {
           await sh(`rsync -a --exclude='data/' --exclude='.env' --exclude='node_modules/' --exclude='dist/' ${repoPath}/ ${prodPath}/`);
           steps.push('Source files synced.');
-          await sh(`docker compose -f ${prodPath}/docker-compose.yml up --build -d 2>&1`, { timeout: 180000 });
+          const { stdout: buildOut } = await sh(`docker-compose up --build -d 2>&1`, { timeout: 180000, cwd: prodPath });
           steps.push('Docker image rebuilt and container restarted.');
+          if (buildOut) steps.push(buildOut.slice(0, 500));
         } else {
           await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
