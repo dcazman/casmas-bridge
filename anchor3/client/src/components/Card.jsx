@@ -1,12 +1,13 @@
 import { useState } from 'preact/hooks';
-import { typeColor, fmtDate, firstLine } from '../helpers';
+import { typeColor, fmtDate, relTime, firstLine } from '../helpers';
 
 export function Card({ note, onClick, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const color     = typeColor(note.type);
   const fline     = firstLine(note);
   const fullText  = note.formatted || note.raw_input || '';
-  const date      = fmtDate(note.created_at);
+  const date      = relTime(note.created_at);
+  const fullDate  = fmtDate(note.created_at);
   const isPending = note.status === 'pending';
   const isRemind  = note.type === 'remind';
   const tags      = note.tags ? note.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
@@ -31,7 +32,7 @@ export function Card({ note, onClick, onDelete }) {
           {note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
         </div>
         <div class={`card-text${expanded ? ' full' : ''}`}>{expanded ? fullText : (fline || '(empty)')}</div>
-        <div class="card-date">{date}</div>
+        <div class="card-date" title={fullDate}>{date}</div>
       </div>
 
       {tags.length > 0 && (

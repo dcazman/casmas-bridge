@@ -8,10 +8,10 @@ export function Lane({ type, notes, onCardClick, onDelete }) {
   const color = typeColor(type);
 
   return (
-    <div class="lane">
+    <div class="lane" style={`--lane-color:${color}`}>
       <div class="lane-hdr" onClick={() => setOpen(o => !o)}>
         <span class={`lane-arrow${open ? ' open' : ''}`}>▶</span>
-        <span class="lane-name" style={`color:${color}`}>{type}</span>
+        <span class="lane-name" style={`color:${color}`}>{type.toUpperCase()}</span>
         <span class="lane-count">({notes.length})</span>
       </div>
       {open && (
