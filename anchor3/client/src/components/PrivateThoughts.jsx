@@ -4,15 +4,29 @@ const PT_KEY = 'pt_token';
 const tok = () => sessionStorage.getItem(PT_KEY) || '';
 
 export function PrivateThoughts() {
-  const [phase,  setPhase]  = useState('loading'); // loading | setup | locked | unlocked
-  const [notes,  setNotes]  = useState([]);
-  const [pw,     setPw]     = useState('');
-  const [curPw,  setCurPw]  = useState('');
-  const [newPw,  setNewPw]  = useState('');
-  const [err,    setErr]    = useState('');
-  const [draft,  setDraft]  = useState('');
-  const [aiOn,   setAiOn]   = useState(false);
-  const [cfg,    setCfg]    = useState(false);
+  const [phase,    setPhase]    = useState('loading');
+  const [notes,    setNotes]    = useState([]);
+  const [pw,       setPw]       = useState('');
+  const [curPw,    setCurPw]    = useState('');
+  const [newPw,    setNewPw]    = useState('');
+  const [err,      setErr]      = useState('');
+  const [draft,    setDraft]    = useState('');
+  const [aiOn,     setAiOn]     = useState(false);
+  const [cfg,      setCfg]      = useState(false);
+  const [editId,   setEditId]   = useState(null);
+  const [editText, setEditText] = useState('');
+
+  function autoLock() {
+    sessionStorage.removeItem(PT_KEY);
+    setNotes([]); setPw(''); setPhase('locked'); setCfg(false); setAiOn(false); setEditId(null);
+  }
+
+  const fetchNotes = useCallback(async () => {
+    const r = await fetch('/api/private/notes', { headers: { 'x-pt-token': tok() } });
+    if (r.status === 401) { autoLock(); return; }
+    const d = await r.json();
+    if (d.ok) setNotes(d.notes);
+  }, []);
 
   const checkStatus = useCallback(async () => {
     try {
@@ -22,15 +36,9 @@ export function PrivateThoughts() {
       if (d.unlocked) { setPhase('unlocked'); setAiOn(d.aiEnabled); fetchNotes(); }
       else setPhase('locked');
     } catch { setPhase('locked'); }
-  }, []);
+  }, [fetchNotes]);
 
   useEffect(() => { checkStatus(); }, [checkStatus]);
-
-  async function fetchNotes() {
-    const r = await fetch('/api/private/notes', { headers: { 'x-pt-token': tok() } });
-    const d = await r.json();
-    if (d.ok) setNotes(d.notes);
-  }
 
   async function doSetup(e) {
     e.preventDefault(); setErr('');
@@ -58,12 +66,12 @@ export function PrivateThoughts() {
 
   async function doLock() {
     await fetch('/api/private/lock', { method: 'POST', headers: { 'x-pt-token': tok() } });
-    sessionStorage.removeItem(PT_KEY);
-    setNotes([]); setPw(''); setPhase('locked'); setCfg(false); setAiOn(false);
+    autoLock();
   }
 
   async function doAiToggle() {
     const r = await fetch('/api/private/ai-toggle', { method: 'POST', headers: { 'x-pt-token': tok() } });
+    if (r.status === 401) { autoLock(); return; }
     const d = await r.json();
     if (d.ok) setAiOn(d.aiEnabled);
   }
@@ -71,18 +79,31 @@ export function PrivateThoughts() {
   async function doAdd(e) {
     e.preventDefault();
     if (!draft.trim()) return;
-    await fetch('/api/private/notes', {
+    const r = await fetch('/api/private/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-pt-token': tok() },
       body: JSON.stringify({ raw: draft })
     });
+    if (r.status === 401) { autoLock(); return; }
     setDraft(''); fetchNotes();
   }
 
   async function doDelete(id) {
     if (!confirm('Delete this entry?')) return;
-    await fetch('/api/private/notes/' + id, { method: 'DELETE', headers: { 'x-pt-token': tok() } });
+    const r = await fetch('/api/private/notes/' + id, { method: 'DELETE', headers: { 'x-pt-token': tok() } });
+    if (r.status === 401) { autoLock(); return; }
     fetchNotes();
+  }
+
+  async function doEdit(id) {
+    if (!editText.trim()) return;
+    const r = await fetch('/api/private/notes/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-pt-token': tok() },
+      body: JSON.stringify({ text: editText })
+    });
+    if (r.status === 401) { autoLock(); return; }
+    setEditId(null); setEditText(''); fetchNotes();
   }
 
   async function doChangePw(e) {
@@ -174,10 +195,25 @@ export function PrivateThoughts() {
         {notes.length === 0 && <p class="pt-empty">No entries yet.</p>}
         {notes.map(n => (
           <div class="pt-note" key={n.id}>
-            <div class="pt-note-body">{n.formatted || n.raw_input}</div>
+            {editId === n.id ? (
+              <div class="pt-edit">
+                <textarea class="pt-textarea" rows="4" value={editText}
+                  onInput={e => setEditText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) doEdit(n.id); }} />
+                <div class="pt-edit-btns">
+                  <button class="pt-btn" onClick={() => doEdit(n.id)}>Save</button>
+                  <button class="pt-btn pt-btn--ghost" onClick={() => { setEditId(null); setEditText(''); }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div class="pt-note-body">{n.formatted || n.raw_input}</div>
+            )}
             <div class="pt-note-foot">
               <span class="pt-note-ts">{new Date(n.created_at).toLocaleString()}</span>
-              <button class="pt-note-del" onClick={() => doDelete(n.id)} title="Delete">🗑</button>
+              <div class="pt-note-actions">
+                <button class="pt-note-btn" onClick={() => { setEditId(n.id); setEditText(n.formatted || n.raw_input || ''); }} title="Edit">✏️</button>
+                <button class="pt-note-btn pt-note-btn--del" onClick={() => doDelete(n.id)} title="Delete">🗑</button>
+              </div>
             </div>
           </div>
         ))}

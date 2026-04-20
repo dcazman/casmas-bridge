@@ -139,6 +139,19 @@ app.post('/api/private/notes', (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/api/private/notes/:id', (req, res) => {
+  const session = pt.validate(req.headers['x-pt-token']);
+  if (!session) return res.status(401).json({ ok: false, error: 'Locked' });
+  const { text } = req.body;
+  if (!text || !text.trim()) return res.json({ ok: false, error: 'Empty' });
+  const { db } = require('./lib/db');
+  const { encrypt } = require('./lib/crypto');
+  const note = db.prepare("SELECT type FROM notes WHERE id=?").get(req.params.id);
+  if (!note || note.type !== 'private-thoughts') return res.json({ ok: false, error: 'Not found' });
+  db.prepare("UPDATE notes SET raw_input=?, formatted=? WHERE id=?").run(encrypt(text), encrypt(text), req.params.id);
+  res.json({ ok: true });
+});
+
 app.delete('/api/private/notes/:id', (req, res) => {
   const session = pt.validate(req.headers['x-pt-token']);
   if (!session) return res.status(401).json({ ok: false, error: 'Locked' });
