@@ -1,0 +1,24 @@
+services:
+  anchor3:
+    build: /srv/mergerfs/warehouse/anchor3
+    container_name: anchor3
+    restart: unless-stopped
+    ports:
+      - "1234:7779"
+    environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TZ=America/New_York
+      - USE_OLLAMA=${USE_OLLAMA:-true}
+      - OLLAMA_URL=${OLLAMA_URL:-http://192.168.50.50:11434}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - ALERT_EMAIL=${ALERT_EMAIL:-}
+      - ALERT_EMAIL2=${ALERT_EMAIL2:-}
+      - TEMPEST_TOKEN=${TEMPEST_TOKEN:-}
+    volumes:
+      - /srv/mergerfs/warehouse/anchor3/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker

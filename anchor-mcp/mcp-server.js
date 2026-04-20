@@ -63,6 +63,7 @@ function sh(cmd, opts = {}) {
 }
 
 const REBUILD_SERVICES = ['anchor'];
+const FULL_BUILD_SERVICES = ['anchor3'];
 
 function createMcpServer(caller) {
   const server = new McpServer({ name: 'anchor', version: '1.9.0' });
@@ -232,6 +233,11 @@ function createMcpServer(caller) {
           await sh(`docker restart anchor`, { timeout: 30000 });
           steps.push('Container restarted.');
           steps.push('Done — no image rebuild needed for JS-only changes.');
+        } else if (FULL_BUILD_SERVICES.includes(service)) {
+          await sh(`rsync -a --exclude='data/' --exclude='.env' --exclude='node_modules/' --exclude='dist/' ${repoPath}/ ${prodPath}/`);
+          steps.push('Source files synced.');
+          await sh(`docker compose -f ${prodPath}/docker-compose.yml up --build -d 2>&1`, { timeout: 180000 });
+          steps.push('Docker image rebuilt and container restarted.');
         } else {
           await sh(`docker restart ${service}`);
           steps.push(`Restarted ${service}.`);
