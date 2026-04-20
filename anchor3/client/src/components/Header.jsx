@@ -28,6 +28,7 @@ export function Header({ engine }) {
 
   return (
     <header class="hdr">
+      <img src="/anchor-logo.png" alt="Anchor" class="hdr-logo" />
       <div class="hdr-text">
         <h1>Anchor <span class="hdr-ver">3</span></h1>
         <p>Dan's memory, context, and second brain</p>

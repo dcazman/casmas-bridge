@@ -2,7 +2,7 @@
 body{font-family:system-ui,sans-serif;background:#0d1117;color:#e2e8f0;font-size:16px;line-height:1.6}
 
 /* ── Header ── */
-.hdr{background:linear-gradient(135deg,#1e3a5f,#1a1f35);border-bottom:1px solid #2d4a7a;padding:16px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.hdr{background:linear-gradient(135deg,#1e3a5f,#1a1f35);border-bottom:1px solid #2d4a7a;padding:16px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.hdr-logo{width:72px;height:72px;object-fit:contain;border-radius:12px;flex-shrink:0}
 .hdr-text{flex:1}.hdr-text h1{font-size:1.8rem;font-weight:700;color:#93c5fd;display:flex;align-items:center;gap:6px}.hdr-ver{display:inline-block;font-size:2.4rem;font-weight:900;color:#fde68a;text-shadow:0 1px 0 #d97706,0 2px 0 #b45309,0 3px 0 #92400e,0 4px 0 #78350f,0 6px 16px rgba(0,0,0,.7);line-height:1;vertical-align:middle}.hdr-text p{font-size:.85rem;color:#64748b}
 .hdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .hdr-time{font-size:.85rem;color:#e2e8f0;white-space:nowrap}
