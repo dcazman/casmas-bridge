@@ -17,6 +17,12 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - ALERT_EMAIL=${ALERT_EMAIL:-}
       - ALERT_EMAIL2=${ALERT_EMAIL2:-}
+      - IMAP_HOST=${IMAP_HOST:-mail.privateemail.com}
+      - IMAP_PORT=${IMAP_PORT:-993}
+      - IMAP_USER=${IMAP_USER:-}
+      - IMAP_PASS=${IMAP_PASS:-}
+      - FROM_EMAIL=${FROM_EMAIL:-}
+      - ANCHOR_INBOUND=${ANCHOR_INBOUND:-anchor@thecasmas.com}
     volumes:
       - /srv/mergerfs/warehouse/anchor/data:/data
       - /srv/mergerfs/warehouse/casmas-bridge:/bridge
@@ -26,3 +32,4 @@ services:
       - /srv/mergerfs/warehouse/anchor/routes:/app/routes
       - /srv/mergerfs/warehouse/anchor/lib:/app/lib
       - /srv/mergerfs/warehouse/anchor/server.js:/app/server.js
+      - /srv/mergerfs/warehouse/anchor/node_modules:/app/node_modules

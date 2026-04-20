@@ -92,7 +92,17 @@ function shouldSync() {
   return (Date.now() - last.getTime()) / 3600000 >= 24 && count > 0;
 }
 
-function chatContext(question) {
+function chatContext(question, includeThoughts = false) {
+  const typeFilter = includeThoughts
+    ? "status='processed'"
+    : "status='processed' AND type != 'personal-thought'";
+  const all = db.prepare(`SELECT * FROM notes WHERE ${typeFilter} ORDER BY created_at DESC LIMIT 200`).all().map(decryptNote);
+  const words = question.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+  const scored = all.map(n => ({ ...n, score: words.reduce((s,w) => s + ((n.formatted||'').toLowerCase().includes(w) ? 1 : 0), 0) }));
+  const rel = scored.filter(n => n.score > 0).sort((a,b) => b.score - a.score).slice(0, 20);
+  const merged = [...new Map([...all.slice(0,10), ...rel].map(n => [n.id, n])).values()];
+  return merged.map(n => '['+n.created_at+'] ('+n.type+') '+n.formatted+(n.tags?' |tags:'+n.tags:'')+(n.open_loops?' |open:'+n.open_loops:'')).join('\n');
+}
   const all = db.prepare("SELECT * FROM notes WHERE status='processed' ORDER BY created_at DESC LIMIT 200").all().map(decryptNote);
   const words = question.toLowerCase().split(/\W+/).filter(w => w.length > 3);
   const scored = all.map(n => ({ ...n, score: words.reduce((s,w) => s + ((n.formatted||'').toLowerCase().includes(w) ? 1 : 0), 0) }));

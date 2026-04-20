@@ -1,15 +1,19 @@
 # Anchor — Session Context
-**Generated:** 4/17/2026, 7:00:08 AM
-**Pending notes:** 0 | **Last sync:** 4/12/2026, 5:49:23 PM
+**Generated:** 4/20/2026, 7:00:05 AM
+**Pending notes:** 1 | **Last sync:** 4/18/2026, 5:28:39 PM
 
 ## 🔔 Active Reminders
 7) make doc apt — due 4/10/2026, 11:00:00 AM ✓sent
 9) smoked meat — due 4/16/2026, 4:00:00 PM ✓sent
 17) animals to vet — due 4/22/2026, 9:00:00 AM
+20) sabbath — due 4/24/2026, 2:00:00 PM
 15) auto policy — due 5/15/2026, 11:00:00 AM
 
 ## 🔓 Open Loops (manual)
 • Loop #2: Apply for federal natural disaster for saddle Brook house damage
+• Loop #3: i need Ph down
+• Loop #4: Cancel aptive
+• Loop #6: Buy rice
 
 ## 📋 Anchor Quick Reference
 **UI:** anchor.thecasmas.com

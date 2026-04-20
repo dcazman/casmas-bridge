@@ -56,12 +56,16 @@ router.post('/', upload.single('file'), async (req, res) => {
       const startIdx = lines.findIndex(l => /^(?:r(?:em(?:ind(?:er)?)?)?|todo)\s*$/i.test(l.trim()));
       const remindLines = lines.slice(startIdx + 1).filter(l => l.trim());
       for (const line of remindLines) {
-        const { thing, dateStr } = parseRemindLine(line.trim());
+        const cleanLine = line.trim();
+        const tagMatch = cleanLine.match(/(?:^|\s)(@\w+)/g);
+        const tags = tagMatch ? tagMatch.map(t => t.trim().slice(1)).join(',') : '';
+        const stripped = cleanLine.replace(/(?:^|\s)@\w+/g, '').trim();
+        const { thing, dateStr } = parseRemindLine(stripped);
         if (!thing) continue;
         const remindAt = parseReminderDate(dateStr).toISOString();
         const num = nextRemindNum();
         const enc = encrypt(thing);
-        db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num) VALUES ('remind','processed',?,?,?,?)").run(enc, enc, remindAt, num);
+        db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num,tags) VALUES ('remind','processed',?,?,?,?,?)").run(enc, enc, remindAt, num, tags);
       }
       return res.json({ ok: true, pendingCount: getPending().count });
     }
@@ -74,12 +78,16 @@ router.post('/', upload.single('file'), async (req, res) => {
       const allLines = raw.split('\n');
       const remindLineIdx = allLines.findIndex(l => /^(?:r(?:em(?:ind(?:er)?)?)?|todo)\s+/i.test(l.trim()));
       const extraLines = allLines.slice(remindLineIdx + 1).filter(l => l.trim());
-      const { thing, dateStr } = parseRemindLine(remindMatch[1].trim());
+      const rawRemind = remindMatch[1].trim();
+      const tagMatch = rawRemind.match(/(?:^|\s)(@\w+)/g);
+      const tags = tagMatch ? tagMatch.map(t => t.trim().slice(1)).join(',') : '';
+      const stripped = rawRemind.replace(/(?:^|\s)@\w+/g, '').trim();
+      const { thing, dateStr } = parseRemindLine(stripped);
       const fullThing = extraLines.length ? thing + '\n' + extraLines.join('\n') : thing;
       const remindAt = parseReminderDate(dateStr).toISOString();
       const num = nextRemindNum();
       const enc = encrypt(fullThing);
-      db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num) VALUES ('remind','processed',?,?,?,?)").run(enc, enc, remindAt, num);
+      db.prepare("INSERT INTO notes (type,status,raw_input,formatted,remind_at,remind_num,tags) VALUES ('remind','processed',?,?,?,?,?)").run(enc, enc, remindAt, num, tags);
       return res.json({ ok: true, pendingCount: getPending().count });
     }
 
