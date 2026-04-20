@@ -236,7 +236,7 @@ function createMcpServer(caller) {
         } else if (FULL_BUILD_SERVICES.includes(service)) {
           await sh(`rsync -a --exclude='data/' --exclude='.env' --exclude='node_modules/' --exclude='dist/' ${repoPath}/ ${prodPath}/`);
           steps.push('Source files synced.');
-          const { stdout: buildOut } = await sh(`docker-compose up --build -d 2>&1`, { timeout: 180000, cwd: prodPath });
+          const { stdout: buildOut } = await sh(`docker compose up --build -d 2>&1`, { timeout: 180000, cwd: prodPath });
           steps.push('Docker image rebuilt and container restarted.');
           if (buildOut) steps.push(buildOut.slice(0, 500));
         } else {
@@ -246,7 +246,7 @@ function createMcpServer(caller) {
 
         return { content: [{ type: 'text', text: steps.join('\n') }] };
       } catch (err) {
-        return { content: [{ type: 'text', text: `rebuild_service error: ${err.message}\n${err.stderr || ''}` }] };
+        return { content: [{ type: 'text', text: `rebuild_service error: ${err.message}\n${err.stdout || ''}\n${err.stderr || ''}` }] };
       }
     }
   );

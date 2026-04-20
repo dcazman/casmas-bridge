@@ -1,6 +1,6 @@
 services:
   anchor3:
-    build: /srv/mergerfs/warehouse/anchor3
+    build: .
     container_name: anchor3
     restart: unless-stopped
     ports:
