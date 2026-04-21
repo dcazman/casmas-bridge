@@ -109,8 +109,8 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
         <div class="card-date" title={fullDate}>{date}</div>
       </div>
 
-      {isRemind && note.remind_at && (
-        <div class="remind-due">🔔 {fmtDate(note.remind_at)}</div>
+      {isRemind && (
+        <div class="remind-due">🔔 {fmtDate(note.remind_at || note.created_at)}</div>
       )}
 
       {tags.length > 0 && (
