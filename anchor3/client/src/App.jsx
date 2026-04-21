@@ -50,12 +50,10 @@ export function App() {
       <Header engine={status.engine} />
       <div class="main">
         <div class="panels">
-          <div class="panel-col">
-            <AddNote onAdd={loadAll} />
-            <SyncQueue status={status} onSync={loadAll} />
-          </div>
-          <div class="panel-col">
-            <Weather />
+          <AddNote onAdd={loadAll} />
+          <Weather />
+          <SyncQueue status={status} onSync={loadAll} />
+          <div class="panel-stack">
             <AskAnchor />
             <Commands />
           </div>

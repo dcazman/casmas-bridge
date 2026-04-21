@@ -56,7 +56,7 @@ export function AddNote({ onAdd }) {
   }
 
   return (
-    <div class="panel">
+    <div class="panel panel-grow">
       <div class="panel-hdr"><span class="dot"></span>📝 Add Note</div>
       <textarea
         value={text}
