@@ -6,7 +6,7 @@ const TYPE_ORDER = TYPE_GROUPS.flatMap(g => g.types);
 
 export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sort, setSort, onCardClick, onDelete }) {
   const [tagFilter,  setTagFilter]  = useState('');
-  const [collapseAll, setCollapseAll] = useState(undefined);
+  const [collapseAll, setCollapseAll] = useState(true);
 
   function handleTagClick(tag) {
     setTagFilter(tag);

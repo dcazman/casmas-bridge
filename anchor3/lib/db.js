@@ -56,6 +56,22 @@ db.exec(`
   } catch (e) { console.error('[db] loop_num backfill error:', e.message); }
 })();
 
+(function backfillRemindNums() {
+  try {
+    const unnumbered = db.prepare(
+      "SELECT id FROM notes WHERE type='remind' AND remind_num IS NULL ORDER BY created_at ASC"
+    ).all();
+    if (!unnumbered.length) return;
+    const row = db.prepare("SELECT value FROM secrets WHERE key='remind_counter'").get();
+    let counter = row ? parseInt(row.value) : 0;
+    for (const note of unnumbered) {
+      counter++;
+      db.prepare('UPDATE notes SET remind_num=? WHERE id=?').run(counter, note.id);
+    }
+    db.prepare("INSERT OR REPLACE INTO secrets (key,value) VALUES ('remind_counter',?)").run(String(counter));
+  } catch (e) { console.error('[db] remind_num backfill error:', e.message); }
+})();
+
 (function bootstrap() {
   const fromEnv = process.env.ANTHROPIC_API_KEY;
   const existing = db.prepare('SELECT value FROM secrets WHERE key=?').get('anthropic_api_key');
