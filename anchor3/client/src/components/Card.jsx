@@ -1,18 +1,27 @@
 import { useState } from 'preact/hooks';
-import { typeColor, fmtDate, relTime, firstLine } from '../helpers';
+import { typeColor, fmtDate, relTime } from '../helpers';
 
 export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop }) {
-  const [expanded,     setExpanded]     = useState(false);
+  const [expanded,      setExpanded]      = useState(false);
   const [snoozePicking, setSnoozePicking] = useState(false);
-  const [snoozeWhen,   setSnoozeWhen]   = useState('');
-  const [dragging,     setDragging]     = useState(false);
-  const [dragOver,     setDragOver]     = useState(false);
+  const [snoozeWhen,    setSnoozeWhen]    = useState('');
+  const [dragging,      setDragging]      = useState(false);
+  const [dragOver,      setDragOver]      = useState(false);
+  const [cbText,        setCbText]        = useState(null);
 
   const color     = typeColor(note.type);
-  const fline     = firstLine(note);
-  const fullText  = note.formatted || note.raw_input || '';
+  const fullText  = cbText ?? (note.formatted || note.raw_input || '');
   const isPending = note.status === 'pending';
   const isRemind  = note.type === 'remind';
+  const hasChecks = /^\s*\[[ x]\]/im.test(fullText);
+
+  const rawFirstLine  = fullText.split('\n').find(l => l.trim()) || '';
+  const collapsedText = hasChecks
+    ? rawFirstLine.replace(/^\s*\[[ x]\]\s*/i, '') || '(empty)'
+    : (rawFirstLine || '(empty)');
+
+  const checkDone  = hasChecks ? (fullText.match(/^\s*\[x\]/gim) || []).length : 0;
+  const checkTotal = hasChecks ? (fullText.match(/^\s*\[[ x]\]/gim) || []).length : 0;
 
   const dateTs   = isRemind && note.remind_at ? note.remind_at : note.created_at;
   const date     = relTime(dateTs);
@@ -51,6 +60,54 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
     setSnoozePicking(false); setSnoozeWhen(''); onDelete();
   }
 
+  async function toggleCheckbox(lineIdx, e) {
+    e.stopPropagation();
+    const lines = fullText.split('\n');
+    const line  = lines[lineIdx];
+    if (/^\s*\[ \]/.test(line)) {
+      lines[lineIdx] = line.replace('[ ]', '[x]');
+    } else if (/^\s*\[x\]/i.test(line)) {
+      lines[lineIdx] = line.replace(/\[x\]/i, '[ ]');
+    } else return;
+    const updated = lines.join('\n');
+    setCbText(updated);
+    try {
+      await fetch(`/api/notes/${note.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formatted: updated })
+      });
+    } catch {}
+  }
+
+  function renderBody() {
+    if (!expanded) {
+      return <div class="card-text">{collapsedText}</div>;
+    }
+    if (!hasChecks) {
+      return <div class="card-text full">{fullText}</div>;
+    }
+    return (
+      <div class="card-text full">
+        <div class="cb-progress">{checkDone}/{checkTotal} done</div>
+        {fullText.split('\n').map((line, i) => {
+          const unchecked = /^\s*\[ \]/.test(line);
+          const checked   = /^\s*\[x\]/i.test(line);
+          if (unchecked || checked) {
+            const label = line.replace(/^\s*\[[ x]\]\s*/i, '');
+            return (
+              <div key={i} class="cb-line" onClick={e => toggleCheckbox(i, e)}>
+                <span class={`cb-box${checked ? ' checked' : ''}`}>{checked ? '☑' : '☐'}</span>
+                <span class={`cb-label${checked ? ' done' : ''}`}>{label}</span>
+              </div>
+            );
+          }
+          return line.trim() ? <div key={i} class="cb-text">{line}</div> : null;
+        })}
+      </div>
+    );
+  }
+
   // ── Drag handlers ──────────────────────────────────────────────
   function handleDragStart(e) {
     e.dataTransfer.setData('application/json', JSON.stringify({ id: note.id, type: note.type }));
@@ -79,10 +136,9 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
       if (data.id === note.id) return;
       if (data.type === laneType) {
-        e.stopPropagation(); // prevent Lane from also handling within-lane drops
-        onCardDrop(data.id, data.type, note.id); // insert before this card
+        e.stopPropagation();
+        onCardDrop(data.id, data.type, note.id);
       }
-      // Cross-lane: don't stop propagation — Lane.onDrop handles it
     } catch {}
   }
 
@@ -104,8 +160,11 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
             {note.type}
             {note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
           </div>
+          {hasChecks && !expanded && (
+            <span class="cb-badge">{checkDone}/{checkTotal}</span>
+          )}
         </div>
-        <div class={`card-text${expanded ? ' full' : ''}`}>{expanded ? fullText : (fline || '(empty)')}</div>
+        {renderBody()}
         <div class="card-date" title={fullDate}>{date}</div>
       </div>
 
