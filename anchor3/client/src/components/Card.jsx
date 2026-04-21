@@ -1,16 +1,23 @@
 import { useState } from 'preact/hooks';
 import { typeColor, fmtDate, relTime, firstLine } from '../helpers';
 
-export function Card({ note, onClick, onDelete }) {
-  const [expanded, setExpanded] = useState(false);
+export function Card({ note, onClick, onDelete, onTagClick }) {
+  const [expanded,     setExpanded]     = useState(false);
+  const [snoozePicking, setSnoozePicking] = useState(false);
+  const [snoozeWhen,   setSnoozeWhen]   = useState('');
+
   const color     = typeColor(note.type);
   const fline     = firstLine(note);
   const fullText  = note.formatted || note.raw_input || '';
-  const date      = relTime(note.created_at);
-  const fullDate  = fmtDate(note.created_at);
   const isPending = note.status === 'pending';
   const isRemind  = note.type === 'remind';
-  const tags      = note.tags ? note.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  const dateTs    = isRemind && note.remind_at ? note.remind_at : note.created_at;
+  const date      = relTime(dateTs);
+  const fullDate  = fmtDate(dateTs);
+
+  const tags = note.tags ? note.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const attachments = note.attachments || [];
 
   async function handleDelete(e) {
     e.stopPropagation();
@@ -19,6 +26,27 @@ export function Card({ note, onClick, onDelete }) {
       await fetch(`/api/notes/${note.id}`, { method: 'DELETE' });
       onDelete();
     } catch {}
+  }
+
+  async function handleDone(e) {
+    e.stopPropagation();
+    if (!confirm(`Mark reminder #${note.remind_num} done and delete it?`)) return;
+    await fetch('/api/remind-cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd: 'done', num: note.remind_num }) });
+    onDelete();
+  }
+
+  async function handleSnooze(e) {
+    e.stopPropagation();
+    await fetch('/api/remind-cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd: 'snooze', num: note.remind_num }) });
+    onDelete();
+  }
+
+  async function handleSnoozePick(e) {
+    e.preventDefault(); e.stopPropagation();
+    const w = snoozeWhen.trim();
+    if (!w) return;
+    await fetch('/api/remind-cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd: 'snooze', num: note.remind_num, when: w }) });
+    setSnoozePicking(false); setSnoozeWhen(''); onDelete();
   }
 
   return (
@@ -35,9 +63,52 @@ export function Card({ note, onClick, onDelete }) {
         <div class="card-date" title={fullDate}>{date}</div>
       </div>
 
+      {isRemind && note.remind_at && (
+        <div class="remind-due">
+          🔔 {fmtDate(note.remind_at)}
+        </div>
+      )}
+
       {tags.length > 0 && (
         <div class="card-tags">
-          {tags.map(t => <span key={t} class="card-tag">{t}</span>)}
+          {tags.map(t => (
+            <span key={t} class="card-tag" onClick={e => { e.stopPropagation(); onTagClick && onTagClick(t); }} title="Filter by label">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {attachments.length > 0 && (
+        <div class="card-attachments">
+          {attachments.map(a => (
+            <a key={a.id} class={`card-attach${a.mime_type?.startsWith('image/') ? ' is-image' : ''}`} href={`/files/${a.filename}`} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} title={a.summary || a.original_name}>
+              {a.mime_type?.startsWith('image/')
+                ? <img src={`/files/${a.filename}`} alt={a.original_name} class="attach-thumb" />
+                : <span>📎 {a.original_name}</span>}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {isRemind && note.remind_num != null && (
+        <div class="remind-actions">
+          <button class="btn-done" onClick={handleDone}>✓ done {note.remind_num}</button>
+          <button class="btn-snooze" onClick={handleSnooze}>⏱ snooze {note.remind_num}</button>
+          <button class="btn-snooze-pick" onClick={e => { e.stopPropagation(); setSnoozePicking(v => !v); }}>📅 snooze to…</button>
+          {snoozePicking && (
+            <form class="snooze-pick-form" onSubmit={handleSnoozePick} onClick={e => e.stopPropagation()}>
+              <input
+                type="text"
+                value={snoozeWhen}
+                onInput={e => setSnoozeWhen(e.target.value)}
+                placeholder="friday 3pm, tomorrow, jan 15 9am"
+                autoFocus
+              />
+              <button type="submit">Set</button>
+              <button type="button" onClick={e => { e.stopPropagation(); setSnoozePicking(false); setSnoozeWhen(''); }}>✕</button>
+            </form>
+          )}
         </div>
       )}
 

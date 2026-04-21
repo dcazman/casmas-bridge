@@ -38,7 +38,7 @@ export function fmtDate(ts) {
   if (!ts) return '';
   try {
     const u = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
-    return new Date(u).toLocaleString();
+    return new Date(u).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
   } catch { return ts; }
 }
 

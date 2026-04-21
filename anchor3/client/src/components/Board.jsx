@@ -1,10 +1,17 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { Lane }       from './Lane';
 import { TYPE_GROUPS } from '../helpers';
 
 const TYPE_ORDER = TYPE_GROUPS.flatMap(g => g.types);
 
 export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sort, setSort, onCardClick, onDelete }) {
+  const [tagFilter,  setTagFilter]  = useState('');
+  const [collapseAll, setCollapseAll] = useState(undefined);
+
+  function handleTagClick(tag) {
+    setTagFilter(tag);
+  }
+
   const filtered = useMemo(() => {
     let result = notes;
     if (search) {
@@ -15,8 +22,12 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
       });
     }
     if (typeFilter) result = result.filter(n => n.type === typeFilter);
+    if (tagFilter) {
+      const tq = tagFilter.toLowerCase();
+      result = result.filter(n => (n.tags || '').toLowerCase().split(',').map(t => t.trim()).includes(tq));
+    }
     return result;
-  }, [notes, search, typeFilter]);
+  }, [notes, search, typeFilter, tagFilter]);
 
   const lanes = useMemo(() => {
     const map = {};
@@ -37,6 +48,7 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
   }, [filtered]);
 
   const typeOptions = TYPE_GROUPS.flatMap(g => g.types.filter(t => notes.some(n => n.type === t)));
+  const hasFilter = !!(search || typeFilter || tagFilter);
 
   return (
     <div>
@@ -47,6 +59,14 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
           value={search}
           onInput={e => setSearch(e.target.value)}
         />
+        <input
+          type="text"
+          class="tag-filter-input"
+          placeholder="Label…"
+          value={tagFilter}
+          onInput={e => setTagFilter(e.target.value)}
+          title="Filter by label (click a tag badge to fill)"
+        />
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option value="">All lanes</option>
           {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
@@ -55,11 +75,19 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
         </select>
-        {(search || typeFilter) && (
-          <button class="btn btn-secondary" style="padding:6px 14px;font-size:.85rem" onClick={() => { setSearch(''); setTypeFilter(''); }}>
+        {hasFilter && (
+          <button class="btn btn-secondary" style="padding:6px 14px;font-size:.85rem" onClick={() => { setSearch(''); setTypeFilter(''); setTagFilter(''); }}>
             Clear
           </button>
         )}
+        <button
+          class="btn btn-secondary"
+          style="padding:6px 14px;font-size:.85rem;margin-left:auto"
+          onClick={() => setCollapseAll(v => v === false ? true : false)}
+          title={collapseAll === false ? 'Expand all lanes' : 'Collapse all lanes'}
+        >
+          {collapseAll === false ? '▶ Expand all' : '▼ Collapse all'}
+        </button>
       </div>
       {lanes.length === 0 && (
         <div style="color:#334155;font-size:.9rem;padding:40px;text-align:center">
@@ -67,7 +95,15 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
         </div>
       )}
       {lanes.map(({ type, notes: laneNotes }) => (
-        <Lane key={type} type={type} notes={laneNotes} onCardClick={onCardClick} onDelete={onDelete} />
+        <Lane
+          key={type}
+          type={type}
+          notes={laneNotes}
+          onCardClick={onCardClick}
+          onDelete={onDelete}
+          onTagClick={handleTagClick}
+          forceOpen={collapseAll}
+        />
       ))}
     </div>
   );

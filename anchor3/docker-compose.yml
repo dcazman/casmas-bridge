@@ -15,10 +15,17 @@ services:
       - SMTP_PORT=${SMTP_PORT:-465}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
+      - FROM_EMAIL=${FROM_EMAIL:-}
       - ALERT_EMAIL=${ALERT_EMAIL:-}
       - ALERT_EMAIL2=${ALERT_EMAIL2:-}
+      - IMAP_HOST=${IMAP_HOST:-mail.privateemail.com}
+      - IMAP_PORT=${IMAP_PORT:-993}
+      - IMAP_USER=${IMAP_USER:-}
+      - IMAP_PASS=${IMAP_PASS:-}
+      - ANCHOR_INBOUND=${ANCHOR_INBOUND:-anchor@thecasmas.com}
       - TEMPEST_TOKEN=${TEMPEST_TOKEN:-}
     volumes:
       - /srv/mergerfs/warehouse/anchor3/data:/data
+      - /srv/mergerfs/warehouse/anchor3/attachments:/attachments
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker

@@ -20,6 +20,16 @@ db.exec(`
     tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0,
     model TEXT, operation TEXT
   );
+  CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    mime_type TEXT,
+    size_bytes INTEGER,
+    summary TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 [

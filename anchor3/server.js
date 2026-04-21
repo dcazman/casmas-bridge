@@ -7,6 +7,7 @@ const PORT = 7779;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/files', express.static('/attachments'));
 
 const notesRouter = require('./routes/notes');
 const syncRouter  = require('./routes/sync');

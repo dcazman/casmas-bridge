@@ -103,6 +103,7 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 /* ── Board ── */
 .board-controls{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .board-controls input{flex:1;min-width:150px}
+.board-controls .tag-filter-input{flex:0 0 auto;min-width:100px;max-width:140px}
 .board-controls select{min-width:130px}
 
 .lane{background:color-mix(in srgb,var(--lane-color,#3b82f6) 5%,#161b27);border:1px solid color-mix(in srgb,var(--lane-color,#3b82f6) 18%,#1e2d45);border-radius:18px;margin-bottom:10px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.02)}
@@ -129,7 +130,23 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .card-date{font-size:.7rem;color:#475569;margin-top:4px}
 .card-badge{display:inline-block;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:10px;border:1px solid;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
 .card-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
-.card-tag{font-size:.62rem;background:#1e3a5f;color:#93c5fd;padding:1px 6px;border-radius:10px}
+.card-tag{font-size:.62rem;background:#1e3a5f;color:#93c5fd;padding:1px 6px;border-radius:10px;cursor:pointer}
+.card-tag:hover{background:#1e4a7a;color:#bfdbfe}
+.remind-due{font-size:.7rem;color:#f472b6;background:#2d0a1a;padding:2px 8px;border-radius:20px;border:1px solid #f472b630;display:inline-block;margin-top:5px}
+.remind-actions{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;align-items:center}
+.btn-done{background:#14532d;color:#4ade80;border:1px solid #4ade8040;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:6px;cursor:pointer}
+.btn-done:hover{background:#166534;border-color:#4ade80}
+.btn-snooze{background:#1e1a35;color:#a78bfa;border:1px solid #a78bfa40;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:6px;cursor:pointer}
+.btn-snooze:hover{background:#2e1a5e;border-color:#a78bfa}
+.btn-snooze-pick{background:#1a2232;color:#60a5fa;border:1px solid #60a5fa40;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:6px;cursor:pointer}
+.btn-snooze-pick:hover{background:#1e3a5f;border-color:#60a5fa}
+.snooze-pick-form{display:flex;gap:4px;margin-top:5px;width:100%;align-items:center}
+.snooze-pick-form input{flex:1;background:#0d1117;border:1px solid #2d4a7a;color:#e2e8f0;border-radius:6px;padding:3px 7px;font-size:.72rem;font-family:inherit}
+.snooze-pick-form button{font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid #2d4a7a;background:#1e2d45;color:#94a3b8}
+.card-attachments{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.card-attach{display:inline-flex;align-items:center;font-size:.68rem;color:#7dd3fc;text-decoration:none;background:#0d1a2a;border:1px solid #1e3a5f;border-radius:6px;padding:2px 7px;max-width:100%}
+.card-attach:hover{color:#bfdbfe;border-color:#3b82f6}
+.attach-thumb{width:48px;height:48px;object-fit:cover;border-radius:4px;display:block}
 .card-actions{display:flex;justify-content:flex-end;gap:2px;margin-top:5px}
 .card-btn-edit,.card-btn-del{background:none;border:none;cursor:pointer;opacity:.45;padding:3px 5px;border-radius:4px;transition:opacity .15s,color .15s;color:#94a3b8;display:inline-flex;align-items:center}
 .card-btn-edit:hover{opacity:1;color:#60a5fa}

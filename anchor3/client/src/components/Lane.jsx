@@ -1,9 +1,13 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { Card }    from './Card';
 import { typeColor, isLocal } from '../helpers';
 
-export function Lane({ type, notes, onCardClick, onDelete }) {
+export function Lane({ type, notes, onCardClick, onDelete, onTagClick, forceOpen }) {
   const [open, setOpen] = useState(isLocal);
+
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen);
+  }, [forceOpen]);
 
   const color = typeColor(type);
 
@@ -17,7 +21,7 @@ export function Lane({ type, notes, onCardClick, onDelete }) {
       {open && (
         <div class="lane-body">
           <div class="lane-cards">
-            {notes.map(n => <Card key={n.id} note={n} onClick={() => onCardClick(n)} onDelete={onDelete} />)}
+            {notes.map(n => <Card key={n.id} note={n} onClick={() => onCardClick(n)} onDelete={onDelete} onTagClick={onTagClick} />)}
           </div>
         </div>
       )}
