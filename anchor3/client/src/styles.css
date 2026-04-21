@@ -125,6 +125,7 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .card.remind{border-color:#f472b650}
 .card.expanded{width:280px;background:#111827}
 .card-top{cursor:pointer}
+.card-top-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .card-text{font-size:.85rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
 .card-text.full{white-space:normal;overflow:visible;text-overflow:unset}
 .card-date{font-size:.7rem;color:#475569;margin-top:4px}
@@ -176,6 +177,17 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .btn-done-sm{background:#14532d;color:#4ade80;border:1px solid #4ade8040;font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer}
 .btn-snooze-sm{background:#1e1a35;color:#a78bfa;border:1px solid #a78bfa40;font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer}
 .rc-st{font-size:.75rem;color:#4ade80}
+
+/* ── Drag & Drop ── */
+.drag-handle{color:#2d3f55;cursor:grab;font-size:1rem;line-height:1;padding:0 5px 0 0;flex-shrink:0;user-select:none;transition:color .15s}
+.drag-handle:hover{color:#60a5fa}
+.card:hover .drag-handle{color:#475569}
+.card-dragging{opacity:.35;cursor:grabbing}
+.card-drag-over{border-top:2px solid #60a5fa !important;margin-top:-1px}
+.lane-drop-target{background:color-mix(in srgb,var(--lane-color,#3b82f6) 12%,#161b27) !important;border-color:color-mix(in srgb,var(--lane-color,#3b82f6) 40%,#1e2d45) !important}
+.lane-move-btns{margin-left:auto;display:flex;gap:2px;padding-left:8px}
+.lane-move-btn{background:none;border:none;color:#334155;cursor:pointer;font-size:.65rem;padding:2px 5px;border-radius:4px;line-height:1;transition:color .15s,background .15s}
+.lane-move-btn:hover{color:#93c5fd;background:#1e2d45}
 
 /* ── Private Thoughts ── */
 .pt-wrap{background:#0d0d1a;border:1px solid #4c1d95;border-radius:12px;padding:20px 24px;margin-top:24px}

@@ -1,10 +1,12 @@
 import { useState } from 'preact/hooks';
 import { typeColor, fmtDate, relTime, firstLine } from '../helpers';
 
-export function Card({ note, onClick, onDelete, onTagClick }) {
+export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop }) {
   const [expanded,     setExpanded]     = useState(false);
   const [snoozePicking, setSnoozePicking] = useState(false);
   const [snoozeWhen,   setSnoozeWhen]   = useState('');
+  const [dragging,     setDragging]     = useState(false);
+  const [dragOver,     setDragOver]     = useState(false);
 
   const color     = typeColor(note.type);
   const fline     = firstLine(note);
@@ -12,11 +14,11 @@ export function Card({ note, onClick, onDelete, onTagClick }) {
   const isPending = note.status === 'pending';
   const isRemind  = note.type === 'remind';
 
-  const dateTs    = isRemind && note.remind_at ? note.remind_at : note.created_at;
-  const date      = relTime(dateTs);
-  const fullDate  = fmtDate(dateTs);
+  const dateTs   = isRemind && note.remind_at ? note.remind_at : note.created_at;
+  const date     = relTime(dateTs);
+  const fullDate = fmtDate(dateTs);
 
-  const tags = note.tags ? note.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const tags        = note.tags ? note.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const attachments = note.attachments || [];
 
   async function handleDelete(e) {
@@ -49,24 +51,66 @@ export function Card({ note, onClick, onDelete, onTagClick }) {
     setSnoozePicking(false); setSnoozeWhen(''); onDelete();
   }
 
+  // ── Drag handlers ──────────────────────────────────────────────
+  function handleDragStart(e) {
+    e.dataTransfer.setData('application/json', JSON.stringify({ id: note.id, type: note.type }));
+    e.dataTransfer.effectAllowed = 'move';
+    setDragging(true);
+  }
+
+  function handleDragEnd() {
+    setDragging(false);
+    setDragOver(false);
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+
+  function handleDragLeave(e) {
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragOver(false);
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (data.id === note.id) return;
+      if (data.type === laneType) {
+        e.stopPropagation(); // prevent Lane from also handling within-lane drops
+        onCardDrop(data.id, data.type, note.id); // insert before this card
+      }
+      // Cross-lane: don't stop propagation — Lane.onDrop handles it
+    } catch {}
+  }
+
   return (
     <div
-      class={`card${isPending ? ' pending' : ''}${isRemind ? ' remind' : ''}${expanded ? ' expanded' : ''}`}
+      class={`card${isPending ? ' pending' : ''}${isRemind ? ' remind' : ''}${expanded ? ' expanded' : ''}${dragging ? ' card-dragging' : ''}${dragOver ? ' card-drag-over' : ''}`}
       style={`border-color:${color}30`}
+      draggable="true"
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div class="card-top" onClick={() => setExpanded(v => !v)} title={expanded ? '' : fullText}>
-        <div class="card-badge" style={`color:${color};border-color:${color}40;background:${color}15`}>
-          {note.type}
-          {note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
+        <div class="card-top-row">
+          <div class="drag-handle" onClick={e => e.stopPropagation()} title="Drag to reorder or move to another lane">⠿</div>
+          <div class="card-badge" style={`color:${color};border-color:${color}40;background:${color}15`}>
+            {note.type}
+            {note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
+          </div>
         </div>
         <div class={`card-text${expanded ? ' full' : ''}`}>{expanded ? fullText : (fline || '(empty)')}</div>
         <div class="card-date" title={fullDate}>{date}</div>
       </div>
 
       {isRemind && note.remind_at && (
-        <div class="remind-due">
-          🔔 {fmtDate(note.remind_at)}
-        </div>
+        <div class="remind-due">🔔 {fmtDate(note.remind_at)}</div>
       )}
 
       {tags.length > 0 && (
@@ -82,7 +126,9 @@ export function Card({ note, onClick, onDelete, onTagClick }) {
       {attachments.length > 0 && (
         <div class="card-attachments">
           {attachments.map(a => (
-            <a key={a.id} class={`card-attach${a.mime_type?.startsWith('image/') ? ' is-image' : ''}`} href={`/files/${a.filename}`} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} title={a.summary || a.original_name}>
+            <a key={a.id} class={`card-attach${a.mime_type?.startsWith('image/') ? ' is-image' : ''}`}
+              href={`/files/${a.filename}`} target="_blank" rel="noopener"
+              onClick={e => e.stopPropagation()} title={a.summary || a.original_name}>
               {a.mime_type?.startsWith('image/')
                 ? <img src={`/files/${a.filename}`} alt={a.original_name} class="attach-thumb" />
                 : <span>📎 {a.original_name}</span>}
@@ -93,18 +139,13 @@ export function Card({ note, onClick, onDelete, onTagClick }) {
 
       {isRemind && note.remind_num != null && (
         <div class="remind-actions">
-          <button class="btn-done" onClick={handleDone}>✓ done {note.remind_num}</button>
-          <button class="btn-snooze" onClick={handleSnooze}>⏱ snooze {note.remind_num}</button>
+          <button class="btn-done"        onClick={handleDone}>✓ done {note.remind_num}</button>
+          <button class="btn-snooze"      onClick={handleSnooze}>⏱ snooze {note.remind_num}</button>
           <button class="btn-snooze-pick" onClick={e => { e.stopPropagation(); setSnoozePicking(v => !v); }}>📅 snooze to…</button>
           {snoozePicking && (
             <form class="snooze-pick-form" onSubmit={handleSnoozePick} onClick={e => e.stopPropagation()}>
-              <input
-                type="text"
-                value={snoozeWhen}
-                onInput={e => setSnoozeWhen(e.target.value)}
-                placeholder="friday 3pm, tomorrow, jan 15 9am"
-                autoFocus
-              />
+              <input type="text" value={snoozeWhen} onInput={e => setSnoozeWhen(e.target.value)}
+                placeholder="friday 3pm, tomorrow, jan 15 9am" autoFocus />
               <button type="submit">Set</button>
               <button type="button" onClick={e => { e.stopPropagation(); setSnoozePicking(false); setSnoozeWhen(''); }}>✕</button>
             </form>
