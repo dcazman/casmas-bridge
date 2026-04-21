@@ -12,11 +12,13 @@ app.use('/files', express.static('/attachments'));
 const notesRouter = require('./routes/notes');
 const syncRouter  = require('./routes/sync');
 const chatRouter  = require('./routes/chat');
+const groomRouter = require('./routes/groom');
 
 app.use('/api/notes', notesRouter);
 app.use('/api/note',  notesRouter);
 app.use('/api/sync',  syncRouter);
 app.use('/api/chat',  chatRouter);
+app.use('/api/groom', groomRouter);
 
 app.get('/api/status', (req, res) => {
   const { getPending, getLastSync, shouldSync } = require('./lib/db');

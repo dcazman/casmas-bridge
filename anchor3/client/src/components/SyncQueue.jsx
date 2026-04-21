@@ -46,6 +46,16 @@ export function SyncQueue({ status, onSync }) {
     } catch { setMsg('✗ Failed'); }
   }
 
+  async function runGroom() {
+    setMsg('⏳ Grooming…');
+    try {
+      const r = await fetch('/api/groom', { method: 'POST' });
+      const d = await r.json();
+      setMsg(d.ok ? `✓ ${d.report}` : '✗ ' + (d.error || 'Groom failed'));
+      if (d.ok) onSync();
+    } catch { setMsg('✗ Groom failed'); }
+  }
+
   return (
     <div class="panel">
       <div class="panel-hdr" onClick={() => setOpen(o => !o)}>
@@ -65,6 +75,7 @@ export function SyncQueue({ status, onSync }) {
         <div class="sync-actions">
           <button class="btn-rebuild" onClick={runRebuild}>🔨 Rebuild</button>
           <button class="btn-rebuild" style="background:#1e2d45;color:#fb923c;border-color:#fb923c40" onClick={sendDigest}>📋 Digest</button>
+          <button class="btn-rebuild" style="background:#1e2d45;color:#34d399;border-color:#34d39940" onClick={runGroom}>🧹 Groom</button>
         </div>
         {msg && <div class={`status${msg.startsWith('✗') ? ' err' : ''}`} style="margin-top:8px">{msg}</div>}
       </div>
