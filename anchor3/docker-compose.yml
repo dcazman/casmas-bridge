@@ -28,4 +28,3 @@ services:
       - /srv/mergerfs/warehouse/anchor3/data:/data
       - /srv/mergerfs/warehouse/anchor3/attachments:/attachments
       - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker

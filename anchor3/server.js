@@ -77,7 +77,7 @@ app.post('/api/alert', async (req, res) => {
 });
 
 app.post('/api/rebuild', (req, res) => {
-  exec('docker compose -f /srv/mergerfs/warehouse/anchor3/docker-compose.yml up --build -d 2>&1', (err, stdout) => {
+  exec('docker-compose -f /app/docker-compose.yml up --build -d 2>&1', (err, stdout) => {
     if (err) return res.json({ ok: false, error: stdout || err.message });
     res.json({ ok: true });
   });
