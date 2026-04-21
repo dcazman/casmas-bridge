@@ -34,8 +34,10 @@ export function Header({ engine }) {
         <p>Dan's memory, context, and second brain</p>
       </div>
       <div class="hdr-right">
-        <div class="hdr-time">{time}</div>
-        {weather && <div class="hdr-weather">{weather}</div>}
+        <div class="hdr-time-block">
+          <div class="hdr-time">{time}</div>
+          {weather && <div class="hdr-weather">{weather}</div>}
+        </div>
         <div class="engine-lbl">{engineLabel}</div>
       </div>
     </header>
