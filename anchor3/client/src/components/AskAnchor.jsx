@@ -13,7 +13,7 @@ function saveHistory(q, a, engine) {
 }
 
 export function AskAnchor() {
-  const [open,     setOpen]     = useState(isLocal);
+  const [open,     setOpen]     = useState(false);
   const [msgs,     setMsgs]     = useState([{ role: 'ai', text: "Ask me anything about your notes." }]);
   const [input,    setInput]    = useState('');
   const [loading,  setLoading]  = useState(false);

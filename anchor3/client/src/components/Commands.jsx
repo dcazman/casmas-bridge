@@ -11,7 +11,7 @@ const GROUPS = [
 ];
 
 export function Commands() {
-  const [open, setOpen] = useState(isLocal);
+  const [open, setOpen] = useState(false);
 
   return (
     <div class="panel">

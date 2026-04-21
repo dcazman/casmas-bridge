@@ -46,8 +46,8 @@ export function Lane({ type, notes, onCardClick, onDelete, onTagClick, forceOpen
         <span class="lane-name" style={`color:${color}`}>{type.toUpperCase()}</span>
         <span class="lane-count">({notes.length})</span>
         <div class="lane-move-btns" onClick={e => e.stopPropagation()}>
-          {!isFirst && <button class="lane-move-btn" onClick={onMoveUp}  title="Move lane up">▲</button>}
-          {!isLast  && <button class="lane-move-btn" onClick={onMoveDown} title="Move lane down">▼</button>}
+          <button class="lane-move-btn" onClick={onMoveUp}   disabled={isFirst} title="Move lane up">▲</button>
+          <button class="lane-move-btn" onClick={onMoveDown} disabled={isLast}  title="Move lane down">▼</button>
         </div>
       </div>
       {open && (

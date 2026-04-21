@@ -11,7 +11,7 @@ function loadLS(key, fallback) {
 
 export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sort, setSort, onCardClick, onDelete }) {
   const [tagFilter,   setTagFilter]   = useState('');
-  const [collapseAll, setCollapseAll] = useState(true);
+  const [collapseAll, setCollapseAll] = useState(false);
   const [laneOrder,   setLaneOrder]   = useState(() => loadLS('a3-lane-order', []));
   const [cardOrders,  setCardOrders]  = useState(() => loadLS('a3-card-orders', {}));
 
