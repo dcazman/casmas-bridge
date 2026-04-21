@@ -8,6 +8,7 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
   const [dragging,      setDragging]      = useState(false);
   const [dragOver,      setDragOver]      = useState(false);
   const [cbText,        setCbText]        = useState(null);
+  const [viewing,       setViewing]       = useState(false);
 
   const color     = typeColor(note.type);
   const fullText  = cbText ?? (note.formatted || note.raw_input || '');
@@ -157,6 +158,7 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
   }
 
   return (
+    <>
     <div
       class={`card${isPending ? ' pending' : ''}${isRemind ? ' remind' : ''}${expanded ? ' expanded' : ''}${dragging ? ' card-dragging' : ''}${dragOver ? ' card-drag-over' : ''}`}
       style={`border-color:${color}30`}
@@ -227,6 +229,9 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
       )}
 
       <div class="card-actions">
+        <button class="card-btn-view" onClick={e => { e.stopPropagation(); setViewing(true); }} title="View">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
         <button class="card-btn-edit" onClick={e => { e.stopPropagation(); onClick(); }} title="Edit">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -235,5 +240,66 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
         </button>
       </div>
     </div>
+    {viewing && (
+      <div class="modal-backdrop" onClick={e => { e.stopPropagation(); setViewing(false); }}>
+        <div class="modal" onClick={e => e.stopPropagation()}>
+          <button class="modal-close" onClick={() => setViewing(false)}>✕</button>
+          <div class="modal-meta">
+            <span class="type-badge" style={`color:${color};border-color:${color}40;background:${color}15`}>
+              {note.type}{note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
+            </span>
+            <span class="modal-date">{fullDate}</span>
+          </div>
+          {isRemind && (
+            <div class="remind-due" style="margin-bottom:10px">🔔 {fmtDate(note.remind_at || note.created_at)}</div>
+          )}
+          {!hasChecks
+            ? <div class="modal-text">{fullText}</div>
+            : (
+              <div class="modal-text" style="padding:12px">
+                <div class="cb-progress" style="margin-bottom:8px">{checkDone}/{checkTotal} done</div>
+                {fullText.split('\n').map((line, i) => {
+                  const unchecked = /^\s*\[ \]/.test(line);
+                  const checked   = /^\s*\[x\]/i.test(line);
+                  if (unchecked || checked) {
+                    const label = line.replace(/^\s*\[[ x]\]\s*/i, '');
+                    return (
+                      <div key={i} class="cb-line" onClick={e => toggleCheckbox(i, e)}>
+                        <span class={`cb-box${checked ? ' checked' : ''}`}>{checked ? '☑' : '☐'}</span>
+                        <span class={`cb-label${checked ? ' done' : ''}`}>{label}</span>
+                      </div>
+                    );
+                  }
+                  return line.trim() ? <div key={i} class="cb-text">{line}</div> : null;
+                })}
+              </div>
+            )
+          }
+          {tags.length > 0 && (
+            <div class="modal-tags" style="margin-top:10px">
+              {tags.map(t => <span key={t} class="tag">{t}</span>)}
+            </div>
+          )}
+          {attachments.length > 0 && (
+            <div class="card-attachments" style="margin-top:12px">
+              {attachments.map(a => (
+                <a key={a.id} class={`card-attach${a.mime_type?.startsWith('image/') ? ' is-image' : ''}`}
+                  href={`/files/${a.filename}`} target="_blank" rel="noopener"
+                  onClick={e => e.stopPropagation()} title={a.summary || a.original_name}>
+                  {a.mime_type?.startsWith('image/')
+                    ? <img src={`/files/${a.filename}`} alt={a.original_name} class="attach-thumb" />
+                    : <span>📎 {a.original_name}</span>}
+                </a>
+              ))}
+            </div>
+          )}
+          <div class="modal-actions">
+            <button class="btn btn-primary" onClick={e => { e.stopPropagation(); setViewing(false); onClick(); }}>✏ Edit</button>
+            <button class="btn btn-secondary" onClick={() => setViewing(false)}>Close</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
