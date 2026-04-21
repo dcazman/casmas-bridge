@@ -82,6 +82,20 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
 
   function renderBody() {
     if (!expanded) {
+      if (hasChecks) {
+        const lines = fullText.split('\n');
+        const idx   = lines.findIndex(l => /^\s*\[[ x]\]/i.test(l));
+        if (idx !== -1) {
+          const checked = /^\s*\[x\]/i.test(lines[idx]);
+          const label   = lines[idx].replace(/^\s*\[[ x]\]\s*/i, '');
+          return (
+            <div class="cb-line" onClick={e => toggleCheckbox(idx, e)}>
+              <span class={`cb-box${checked ? ' checked' : ''}`}>{checked ? '☑' : '☐'}</span>
+              <span class={`cb-label${checked ? ' done' : ''}`}>{label}</span>
+            </div>
+          );
+        }
+      }
       return <div class="card-text">{collapsedText}</div>;
     }
     if (!hasChecks) {
