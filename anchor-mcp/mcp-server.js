@@ -45,6 +45,15 @@ async function anchorPost(path, body, caller) {
   return res.json();
 }
 
+async function anchorGet(path, caller) {
+  const res = await fetch(ANCHOR_URL + path, {
+    method: 'GET',
+    headers: { 'x-mcp-caller': caller }
+  });
+  if (!res.ok) throw new Error('Anchor returned ' + res.status);
+  return res.json();
+}
+
 async function anchorDelete(path, caller) {
   const res = await fetch(ANCHOR_URL + path, {
     method: 'DELETE',
@@ -62,7 +71,7 @@ function sh(cmd, opts = {}) {
   return execAsync(cmd, { shell: true, ...opts });
 }
 
-const REBUILD_SERVICES = ['anchor'];
+const REBUILD_SERVICES = [];
 const FULL_BUILD_SERVICES = ['anchor3'];
 
 function createMcpServer(caller) {
@@ -72,7 +81,7 @@ function createMcpServer(caller) {
     'Add a note to Anchor. Use cat markup for multiple notes: "cat p\\ntext\\ncat w\\ntext"',
     { raw: z.string().describe('The note content. Supports cat markup for multi-category dumps.') },
     async ({ raw }) => {
-      const data = await anchorPost('/note', { raw }, caller);
+      const data = await anchorPost('/api/note', { raw }, caller);
       return { content: [{ type: 'text', text: data.ok ? 'Note saved.' + (data.split ? ' Split into ' + data.split + ' notes.' : ' Pending sync.') : 'Failed: ' + (data.error || 'Unknown error') }] };
     }
   );
@@ -86,8 +95,15 @@ function createMcpServer(caller) {
       label: z.string().optional().describe('Filter by label/tag (e.g. "casmas-bridge")')
     },
     async ({ type, limit = 20, sort = 'newest', label }) => {
-      const data = await anchorPost('/mcp/notes', { type, limit, sort, label, caller }, caller);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      const data = await anchorGet('/api/notes', caller);
+      let notes = data.notes || [];
+      if (type) notes = notes.filter(n => n.type === type);
+      if (label) notes = notes.filter(n => n.tags && n.tags.includes(label));
+      if (sort === 'oldest') notes = notes.sort((a, b) => a.id - b.id);
+      else if (sort === 'open-loops') notes = notes.filter(n => n.open_loops);
+      else notes = notes.sort((a, b) => b.id - a.id);
+      notes = notes.slice(0, limit);
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, notes }, null, 2) }] };
     }
   );
 
@@ -95,8 +111,12 @@ function createMcpServer(caller) {
     'Search Anchor notes by keyword.',
     { query: z.string().describe('Search keywords') },
     async ({ query }) => {
-      const data = await anchorPost('/mcp/search', { query, caller }, caller);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      const data = await anchorGet('/api/notes', caller);
+      const notes = (data.notes || []).filter(n => {
+        const text = ((n.formatted || '') + ' ' + (n.tags || '')).toLowerCase();
+        return query.toLowerCase().split(' ').every(w => text.includes(w));
+      });
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, notes }, null, 2) }] };
     }
   );
 
@@ -104,8 +124,9 @@ function createMcpServer(caller) {
     'Get all notes with unresolved actions or open questions.',
     {},
     async () => {
-      const data = await anchorPost('/mcp/open-loops', { caller }, caller);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      const data = await anchorGet('/api/notes', caller);
+      const notes = (data.notes || []).filter(n => n.open_loops || n.type === 'open-loop');
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, notes }, null, 2) }] };
     }
   );
 
@@ -113,8 +134,10 @@ function createMcpServer(caller) {
     'Get a recent activity digest from Anchor.',
     { days: z.number().optional().describe('How many days back to summarize (default 7)') },
     async ({ days = 7 }) => {
-      const data = await anchorPost('/mcp/summary', { days, caller }, caller);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      const data = await anchorGet('/api/notes', caller);
+      const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+      const notes = (data.notes || []).filter(n => n.created_at > cutoff);
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, notes }, null, 2) }] };
     }
   );
 
@@ -122,8 +145,9 @@ function createMcpServer(caller) {
     'Get personal information facts about Dan.',
     {},
     async () => {
-      const data = await anchorPost('/mcp/notes', { type: 'pi', limit: 50, caller }, caller);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      const data = await anchorGet('/api/notes', caller);
+      const notes = (data.notes || []).filter(n => n.type === 'pi');
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, notes }, null, 2) }] };
     }
   );
 
@@ -134,7 +158,7 @@ function createMcpServer(caller) {
       type: z.string().describe('The new category type')
     },
     async ({ id, type }) => {
-      const data = await anchorPost('/reclassify', { id, type }, caller);
+      const data = await anchorPost('/api/reclassify', { id, type }, caller);
       return { content: [{ type: 'text', text: data.ok ? 'Note ' + id + ' reclassified to ' + type : 'Failed: ' + (data.error || 'Unknown') }] };
     }
   );
@@ -144,7 +168,7 @@ function createMcpServer(caller) {
     { id: z.number().describe('The note ID to delete') },
     async ({ id }) => {
       try {
-        const data = await anchorDelete('/mcp/notes/' + id, caller);
+        const data = await anchorDelete('/api/notes/' + id, caller);
         return { content: [{ type: 'text', text: data.ok ? 'Note ' + id + ' deleted.' : 'Failed: ' + (data.error || 'Unknown') }] };
       } catch (err) {
         return { content: [{ type: 'text', text: 'Delete error: ' + err.message }] };
