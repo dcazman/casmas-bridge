@@ -13,9 +13,10 @@ export function PrivateThoughts({ onCardClick }) {
   const [curPw,  setCurPw]  = useState('');
   const [newPw,  setNewPw]  = useState('');
   const [err,    setErr]    = useState('');
-  const [open,   setOpen]   = useState(false);
-  const [aiOn,   setAiOn]   = useState(false);
-  const [cfg,    setCfg]    = useState(false);
+  const [open,      setOpen]      = useState(false);
+  const [aiOn,      setAiOn]      = useState(false);
+  const [cfg,       setCfg]       = useState(false);
+  const [labelFilter, setLabelFilter] = useState('');
 
   function autoLock() {
     sessionStorage.removeItem(PT_KEY);
@@ -152,14 +153,22 @@ export function PrivateThoughts({ onCardClick }) {
                 </form>
               )}
               <div class="lane-cards">
+                {labelFilter && (
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                    <span style="font-size:.75rem;color:#a855f7">🏷 {labelFilter}</span>
+                    <button style="background:none;border:none;color:#475569;cursor:pointer;font-size:.8rem" onClick={() => setLabelFilter('')}>✕ clear</button>
+                  </div>
+                )}
                 {notes.length === 0 && <p class="pt-empty">No entries yet. Add via main input: pt → body → @label</p>}
-                {notes.map(n => (
+                {notes
+                  .filter(n => !labelFilter || (n.tags || '').toLowerCase().split(',').map(t => t.trim()).includes(labelFilter.toLowerCase()))
+                  .map(n => (
                   <Card
                     key={n.id}
                     note={n}
                     onClick={() => onCardClick && onCardClick(n)}
                     onDelete={fetchNotes}
-                    onTagClick={() => {}}
+                    onTagClick={tag => setLabelFilter(tag)}
                     laneType="private-thoughts"
                     onCardDrop={() => {}}
                   />

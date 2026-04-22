@@ -18,17 +18,10 @@ Production files live on OMV (`192.168.50.23`). Local edits at `C:\casmas-bridge
    - Source: `/srv/mergerfs/warehouse/casmas-bridge/anchor3/`
    - Live path: `/srv/mergerfs/warehouse/anchor3/`
 
-## Anchor 2 — legacy (anchor/)
+## Anchor 2 — DECOMMISSIONED (anchor/)
 
-**Pending decommission.** Only edit if explicitly asked.
-
-JS-only changes: push to git → auto-applied every 3hr, or ⇄ Sync Bridge in UI.
-
-Dockerfile/package.json changes: rebuild via 🔨 Rebuild button or:
-```
-cd /srv/mergerfs/warehouse/anchor
-docker compose down && docker compose build --no-cache && docker compose up -d
-```
+**Do not edit. Do not deploy. Ignore entirely.** This directory exists only as historical reference.
+The live app is anchor3. All work goes in `anchor3/`.
 
 ## What NOT to commit
 
