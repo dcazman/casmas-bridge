@@ -58,7 +58,7 @@ Dockerfile/package.json changes: require full rebuild via 🔨 Rebuild button.
 | `wp` | work-project |
 | `wm` | work-meeting |
 | `wpw` | work-password |
-| `pst` | personal-task |
+| `pst` / `pta` | personal-task |
 | `pd` | personal-decision |
 | `pid` | personal-idea |
 | `pp` | personal-project |

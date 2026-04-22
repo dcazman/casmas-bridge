@@ -39,7 +39,7 @@ Frontend changes need the updated file copied to the live path before rebuild.
 | `wp` | work-project |
 | `wm` | work-meeting |
 | `wpw` | work-password |
-| `pst` | personal-task |
+| `pst` / `pta` | personal-task |
 | `pd` | personal-decision |
 | `pid` | personal-idea |
 | `pp` | personal-project |
