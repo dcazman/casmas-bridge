@@ -520,6 +520,7 @@ router.get('/', (req, res) => {
     </div>
   </div>
   <script>
+    window.scrollTo(0,0);
     function renderTimestamps(){document.querySelectorAll('.note-date[data-ts]').forEach(el=>{const ts=el.getAttribute('data-ts');if(ts){const u=ts.includes('T')?ts:ts.replace(' ','T')+'Z';el.textContent=new Date(u).toLocaleString();}});}
     renderTimestamps();
     function clock(){const el=document.getElementById('hdrTime');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}
