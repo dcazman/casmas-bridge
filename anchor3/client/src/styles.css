@@ -214,6 +214,7 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .pt-title{font-size:1.3rem;font-weight:700;color:#c084fc}
 .pt-hint{font-size:.85rem;color:#6b7280;margin-bottom:12px}
 .pt-form{display:flex;gap:8px;align-items:center}
+.pt-unlock-form{padding-top:8px;display:flex;flex-direction:column;gap:6px}
 .pt-pw-input{flex:1;background:#13132a;border:1px solid #4c1d95;color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:.9rem;font-family:inherit}
 .pt-pw-input:focus{outline:none;border-color:#c084fc}
 .pt-btn{background:#6d28d9;color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:.9rem;font-weight:600;white-space:nowrap}
