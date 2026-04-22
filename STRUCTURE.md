@@ -5,7 +5,7 @@ Last updated: April 22, 2026
 
 ```
 casmas-bridge/
-  anchor3/          ← Anchor 3 source (LIVE — Preact/Vite + Express)
+  anchor3/         ← Anchor 3 source (LIVE — Preact/Vite + Express)
     server.js       ← Express entry point
     Dockerfile      ← Node 20 Alpine, Vite build included
     docker-compose.yml
@@ -22,7 +22,7 @@ casmas-bridge/
     lib/            ← crypto.js, db.js, email.js, helpers.js, remind.js, usage.js, weather.js, inbound.js, private.js
     routes/         ← notes.js, sync.js, chat.js, groom.js
 
-  anchor/           ← Anchor 2 source (pending decom — no external tunnel, port 7778)
+  anchor/           ← Anchor 2 source (DECOMMISSIONED — do not edit or deploy)
     server.js
     Dockerfile
     package.json

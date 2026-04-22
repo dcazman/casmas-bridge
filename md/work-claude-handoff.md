@@ -1,5 +1,5 @@
 # Casmas Bridge — Work Claude Handoff
-**Last updated:** April 5, 2026
+**Last updated:** April 22, 2026
 **Written by:** Personal Claude (synced from Anchor)
 
 ---
@@ -28,8 +28,8 @@ Add in Claude.ai → Settings → Connectors → GitHub. Then read this file and
 ### OMV Server (192.168.50.23)
 | Service | URL | Notes |
 |---|---|---|
-| Anchor 2.0 | anchor.thecasmas.com | Personal AI memory app |
-| anchor-mcp | mcp.thecasmas.com:8000 | MCP gateway, 12 tools |
+| **Anchor 3** | anchor.thecasmas.com | Personal AI memory app — LIVE |
+| anchor-mcp | mcp.thecasmas.com | MCP gateway |
 | GMR | gmr.thecasmas.com | DNS mail lookup tool |
 | Mealie, Dozzle, Seerr | local only | Home services |
 | Cloudflared, Watchtower | — | Tunnel + auto-updates |
@@ -39,92 +39,97 @@ Add in Claude.ai → Settings → Connectors → GitHub. Then read this file and
 |---|---|
 | Plex | Media server |
 | Sonarr / Radarr / Profilarr | Media management |
-| **Ollama** | **LIVE** — llama3.2:3b (chat) + mistral (sync/classification) at 192.168.50.50:11434, Metal GPU, persistent via LaunchAgent (has been crashing — under investigation) |
+| Ollama | Installed but **DECOMMISSIONED** — stopped + disabled via launchctl. Not uninstalled. |
 | FileFlows | Media transcoding, nights only |
 
-### Anchor 2.0 — Current State
-- Stack: Node/Express + SQLite (better-sqlite3), AES-256-GCM encrypted
-- Modular codebase: `routes/` (notes, sync, chat, bridge, mcp, ui) + `lib/` (db, crypto, usage, email, helpers)
-- **Ollama connected** — Ask button = local llama3.2:3b (free). Ask Claude ($) = Anthropic API (paid), always visible
-- Engine label in header shows 🦙 Ollama or 🤖 Anthropic depending on active engine
-- TZ=America/New_York set in docker-compose (DST fixed)
-- Ollama system prompt loads from `/bridge/md/ollama-system-prompt.md` at runtime
-- Chat history panel (collapsible, localStorage, 30 entries)
-- SMTP email working (mail.privateemail.com → dcasmas@gmail.com)
-- Alert button live in Sync Queue
-- Data: `/srv/mergerfs/warehouse/anchor/data/notes.db`
-- Config: `/srv/mergerfs/warehouse/anchor/.env`
-- Runs outside OMV GUI via plain docker compose
+---
 
-### Classification System
-- Guide lives in Anchor DB as a `pi` note, pulled on every sync
-- Categories added April 5: `anchor` (cat a) and `anchor-task` (cat at)
-- Anchor/system notes are **personal scope** — Work Claude never sees them
+## Anchor 3 — Current State (LIVE)
 
-### casmas-bridge Repo
-- Server path: `/srv/mergerfs/warehouse/casmas-bridge/`
-- Mounted into anchor-mcp at `/repo/casmas-bridge`
-- Personal Claude writes here via MCP tools (write_file, git_commit_push)
-- Work Claude reads via GitHub MCP
+- **Stack:** Preact/Vite frontend + Node/Express backend + SQLite (better-sqlite3), AES-256-GCM encrypted
+- **Container:** `anchor3` on OMV, port 1234 (external) → 7779 (internal)
+- **Cloudflare tunnel:** `anchor.thecasmas.com` → port 1234
+- **Source:** `anchor3/` in this repo
+- **Live path on OMV:** `/srv/mergerfs/warehouse/anchor3/`
+- **Data:** `/srv/mergerfs/warehouse/anchor3/data/notes3.db`
+- **Config:** `/srv/mergerfs/warehouse/anchor3/.env` (secrets — never in repo)
+- **AI:** Anthropic API only (Rooster/Ollama decommissioned). Ask button = Haiku. Ask Claude ($) = Opus.
+- **USE_OLLAMA=false** in .env
+
+### Anchor 3 Features
+- Lane/card board UI — notes grouped by type into collapsible lanes
+- Private Thoughts lane — password-protected, separate session token, label filter support
+- Label/tag support on all cards including Private Thoughts
+- Reminders system with snooze
+- Weather panel (Tempest station)
+- Ask Anchor chat (Anthropic API)
+- Inbound email (anchor@thecasmas.com → IMAP polling every 30min)
+- File attachments
+- Drag-to-reorder cards and lanes
+
+### Anchor 3 API Routes
+All under `/api/` prefix: `/api/notes`, `/api/note`, `/api/reclassify`, `/api/status`, `/api/chat`, `/api/sync`, `/api/private/*`
+
+### Anchor 3 Update Workflow
+No auto-sync — every change requires manual deploy.
+
+**Frontend (JSX/CSS) changes:**
+1. Edit in `anchor3/client/src/` via MCP write tools
+2. `git_commit_push`
+3. `rebuild_service anchor3` (triggers full Docker rebuild with Vite)
+
+**Backend JS only (routes/, lib/):**
+1. Edit via MCP write tools
+2. `git_commit_push`
+3. `rebuild_service anchor3`
+
+**Dockerfile or package.json:**
+Same as above — always a full rebuild.
 
 ---
 
-## What Personal Claude Manages (not Work Claude's concern)
+## Anchor 2 — DECOMMISSIONED
 
-All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-bridge repo, Ollama. Work Claude stays in its lane — Sonos work, Jira, Slack, GitLab, GCP only.
+`anchor/` directory exists in repo as historical reference only. **Do not edit. Do not deploy.**
+The live app is Anchor 3 only.
 
 ---
 
-## anchor-mcp Tools (12 total)
+## anchor-mcp Tools
 
 `add_note`, `get_notes`, `search_notes`, `get_open_loops`, `get_summary`, `get_pi`, `reclassify_note`, `delete_note`, `write_file`, `read_file`, `git_commit_push`, `rebuild_service`
 
-**Known issue:** `reclassify_note` returning "Failed: No input" — needs investigation.
-
-**Work scope filter:** Work token only returns `work`, `work-task`, `work-decision`, `work-idea`, `meeting`, `calendar`, `email` — personal data never surfaces.
+**Work scope filter:** Work token only returns work-scoped notes. Personal data never surfaces.
 
 ---
 
-## Open Work Tasks (as of April 5, 2026)
+## Restore from Scratch (if OMV goes down)
 
-### Tomorrow (April 6) — Priority Build Session
-- [ ] **Proactive reminders** — when a `calendar` note contains a date/time, Anchor creates a phone notification automatically. Core gap: Anchor knows but doesn't tell Dan.
-- [ ] **Daily digest** — morning summary: today's calendar notes, open loops, 3-day lookahead. Like a weather widget for your life. Could be push notification, email, or dedicated home screen view.
+Everything needed to rebuild anchor3 is in this repo **except**:
+1. `.env` file (secrets) — stored in Anchor PI notes (type: `pi`)
+2. `notes3.db` — the live database. Back up regularly from `/srv/mergerfs/warehouse/anchor3/data/notes3.db`
 
-### Anchor — Immediate
-- [ ] Sync sanitized `anchor/docker-compose.yml` to casmas-bridge (live file has hardcoded SMTP password — use `${VAR}` placeholders in repo version)
-- [ ] Sync sanitized `anchor-mcp/docker-compose.yml` to casmas-bridge (MCP_TOKEN hardcoded in live file)
-- [ ] Deploy rebuild_service fix to anchor-mcp: `docker compose -f /srv/mergerfs/warehouse/anchor-mcp/docker-compose.yml up -d --build`
-- [ ] Set up weekly groom cron: `0 9 * * 0 curl -s -X POST http://192.168.50.23:7778/groom`
-- [ ] Groom should fix as well as report — currently report-only
-- [ ] Investigate Ollama crash pattern on M4
-- [ ] casmas-bridge cleanup — delete `_chat_buttons_patch.txt` and `_pull_bridge_patch.js`
-- [ ] Remove tokens from sync area in Anchor UI
-- [ ] Fix `reclassify_note` tool — returning "Failed: No input"
-
-### Anchor — Soon
-- [ ] Date grouping headers in notes list (Today / Yesterday / This Week)
-- [ ] Split note UI action — select a note, split into two categories in one step
-- [ ] Token cost display near Ask Claude ($) button (deferred)
-
-### Infrastructure / Future
-- Casmas Core — RTX 3090 24GB in used SFF tower (~$550-650 total) for dedicated local LLM. Goal: run 32B-70B models and eliminate Anthropic API costs.
-- Skylight → Anchor sync service (parked)
-- Hey Anchor Pi listener (Pi 5 hardware broken, parked)
-- Obsidian export target (future)
-- Multer upgrade to 2.x (low priority)
-- Proactive email alerts from Anchor (future)
+**Steps to restore on any Docker host:**
+```bash
+git clone https://github.com/dcazman/casmas-bridge
+cd casmas-bridge/anchor3
+# create .env with secrets (pull from PI notes or memory)
+mkdir -p data attachments
+# restore notes3.db into data/ if available
+docker compose up -d --build
+```
+Point Cloudflare tunnel to new host port 1234.
 
 ---
 
 ## Decisions Made (permanent record)
 
-- **Ollama on Mac** — nothing moves to OMV. FileFlows runs nights only to free headroom. M4 handles Plex, arrs, Ollama daytime fine.
-- **Anchor not on Docker Hub** — local/private build only, no Watchtower for anchor or anchor-mcp
-- **anchor-mcp runs outside OMV GUI** — plain docker compose, env vars baked into compose file on disk
-- **No background GitHub polling** — only Anchor or Claude triggers a bridge sync (intent-driven)
-- **Work Claude uses GitHub MCP** — employer blocks custom connectors, GitHub MCP is policy-safe
-- **USE_OLLAMA=true hardcoded** in anchor docker-compose
+- **Anchor 3 is the only live app** — Anchor 2 decommissioned April 2026
+- **Ollama/Rooster decommissioned** — not providing value; Anthropic API used for all AI
+- **Anchor not on Docker Hub** — local/private build only, no Watchtower for anchor3 or anchor-mcp
+- **anchor-mcp runs outside OMV GUI** — plain docker compose
+- **No background GitHub polling** — only Claude or manual triggers a bridge sync
+- **Work Claude uses GitHub MCP** — employer blocks custom connectors
 
 ---
 
@@ -132,16 +137,7 @@ All infrastructure: anchor, anchor-mcp, OMV, Docker, Cloudflare tunnels, casmas-
 
 Dan's employer is Sonos. He's a Senior Messaging Engineer. Manager is Paul Henry.
 
-Recent work activity:
-- April 3, 2026: Jeff Williams — ExternalSecret namespace targeting (argocd vs drive-copy). File moved, namespace Jeff's domain. PR rebased, logs visible.
-- April 3, 2026: Sharif Kadri (Director of Revenue Systems) — AI/Kit conversation. Dan keeping eye on inspiration for Kit project.
-- April 3, 2026: Paul Henry — loose conversation noted.
-
-### Upcoming Schedule
-- **Monday April 6** — 9:30 AM, 2 hours taken
-- **Thursday April 9** — 4 hours off starting 11 AM
-
-Work Claude should check `md/session-latest.md` for any more recent work context if it exists.
+Work Claude should check `md/session-latest.md` for recent work context if it exists.
 
 ---
 
