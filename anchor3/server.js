@@ -56,10 +56,20 @@ app.post('/api/remind-cmd', (req, res) => {
   const { cmd, num, when } = req.body;
   if (!cmd || num == null) return res.json({ ok: false, error: 'Missing cmd or num' });
   try {
-    const { processCommands } = require('./lib/remind');
+    const { processCommands, parseReminderDate } = require('./lib/remind');
+    // snooze-to with a 'when' goes direct — bypasses processCommands which splits on commas
+    // and would break inputs like "Friday, 2pm"
+    if (cmd === 'snooze' && when) {
+      const { db } = require('./lib/db');
+      const note = db.prepare('SELECT * FROM notes WHERE remind_num=?').get(num);
+      if (!note) return res.json({ ok: false, error: 'not found' });
+      const newDate = parseReminderDate(when).toISOString();
+      db.prepare('UPDATE notes SET remind_at=?, remind_sent=0 WHERE id=?').run(newDate, note.id);
+      return res.json({ ok: true, results: [{ cmd: 'snooze', num, ok: true, newDate }] });
+    }
     let text;
     if (cmd === 'done')   text = `done ${num}`;
-    if (cmd === 'snooze') text = when ? `snooze ${num} ${when}` : `snooze ${num}`;
+    if (cmd === 'snooze') text = `snooze ${num}`;
     if (!text) return res.json({ ok: false, error: 'Unknown cmd' });
     const results = processCommands(text);
     res.json({ ok: true, results });
