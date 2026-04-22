@@ -152,12 +152,16 @@ export function Modal({ note, onClose, onMutate }) {
 
         <div class="modal-rc">
           <select class="rc-sel" onChange={e => { reclassify(e.target.value); e.target.value = ''; }}>
-            <option value="">↩ reclassify…</option>
-            {TYPE_GROUPS.map(g => (
-              <optgroup key={g.label} label={g.label}>
-                {g.types.map(t => <option key={t} value={t}>{t}</option>)}
-              </optgroup>
-            ))}
+            <option value="">↩ Move to…</option>
+            {TYPE_GROUPS.map(g => {
+              const opts = g.types.filter(t => t !== note.type);
+              if (!opts.length) return null;
+              return (
+                <optgroup key={g.label} label={g.label}>
+                  {opts.map(t => <option key={t} value={t}>{t.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
+                </optgroup>
+              );
+            })}
           </select>
           {rcStatus && <span class="rc-st">{rcStatus}</span>}
         </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { Card }    from './Card';
-import { typeColor, isLocal } from '../helpers';
+import { typeColor, isLocal, LANE_DESCRIPTIONS } from '../helpers';
 
 export function Lane({ type, notes, onCardClick, onDelete, onTagClick, forceOpen,
                        isFirst, isLast, onMoveUp, onMoveDown, onCardDrop }) {
@@ -43,7 +43,10 @@ export function Lane({ type, notes, onCardClick, onDelete, onTagClick, forceOpen
     >
       <div class="lane-hdr" onClick={() => setOpen(o => !o)}>
         <span class={`lane-arrow${open ? ' open' : ''}`}>▶</span>
-        <span class="lane-name" style={`color:${color}`}>{type.toUpperCase()}</span>
+        <div class="lane-title-group">
+          <span class="lane-name" style={`color:${color}`}>{type.toUpperCase()}</span>
+          {LANE_DESCRIPTIONS[type] && <span class="lane-desc">{LANE_DESCRIPTIONS[type]}</span>}
+        </div>
         <span class="lane-count">({notes.length})</span>
         <div class="lane-move-btns" onClick={e => e.stopPropagation()}>
           <button class="lane-move-btn" onClick={onMoveUp}   disabled={isFirst} title="Move lane up">▲</button>

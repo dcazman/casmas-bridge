@@ -28,7 +28,7 @@ async function extractText(file) {
 
 const ALL_TYPES = [
   'work-task', 'work-decision', 'work-idea', 'work-project', 'work-meeting', 'work-password',
-  'personal-task', 'personal-decision', 'personal-idea', 'personal-project', 'personal-recipe', 'personal-password', 'personal-meeting',
+  'personal-task', 'personal-note', 'personal-decision', 'personal-idea', 'personal-project', 'personal-recipe', 'personal-password', 'personal-meeting',
   'health-task', 'health-idea', 'health-project',
   'finance-task', 'finance-idea', 'finance-project',
   'Kathie-Wife', 'Zach-Son', 'Ethan-Son', 'Andy-FatherInLaw',
@@ -47,7 +47,7 @@ const WORK_TYPES = ['work-task', 'work-decision', 'work-idea', 'work-project', '
 const CAT = {
   'wt': 'work-task', 'wd': 'work-decision', 'wi': 'work-idea', 'wp': 'work-project',
   'wm': 'work-meeting', 'wpw': 'work-password',
-  'pst': 'personal-task', 'pta': 'personal-task', 'pd': 'personal-decision', 'pid': 'personal-idea', 'pp': 'personal-project',
+  'pst': 'personal-task', 'pta': 'personal-task', 'pn': 'personal-note', 'pd': 'personal-decision', 'pid': 'personal-idea', 'pp': 'personal-project',
   'rec': 'personal-recipe', 'rcp': 'personal-recipe', 'ppw': 'personal-password', 'pm': 'personal-meeting',
   'ht': 'health-task', 'hid': 'health-idea', 'hpr': 'health-project',
   'ft': 'finance-task', 'fid': 'finance-idea', 'fpr': 'finance-project',
@@ -102,7 +102,7 @@ function parseCat(raw) {
 const COLORS = {
   'work-task': '#0ea5e9', 'work-decision': '#0284c7', 'work-idea': '#7dd3fc',
   'work-project': '#38bdf8', 'work-meeting': '#fb923c', 'work-password': '#f87171',
-  'personal-task': '#d946ef', 'personal-decision': '#a21caf', 'personal-idea': '#c084fc',
+  'personal-task': '#d946ef', 'personal-note': '#f9a8d4', 'personal-decision': '#a21caf', 'personal-idea': '#c084fc',
   'personal-project': '#e879f9', 'personal-recipe': '#fb923c', 'personal-password': '#f87171',
   'personal-meeting': '#f59e0b',
   'health-task': '#ef4444', 'health-idea': '#fca5a5', 'health-project': '#f87171',

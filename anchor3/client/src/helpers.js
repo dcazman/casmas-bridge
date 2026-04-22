@@ -1,7 +1,7 @@
 export const COLORS = {
   'work-task': '#0ea5e9', 'work-decision': '#0284c7', 'work-idea': '#7dd3fc',
   'work-project': '#38bdf8', 'work-meeting': '#fb923c', 'work-password': '#f87171',
-  'personal-task': '#d946ef', 'personal-decision': '#a21caf', 'personal-idea': '#c084fc',
+  'personal-task': '#d946ef', 'personal-note': '#f9a8d4', 'personal-decision': '#a21caf', 'personal-idea': '#c084fc',
   'personal-project': '#e879f9', 'personal-recipe': '#fb923c', 'personal-password': '#f87171',
   'personal-meeting': '#f59e0b',
   'health-task': '#ef4444', 'health-idea': '#fca5a5', 'health-project': '#f87171',
@@ -16,19 +16,53 @@ export const COLORS = {
   'employment': '#94a3b8', 'claude-handoff': '#60a5fa',
   'pending': '#f59e0b',
   'private-thoughts': '#a855f7',
+  'personal-thought': '#a855f7',
 };
 
 export function typeColor(t) { return COLORS[t] || '#60a5fa'; }
 
 export const TYPE_GROUPS = [
   { label: 'Work',     types: ['work-task','work-decision','work-idea','work-project','work-meeting','work-password'] },
-  { label: 'Personal', types: ['personal-task','personal-decision','personal-idea','personal-project','personal-recipe','personal-password','personal-meeting'] },
+  { label: 'Personal', types: ['personal-task','personal-note','personal-decision','personal-idea','personal-project','personal-recipe','personal-password','personal-meeting'] },
   { label: 'Health',   types: ['health-task','health-idea','health-project'] },
   { label: 'Finance',  types: ['finance-task','finance-idea','finance-project'] },
   { label: 'Family',   types: ['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw'] },
   { label: 'Pets',     types: ['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster'] },
   { label: 'System',   types: ['pi','remind','random','list','open-loop','closed-loop','calendar','anchor','employment','claude-handoff','pending','private-thoughts','personal-thought'] },
 ];
+
+export const LANE_DESCRIPTIONS = {
+  'work-task':         'Single work actions to complete',
+  'work-project':      'Multi-step work goals & initiatives',
+  'work-decision':     'Decisions made or pending',
+  'work-idea':         'Work ideas to explore',
+  'work-meeting':      'Meeting notes & agendas',
+  'work-password':     'Work credentials',
+  'personal-task':     'Single actions — do it, done',
+  'personal-note':     'Casual observations & everyday rambling',
+  'personal-project':  'Personal goals & multi-step projects',
+  'personal-decision': 'Personal decisions made or pending',
+  'personal-idea':     'Personal ideas to explore',
+  'personal-recipe':   'Recipes & cooking notes',
+  'personal-meeting':  'Personal events & meeting notes',
+  'private-thoughts':  'Personal journal — blurred for privacy',
+  'personal-thought':  'Semi-private thoughts — blurred',
+  'health-task':       'Single health actions',
+  'health-idea':       'Health ideas & research',
+  'health-project':    'Health goals & ongoing care',
+  'finance-task':      'Single finance actions',
+  'finance-idea':      'Finance ideas',
+  'finance-project':   'Financial goals & projects',
+  'pi':                'Permanent facts — things that rarely change',
+  'open-loop':         'Unresolved threads — close by deleting or reclassifying',
+  'remind':            'Time-based reminders',
+  'list':              'Checklist notes',
+  'calendar':          'Calendar & scheduling',
+  'claude-handoff':    'Context handoffs for AI sessions',
+  'anchor':            'Anchor system notes',
+  'employment':        'Job & employment records',
+  'random':            'Uncategorized notes',
+};
 
 export function isLocal() {
   const h = window.location.hostname;

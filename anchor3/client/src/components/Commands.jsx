@@ -3,7 +3,7 @@ import { isLocal } from '../helpers';
 
 const GROUPS = [
   { label: 'Work',     items: [['wt','task'],['wp','project'],['wd','decision'],['wm','meeting'],['wi','idea'],['wpw','password']] },
-  { label: 'Personal', items: [['pst','task'],['pp','project'],['pd','decision'],['pm','meeting'],['pid','idea'],['rec','recipe'],['ppw','password']] },
+  { label: 'Personal', items: [['pst','task'],['pn','note'],['pp','project'],['pd','decision'],['pm','meeting'],['pid','idea'],['rec','recipe'],['ppw','password']] },
   { label: 'Health & Finance', items: [['ht','task'],['hid','idea'],['hpr','project'],['ft','task'],['fid','idea'],['fpr','project']] },
   { label: 'Family',   items: [['kw','Kathie'],['zs','Zach'],['es','Ethan'],['afl','Andy'],['ma','Maureen'],['ka','Kathy-Aunt'],['ms','Micky'],['lb','Lee'],['csl','Charity']] },
   { label: 'Pets',     items: [['kd','Kevin'],['mc','Mat'],['pcc','Phil'],['acc','Ace'],['liz','Herschel'],['hen','hens'],['hhr','hey-hey-Rooster']] },
