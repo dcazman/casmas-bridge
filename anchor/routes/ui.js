@@ -421,14 +421,43 @@ router.get('/', (req, res) => {
               ? 'Password is set. Use <code style="color:#22d3ee">pth</code> alias to add private thoughts.'
               : '<span style="color:#f87171">⚠ No password set yet.</span> Set one below to enable private thoughts.'}
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="password" id="tpw1" placeholder="${thoughtPwSet?'New password':'Set password'}" style="max-width:200px">
-            <input type="password" id="tpw2" placeholder="Confirm" style="max-width:160px">
-            <button class="btn btn-primary" style="padding:6px 14px;font-size:.85rem" onclick="setThoughtPassword()">
-              ${thoughtPwSet?'Change Password':'Set Password'}
-            </button>
+          <!-- Password gate -->
+          <div id="pvt-lock" style="margin-bottom:14px">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="password" id="pvt-unlock-pw" placeholder="Password to view notes" style="max-width:200px" onkeydown="if(event.key==='Enter')unlockPrivateSection()">
+              <button class="btn btn-secondary" style="padding:6px 14px;font-size:.85rem" onclick="unlockPrivateSection()">🔓 Unlock</button>
+            </div>
+            <div class="status" id="pvt-lock-st" style="margin-top:6px"></div>
           </div>
-          <div class="status" id="tpws" style="margin-top:6px"></div>
+          <!-- Notes area (hidden until unlocked) -->
+          <div id="pvt-notes-area" style="display:none;margin-bottom:16px">
+            <div class="search-row" style="margin-bottom:12px">
+              <input type="text" id="pvt-sq" placeholder="Search private..." style="flex:1;min-width:120px" onkeydown="if(event.key==='Enter')pvtSearch()">
+              <input type="text" id="pvt-stag" placeholder="Label..." style="max-width:120px" title="Filter by label">
+              <select id="pvt-so">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+              <button class="btn btn-secondary" onclick="pvtSearch()">Search</button>
+            </div>
+            <div class="notes-list" id="pvt-notes-list"></div>
+          </div>
+          <!-- Change password (collapsed by default) -->
+          <div style="margin-top:8px">
+            <div style="font-size:.75rem;color:#475569;cursor:pointer;margin-bottom:6px" onclick="tp('pvt-pwchg','pvt-pwchg-chev')" >
+              ⚙ ${thoughtPwSet?'Change password':'Set password'} <span id="pvt-pwchg-chev">▶</span>
+            </div>
+            <div id="pvt-pwchg" class="collapsed">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <input type="password" id="tpw1" placeholder="${thoughtPwSet?'New password':'Set password'}" style="max-width:200px">
+                <input type="password" id="tpw2" placeholder="Confirm" style="max-width:160px">
+                <button class="btn btn-primary" style="padding:6px 14px;font-size:.85rem" onclick="setThoughtPassword()">
+                  ${thoughtPwSet?'Change':'Set'}
+                </button>
+              </div>
+              <div class="status" id="tpws" style="margin-top:6px"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -652,6 +681,35 @@ router.get('/', (req, res) => {
     }
     function toggleHistory(){const box=document.getElementById('histBox'),chev=document.getElementById('histChev');const open=box.style.display!=='none';box.style.display=open?'none':'block';chev.textContent=open?'▶':'▼';if(!open)renderHistory();}
     function clearHistory(){if(confirm('Clear chat history?')){localStorage.removeItem(HIST_KEY);renderHistory();}}
+    // ── Private section unlock ───────────────────────────────────
+    async function unlockPrivateSection(){
+      const pw=document.getElementById('pvt-unlock-pw').value;
+      const st=document.getElementById('pvt-lock-st');
+      if(!pw){st.textContent='Enter password';st.style.color='#f87171';return;}
+      try{
+        const r=await fetch('/thought-unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        const d=await r.json();
+        if(d.ok){
+          document.getElementById('pvt-lock').style.display='none';
+          document.getElementById('pvt-notes-area').style.display='block';
+          pvtSearch();
+        } else {
+          st.textContent='Wrong password';st.style.color='#f87171';
+        }
+      }catch(e){st.textContent='Error';st.style.color='#f87171';}
+    }
+    function pvtSearch(){
+      const q=document.getElementById('pvt-sq')?.value||'';
+      const tg=document.getElementById('pvt-stag')?.value||'';
+      const s=document.getElementById('pvt-so')?.value||'newest';
+      const p=new URLSearchParams({type:'personal-thought',sort:s});
+      if(q)p.set('q',q);if(tg)p.set('tag',tg);
+      fetch('/notes-html?'+p.toString()).then(r=>r.text()).then(html=>{
+        const nl=document.getElementById('pvt-notes-list');if(nl){nl.innerHTML=html;renderTimestamps();}
+      });
+    }
+    document.getElementById('pvt-stag')?.addEventListener('input',()=>pvtSearch());
+    document.getElementById('pvt-so')?.addEventListener('change',()=>pvtSearch());
     // ── Thought password ─────────────────────────────────────────
     async function setThoughtPassword(){
       const p1=document.getElementById('tpw1').value,p2=document.getElementById('tpw2').value;
