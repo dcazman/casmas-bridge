@@ -120,7 +120,7 @@ function pollInbound() {
         if (!uids || !uids.length) { console.log('[inbound] no new messages'); imap.end(); return; }
 
         console.log(`[inbound] ${uids.length} message(s) found`);
-        const f = imap.fetch(uids, { bodies: '', markSeen: false });
+        const f = imap.fetch(uids, { bodies: '', markSeen: true });
 
         f.on('message', (msg, seqno) => {
           let rawEmail = '';

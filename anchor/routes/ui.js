@@ -189,8 +189,8 @@ router.get('/', (req, res) => {
     {l:'Finance',t:['finance-task','finance-idea','finance-project']},
     {l:'Family',t:['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw']},
     {l:'Pets',t:['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster']},
-    {l:'System',t:['pi','remind','random','list','open-loop','calendar','anchor','employment','claude-handoff']},
-    {l:'Private',t:['personal-thought']}
+    {l:'System',t:['pi','remind','random','list','open-loop','calendar','anchor','employment','claude-handoff','personal-thought']},
+    {l:'Private',t:[]}
   ];
   const typeOpts = TG.map(g=>'<optgroup label="'+g.l+'">'+g.t.map(t=>'<option value="'+t+'"'+(type===t?' selected':'')+'>'+t+'</option>').join('')+'</optgroup>').join('');
   const ss = v => sort===v||(!sort&&v==='newest')?'selected':'';
@@ -476,7 +476,7 @@ router.get('/', (req, res) => {
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Personal</div>
-              <code>pt</code> task &nbsp; <code>pp</code> project &nbsp; <code>pd</code> decision &nbsp; <code>pm</code> meeting &nbsp; <code>pid</code> idea &nbsp; <code>rec</code> recipe &nbsp; <code>ppw</code> password
+              <code>pta</code> task &nbsp; <code>pp</code> project &nbsp; <code>pd</code> decision &nbsp; <code>pm</code> meeting &nbsp; <code>pid</code> idea &nbsp; <code>rec</code> recipe &nbsp; <code>ppw</code> password
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Health &amp; Finance</div>
@@ -497,7 +497,7 @@ router.get('/', (req, res) => {
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Private</div>
-              <code>pth</code> personal-thought &nbsp; <span style="color:#64748b">(blurred until unlocked, excluded from AI by default)</span>
+              <code>pt</code> personal-thought &nbsp; <code>pth</code> personal-thought &nbsp; <span style="color:#64748b">(blurred until unlocked, excluded from AI by default)</span>
             </div>
             <div class="cmd-group">
               <div class="cmd-label">Tips</div>

@@ -41,7 +41,7 @@ const ALL_TYPES = [
   // Pets
   'Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster',
   // System
-  'pi','list','remind','random','open-loop','closed-loop','calendar','anchor','employment','claude-handoff',
+  'pi','list','remind','random','open-loop','closed-loop','calendar','anchor','employment','claude-handoff','personal-thought',
   // Legacy (keep for backwards compat — don't create new)
   'work','personal','home','home-task','home-decision','kids','kids-task',
   'health','finance','social','email','idea','brain-dump',
@@ -58,7 +58,7 @@ const CAT = {
   'wt':'work-task','wd':'work-decision','wi':'work-idea','wp':'work-project',
   'wm':'work-meeting','wpw':'work-password',
   // Personal
-  'pt':'personal-task','pd':'personal-decision','pid':'personal-idea','pp':'personal-project',
+  'pt':'personal-thought','pta':'personal-task','pd':'personal-decision','pid':'personal-idea','pp':'personal-project',
   'rec':'personal-recipe','rcp':'personal-recipe','ppw':'personal-password','pm':'personal-meeting',
   // Health
   'ht':'health-task','hid':'health-idea','hpr':'health-project',
