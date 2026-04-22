@@ -117,9 +117,11 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .lane-name{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .lane-count{font-size:.78rem;color:#475569;margin-left:3px}
 .lane-body{padding:0 18px 14px}
-.lane-cards{display:flex;gap:10px;overflow-x:auto;padding-top:4px;padding-bottom:4px}
-.lane-cards::-webkit-scrollbar{height:4px}
-.lane-cards::-webkit-scrollbar-thumb{background:#2d4a7a;border-radius:4px}
+.lane-cards{display:flex;gap:10px;overflow-x:auto;padding-top:4px;padding-bottom:10px;scrollbar-width:thin;scrollbar-color:#3b82f6 rgba(255,255,255,0.06)}
+.lane-cards::-webkit-scrollbar{height:8px}
+.lane-cards::-webkit-scrollbar-track{background:rgba(255,255,255,0.06);border-radius:4px}
+.lane-cards::-webkit-scrollbar-thumb{background:#3b82f6;border-radius:4px}
+.lane-cards::-webkit-scrollbar-thumb:hover{background:#60a5fa}
 
 /* ── Cards ── */
 .card{flex-shrink:0;width:220px;background:#0f1520;border:1px solid #1e2d45;border-radius:14px;padding:10px 12px;transition:border-color .2s,background .2s,box-shadow .2s;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.3)}

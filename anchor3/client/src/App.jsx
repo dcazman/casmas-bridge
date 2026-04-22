@@ -28,13 +28,18 @@ export function App() {
       if (sr.ok) setStatus(sr);
     } catch (e) { console.error('loadAll failed:', e); }
     setLoading(false);
-    setTimeout(() => window.scrollTo(0, 0), 50);
   }, [sort]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   useEffect(() => {
-    if (!loading) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, 0)));
+    if (!loading) {
+      window.scrollTo(0, 0);
+      const lock = () => window.scrollTo(0, 0);
+      window.addEventListener('scroll', lock, { once: true });
+      const t = setTimeout(() => window.removeEventListener('scroll', lock), 600);
+      return () => { clearTimeout(t); window.removeEventListener('scroll', lock); };
+    }
   }, [loading]);
 
   const refreshModal = useCallback((updatedNote) => {
