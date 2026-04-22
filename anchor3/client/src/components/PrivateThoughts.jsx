@@ -107,7 +107,7 @@ export function PrivateThoughts({ onCardClick }) {
         <span class={`lane-arrow${open ? ' open' : ''}`}>▶</span>
         <div class="lane-title-group">
           <span class="lane-name" style={`color:${COLOR}`}>{isLocked ? '🔒' : '🔓'} PRIVATE-THOUGHTS</span>
-          <span class="lane-desc">Personal journal — password protected</span>
+          <span class="lane-desc">Private notes — password protected</span>
         </div>
         {count != null && <span class="lane-count">({count})</span>}
         {!isLocked && (

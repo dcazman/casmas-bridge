@@ -46,7 +46,7 @@ export const LANE_DESCRIPTIONS = {
   'personal-recipe':   'Yummy food — recipes, meals & kitchen wins',
   'recipe':            'Yummy food — recipes, meals & kitchen wins',
   'personal-meeting':  'Personal events & meeting notes',
-  'private-thoughts':  'Personal journal — password protected',
+  'private-thoughts':  'Private notes — password protected',
   'personal-thought':  'Semi-private thoughts',
   'health-task':       'Single health actions',
   'health-idea':       'Health ideas & research',
