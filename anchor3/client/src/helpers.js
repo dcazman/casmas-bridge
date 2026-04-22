@@ -44,6 +44,7 @@ export const LANE_DESCRIPTIONS = {
   'personal-decision': 'Personal decisions made or pending',
   'personal-idea':     'Personal ideas to explore',
   'personal-recipe':   'Yummy food — recipes, meals & kitchen wins',
+  'recipe':            'Yummy food — recipes, meals & kitchen wins',
   'personal-meeting':  'Personal events & meeting notes',
   'private-thoughts':  'Personal journal — password protected',
   'personal-thought':  'Semi-private thoughts',
