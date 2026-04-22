@@ -15,14 +15,14 @@ const inboundEnabled = !!(IMAP_USER && IMAP_PASS);
 
 const CAT_MAP = {
   'wt':'work-task','wp':'work-project','wd':'work-decision','wm':'work-meeting','wi':'work-idea','wpw':'work-password',
-  'pt':'personal-task','pp':'personal-project','pd':'personal-decision','pm':'personal-meeting','pid':'personal-idea','rec':'personal-recipe','ppw':'personal-password',
+  'pst':'personal-task','pta':'personal-task','pn':'personal-note','pp':'personal-project','pd':'personal-decision','pm':'personal-meeting','pid':'personal-idea','rec':'personal-recipe','ppw':'personal-password',
   'ht':'health-task','hid':'health-idea','hpr':'health-project',
   'ft':'finance-task','fid':'finance-idea','fpr':'finance-project',
   'kw':'Kathie-Wife','zs':'Zach-Son','es':'Ethan-Son','afl':'Andy-FatherInLaw',
   'ma':'Maureen-Aunt','ka':'Kathy-Aunt','ms':'Micky-Stepmother','lb':'Lee-Brother','csl':'Charity-SisterInLaw',
   'kd':'Kevin-Dog','mc':'Mat-Cat','pcc':'Phil-Cat','acc':'Ace-Cat',
   'liz':'Herschel-Lizard','hen':'hens','hhr':'hey-hey-Rooster',
-  'pi':'pi','ls':'list','re':'remind','r':'random',
+  'pi':'pi','ls':'list','re':'remind','r':'random','pt':'private-thoughts',
   'ol':'open-loop','cal':'calendar','anc':'anchor','emp':'employment','ch':'claude-handoff',
   'remind':'remind','reminder':'remind','todo':'remind',
   'task':'work-task','idea':'work-idea','decision':'work-decision','meeting':'work-meeting',
@@ -88,31 +88,50 @@ function pollInbound() {
         if (!uids || !uids.length) { console.log('[inbound] no new messages'); imap.end(); return; }
 
         console.log(`[inbound] ${uids.length} message(s) found`);
-        const f = imap.fetch(uids, { bodies: '', markSeen: false });
+        // markSeen: true immediately marks as SEEN on fetch — prevents re-ingestion if server
+        // restarts between fetch and expunge (was markSeen: false which caused duplicates)
+        const f = imap.fetch(uids, { bodies: '', markSeen: true });
+
+        const parsePromises = [];
 
         f.on('message', (msg) => {
           let rawEmail = '', uid = null;
           msg.once('attributes', attrs => { uid = attrs.uid; });
           msg.on('body', (stream) => {
             stream.on('data', chunk => { rawEmail += chunk.toString('utf8'); });
-            stream.once('end', async () => {
-              try {
-                const parsed = await simpleParser(rawEmail);
-                const type = resolveType((parsed.subject || '').trim());
-                if (!type) { console.log(`[inbound] discarding — unknown subject: "${parsed.subject}"`); return; }
-                const { body, tags } = parseBody(parsed.text || '');
-                if (!body) { console.log('[inbound] discarding — empty body'); return; }
-                insertNote(type, body, tags);
-                if (uid) imap.addFlags(uid, ['\\Deleted'], err => {
-                  if (!err) imap.expunge(err2 => { if (err2) console.warn('[inbound] expunge error:', err2.message); });
-                });
-              } catch (e) { console.error('[inbound] parse error:', e.message); }
+            stream.once('end', () => {
+              const p = (async () => {
+                try {
+                  const parsed = await simpleParser(rawEmail);
+                  const type = resolveType((parsed.subject || '').trim());
+                  if (!type) { console.log(`[inbound] discarding — unknown subject: "${parsed.subject}"`); return null; }
+                  const { body, tags } = parseBody(parsed.text || '');
+                  if (!body) { console.log('[inbound] discarding — empty body'); return null; }
+                  insertNote(type, body, tags);
+                  return uid;
+                } catch (e) { console.error('[inbound] parse error:', e.message); return null; }
+              })();
+              parsePromises.push(p);
             });
           });
         });
 
         f.once('error', err => console.error('[inbound] fetch error:', err.message));
-        f.once('end', () => { imap.end(); });
+        f.once('end', () => {
+          // Wait for ALL async parsing to finish before deleting — previous code called imap.end()
+          // here while simpleParser promises were still in-flight, silently killing the deletions.
+          Promise.all(parsePromises).then(insertedUids => {
+            const toDelete = insertedUids.filter(Boolean);
+            if (!toDelete.length) { imap.end(); return; }
+            imap.addFlags(toDelete, ['\\Deleted'], addErr => {
+              if (addErr) { console.warn('[inbound] addFlags error:', addErr.message); imap.end(); return; }
+              imap.expunge(expErr => {
+                if (expErr) console.warn('[inbound] expunge error:', expErr.message);
+                imap.end();
+              });
+            });
+          }).catch(() => imap.end());
+        });
       });
     });
   });
