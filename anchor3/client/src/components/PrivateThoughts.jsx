@@ -16,7 +16,7 @@ export function PrivateThoughts() {
   const [cfg,      setCfg]      = useState(false);
   const [editId,   setEditId]   = useState(null);
   const [editText, setEditText] = useState('');
-  const [open,     setOpen]     = useState(true);
+  const [open,     setOpen]     = useState(false);
 
   function autoLock() {
     sessionStorage.removeItem(PT_KEY);
