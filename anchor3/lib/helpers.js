@@ -35,7 +35,7 @@ const ALL_TYPES = [
   'Maureen-Aunt', 'Kathy-Aunt', 'Micky-Stepmother', 'Lee-Brother', 'Charity-SisterInLaw',
   'Kevin-Dog', 'Mat-Cat', 'Phil-Cat', 'Ace-Cat', 'Herschel-Lizard', 'hens', 'hey-hey-Rooster',
   'pi', 'list', 'remind', 'random', 'open-loop', 'closed-loop', 'calendar', 'anchor', 'employment', 'claude-handoff',
-  'private-thoughts',
+  'private-thoughts', 'personal-thought',
   'pending',
   'work', 'personal', 'home', 'home-task', 'home-decision', 'kids', 'kids-task',
   'health', 'finance', 'social', 'email', 'idea', 'brain-dump',
@@ -47,7 +47,7 @@ const WORK_TYPES = ['work-task', 'work-decision', 'work-idea', 'work-project', '
 const CAT = {
   'wt': 'work-task', 'wd': 'work-decision', 'wi': 'work-idea', 'wp': 'work-project',
   'wm': 'work-meeting', 'wpw': 'work-password',
-  'pst': 'personal-task', 'pd': 'personal-decision', 'pid': 'personal-idea', 'pp': 'personal-project',
+  'pst': 'personal-task', 'pta': 'personal-task', 'pd': 'personal-decision', 'pid': 'personal-idea', 'pp': 'personal-project',
   'rec': 'personal-recipe', 'rcp': 'personal-recipe', 'ppw': 'personal-password', 'pm': 'personal-meeting',
   'ht': 'health-task', 'hid': 'health-idea', 'hpr': 'health-project',
   'ft': 'finance-task', 'fid': 'finance-idea', 'fpr': 'finance-project',
@@ -120,7 +120,8 @@ const COLORS = {
   'kids': '#fde68a', 'kids-task': '#fbbf24', 'health': '#f87171', 'finance': '#4ade80',
   'social': '#86efac', 'email': '#67e8f9', 'idea': '#a78bfa', 'brain-dump': '#60a5fa',
   'summary': '#fbbf24', 'anchor-task': '#10b981', 'recipe': '#fb923c', 'password': '#f87171',
-  'private-thoughts': '#a855f7'
+  'private-thoughts': '#a855f7',
+  'personal-thought': '#a855f7'
 };
 
 function typeColor(t) { return COLORS[t] || '#60a5fa'; }

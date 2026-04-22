@@ -15,6 +15,7 @@ export const COLORS = {
   'open-loop': '#fb923c', 'closed-loop': '#6b7280', 'calendar': '#c084fc', 'anchor': '#34d399',
   'employment': '#94a3b8', 'claude-handoff': '#60a5fa',
   'pending': '#f59e0b',
+  'private-thoughts': '#a855f7',
 };
 
 export function typeColor(t) { return COLORS[t] || '#60a5fa'; }
@@ -26,7 +27,7 @@ export const TYPE_GROUPS = [
   { label: 'Finance',  types: ['finance-task','finance-idea','finance-project'] },
   { label: 'Family',   types: ['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw'] },
   { label: 'Pets',     types: ['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster'] },
-  { label: 'System',   types: ['pi','remind','random','list','open-loop','closed-loop','calendar','anchor','employment','claude-handoff','pending'] },
+  { label: 'System',   types: ['pi','remind','random','list','open-loop','closed-loop','calendar','anchor','employment','claude-handoff','pending','private-thoughts'] },
 ];
 
 export function isLocal() {
