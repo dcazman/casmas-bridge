@@ -28,6 +28,7 @@ export function App() {
       if (sr.ok) setStatus(sr);
     } catch (e) { console.error('loadAll failed:', e); }
     setLoading(false);
+    window.scrollTo(0, 0);
   }, [sort]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
