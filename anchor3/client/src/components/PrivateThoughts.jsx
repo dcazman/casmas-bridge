@@ -1,33 +1,40 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
+import { Card } from './Card';
 
 const PT_KEY = 'pt_token';
 const tok = () => sessionStorage.getItem(PT_KEY) || '';
 const COLOR = '#a855f7';
 
-export function PrivateThoughts() {
-  const [phase,    setPhase]    = useState('loading');
-  const [notes,    setNotes]    = useState([]);
-  const [pw,       setPw]       = useState('');
-  const [curPw,    setCurPw]    = useState('');
-  const [newPw,    setNewPw]    = useState('');
-  const [err,      setErr]      = useState('');
-  const [draft,    setDraft]    = useState('');
-  const [aiOn,     setAiOn]     = useState(false);
-  const [cfg,      setCfg]      = useState(false);
-  const [editId,   setEditId]   = useState(null);
-  const [editText, setEditText] = useState('');
-  const [open,     setOpen]     = useState(false);
+export function PrivateThoughts({ onCardClick }) {
+  const [phase,  setPhase]  = useState('loading');
+  const [notes,  setNotes]  = useState([]);
+  const [count,  setCount]  = useState(null);
+  const [pw,     setPw]     = useState('');
+  const [curPw,  setCurPw]  = useState('');
+  const [newPw,  setNewPw]  = useState('');
+  const [err,    setErr]    = useState('');
+  const [open,   setOpen]   = useState(false);
+  const [aiOn,   setAiOn]   = useState(false);
+  const [cfg,    setCfg]    = useState(false);
 
   function autoLock() {
     sessionStorage.removeItem(PT_KEY);
-    setNotes([]); setPw(''); setPhase('locked'); setCfg(false); setAiOn(false); setEditId(null);
+    setNotes([]); setPw(''); setPhase('locked'); setCfg(false); setAiOn(false);
   }
+
+  const fetchCount = useCallback(async () => {
+    try {
+      const r = await fetch('/api/private/count');
+      const d = await r.json();
+      if (d.ok) setCount(d.count);
+    } catch {}
+  }, []);
 
   const fetchNotes = useCallback(async () => {
     const r = await fetch('/api/private/notes', { headers: { 'x-pt-token': tok() } });
     if (r.status === 401) { autoLock(); return; }
     const d = await r.json();
-    if (d.ok) setNotes(d.notes);
+    if (d.ok) { setNotes(d.notes); setCount(d.notes.length); }
   }, []);
 
   const checkStatus = useCallback(async () => {
@@ -40,7 +47,7 @@ export function PrivateThoughts() {
     } catch { setPhase('locked'); }
   }, [fetchNotes]);
 
-  useEffect(() => { checkStatus(); }, [checkStatus]);
+  useEffect(() => { checkStatus(); fetchCount(); }, [checkStatus, fetchCount]);
 
   async function doSetup(e) {
     e.preventDefault(); setErr('');
@@ -51,7 +58,7 @@ export function PrivateThoughts() {
     const d = await r.json();
     if (!d.ok) { setErr(d.error); return; }
     sessionStorage.setItem(PT_KEY, d.token);
-    setPw(''); setPhase('unlocked'); setNotes([]);
+    setPw(''); setPhase('unlocked'); fetchNotes();
   }
 
   async function doUnlock(e) {
@@ -78,36 +85,6 @@ export function PrivateThoughts() {
     if (d.ok) setAiOn(d.aiEnabled);
   }
 
-  async function doAdd(e) {
-    e.preventDefault();
-    if (!draft.trim()) return;
-    const r = await fetch('/api/private/notes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-pt-token': tok() },
-      body: JSON.stringify({ raw: draft })
-    });
-    if (r.status === 401) { autoLock(); return; }
-    setDraft(''); fetchNotes();
-  }
-
-  async function doDelete(id) {
-    if (!confirm('Delete this entry?')) return;
-    const r = await fetch('/api/private/notes/' + id, { method: 'DELETE', headers: { 'x-pt-token': tok() } });
-    if (r.status === 401) { autoLock(); return; }
-    fetchNotes();
-  }
-
-  async function doEdit(id) {
-    if (!editText.trim()) return;
-    const r = await fetch('/api/private/notes/' + id, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-pt-token': tok() },
-      body: JSON.stringify({ text: editText })
-    });
-    if (r.status === 401) { autoLock(); return; }
-    setEditId(null); setEditText(''); fetchNotes();
-  }
-
   async function doChangePw(e) {
     e.preventDefault(); setErr('');
     const r = await fetch('/api/private/setup', {
@@ -130,9 +107,9 @@ export function PrivateThoughts() {
         <span class={`lane-arrow${open ? ' open' : ''}`}>▶</span>
         <div class="lane-title-group">
           <span class="lane-name" style={`color:${COLOR}`}>{isLocked ? '🔒' : '🔓'} PRIVATE-THOUGHTS</span>
-          <span class="lane-desc">Personal journal — blurred for privacy</span>
+          <span class="lane-desc">Personal journal — password protected</span>
         </div>
-        {!isLocked && <span class="lane-count">({notes.length})</span>}
+        {count != null && <span class="lane-count">({count})</span>}
         {!isLocked && (
           <div style="display:flex;gap:6px;align-items:center;margin-left:auto" onClick={e => e.stopPropagation()}>
             <button class={`pt-ai-toggle${aiOn ? ' on' : ''}`} onClick={doAiToggle}
@@ -174,44 +151,18 @@ export function PrivateThoughts() {
                   {err && <p class="pt-err">{err}</p>}
                 </form>
               )}
-
-              <form onSubmit={doAdd} class="pt-add">
-                <textarea value={draft} onInput={e => setDraft(e.target.value)}
-                  placeholder="Write anything… (Ctrl+Enter to add)"
-                  class="pt-textarea" rows="3"
-                  onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) doAdd(e); }} />
-                <button type="submit" class="pt-btn">Add</button>
-              </form>
-
-              <div class="pt-notes">
-                {notes.length === 0 && <p class="pt-empty">No entries yet.</p>}
+              <div class="lane-cards">
+                {notes.length === 0 && <p class="pt-empty">No entries yet. Add via main input: pt → body → @label</p>}
                 {notes.map(n => (
-                  <div class="pt-note" key={n.id}>
-                    {editId === n.id ? (
-                      <div class="pt-edit">
-                        <textarea class="pt-textarea" rows="4" value={editText}
-                          onInput={e => setEditText(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) doEdit(n.id); }} />
-                        <div class="pt-edit-btns">
-                          <button class="pt-btn" onClick={() => doEdit(n.id)}>Save</button>
-                          <button class="pt-btn pt-btn--ghost" onClick={() => { setEditId(null); setEditText(''); }}>Cancel</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div class="pt-note-body">{n.formatted || n.raw_input}</div>
-                    )}
-                    <div class="pt-note-foot">
-                      <span class="pt-note-ts">{new Date(n.created_at).toLocaleString()}</span>
-                      <div class="pt-note-actions">
-                        <button class="pt-note-btn" onClick={() => { setEditId(n.id); setEditText(n.formatted || n.raw_input || ''); }} title="Edit">
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                        <button class="pt-note-btn pt-note-btn--del" onClick={() => doDelete(n.id)} title="Delete">
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <Card
+                    key={n.id}
+                    note={n}
+                    onClick={() => onCardClick && onCardClick(n)}
+                    onDelete={fetchNotes}
+                    onTagClick={() => {}}
+                    laneType="private-thoughts"
+                    onCardDrop={() => {}}
+                  />
                 ))}
               </div>
             </>

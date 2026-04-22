@@ -79,7 +79,7 @@ export function App() {
           onCardClick={setModal}
           onDelete={loadAll}
         />
-        <PrivateThoughts />
+        <PrivateThoughts onCardClick={setModal} />
       </div>
       {modal && <Modal note={modal} onClose={closeModal} onMutate={refreshModal} />}
     </div>

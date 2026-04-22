@@ -98,6 +98,12 @@ app.post('/api/rebuild', (req, res) => {
 // ── Private Thoughts ─────────────────────────────────────────────────────────
 const pt = require('./lib/private');
 
+app.get('/api/private/count', (req, res) => {
+  const { db } = require('./lib/db');
+  const row = db.prepare("SELECT COUNT(*) as count FROM notes WHERE type='private-thoughts'").get();
+  res.json({ ok: true, count: row.count });
+});
+
 app.get('/api/private/status', (req, res) => {
   const token = req.headers['x-pt-token'];
   const session = pt.validate(token);
