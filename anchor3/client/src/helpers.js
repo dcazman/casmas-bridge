@@ -27,7 +27,7 @@ export const TYPE_GROUPS = [
   { label: 'Finance',  types: ['finance-task','finance-idea','finance-project'] },
   { label: 'Family',   types: ['Kathie-Wife','Zach-Son','Ethan-Son','Andy-FatherInLaw','Maureen-Aunt','Kathy-Aunt','Micky-Stepmother','Lee-Brother','Charity-SisterInLaw'] },
   { label: 'Pets',     types: ['Kevin-Dog','Mat-Cat','Phil-Cat','Ace-Cat','Herschel-Lizard','hens','hey-hey-Rooster'] },
-  { label: 'System',   types: ['pi','remind','random','list','open-loop','closed-loop','calendar','anchor','employment','claude-handoff','pending','private-thoughts'] },
+  { label: 'System',   types: ['pi','remind','random','list','open-loop','closed-loop','calendar','anchor','employment','claude-handoff','pending','private-thoughts','personal-thought'] },
 ];
 
 export function isLocal() {
