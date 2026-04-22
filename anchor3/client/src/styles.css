@@ -117,7 +117,7 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .lane-title-group{display:flex;flex-direction:column;gap:1px}
 .lane-name{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .lane-desc{font-size:.68rem;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0}
-.lane-count{font-size:.78rem;color:#475569;margin-left:3px}
+.lane-count{font-size:.78rem;color:#94a3b8;margin-left:3px}
 .lane-body{padding:0 18px 14px}
 .lane-cards{display:flex;gap:10px;overflow-x:auto;padding-top:4px;padding-bottom:10px;scrollbar-width:thin;scrollbar-color:#3b82f6 rgba(255,255,255,0.06)}
 .lane-cards::-webkit-scrollbar{height:8px}
