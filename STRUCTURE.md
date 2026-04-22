@@ -1,18 +1,33 @@
 # casmas-bridge — Repo Structure
-Last updated: April 6, 2026
+Last updated: April 22, 2026
 
 ## Directory Layout
 
 ```
 casmas-bridge/
-  anchor/           ← Anchor 2.0 source (SOURCE OF TRUTH)
-    server.js       ← entry point only
-    start.sh        ← "Starting Anchor 2.0..."
-    Dockerfile      ← copies lib/, routes/, assets/
-    package.json    ← v3.0.0
+  anchor3/          ← Anchor 3 source (LIVE — Preact/Vite + Express)
+    server.js       ← Express entry point
+    Dockerfile      ← Node 20 Alpine, Vite build included
+    docker-compose.yml
+    package.json
+    client/         ← Preact/Vite frontend
+      src/
+        main.jsx    ← Preact entry, scroll restoration
+        App.jsx     ← Root component, state management
+        helpers.js  ← TYPE_GROUPS, COLORS, isLocal(), fmtDate()
+        styles.css
+        components/
+          Header, AddNote, Board, Lane, Card, Modal,
+          AskAnchor, Commands, SyncQueue, Weather, PrivateThoughts
+    lib/            ← crypto.js, db.js, email.js, helpers.js, remind.js, usage.js, weather.js, inbound.js, private.js
+    routes/         ← notes.js, sync.js, chat.js, groom.js
+
+  anchor/           ← Anchor 2 source (pending decom — no external tunnel, port 7778)
+    server.js
+    Dockerfile
+    package.json
     lib/            ← crypto.js, db.js, email.js, helpers.js, usage.js
     routes/         ← notes.js, sync.js, chat.js, bridge.js, mcp.js, ui.js
-    assets/         ← anchor-icon.png, anchor-logo.png
 
   anchor-mcp/       ← anchor-mcp source (SOURCE OF TRUTH)
     mcp-server.js
@@ -25,33 +40,47 @@ casmas-bridge/
     session-latest.md        ← most recent session summary (if exists)
 
   archive/          ← old backups
-    v2.1-server.js  ← single-file restore point before modular refactor
-    v2.1-readme.md
+```
 
-## Production Locations (OMV server)
+## Production Locations (OMV server — 192.168.50.23)
 
-  /srv/mergerfs/warehouse/anchor/       ← production anchor (Docker builds here)
-  /srv/mergerfs/warehouse/anchor-mcp/   ← production anchor-mcp (Docker builds here)
-  /srv/mergerfs/warehouse/casmas-bridge/ ← this repo (git clone)
+```
+/srv/mergerfs/warehouse/anchor3/         ← Anchor 3 production (LIVE)
+  data/notes3.db                         ← SQLite (encrypted)
+  attachments/
+  .env                                   ← secrets (never commit)
 
-## Update Workflow
+/srv/mergerfs/warehouse/anchor/          ← Anchor 2 production (pending decom)
+  data/notes.db
 
-For anchor source changes:
-  1. Edit in casmas-bridge/anchor/ via write_file MCP tool
-  2. git_commit_push
-  3. cp file from casmas-bridge to /srv/mergerfs/warehouse/anchor/
-  4. docker cp to container OR docker restart anchor
+/srv/mergerfs/warehouse/anchor-mcp/      ← anchor-mcp production (live)
+/srv/mergerfs/warehouse/casmas-bridge/   ← this repo (git clone on NAS)
+```
 
-Full rebuild only needed when Dockerfile or package.json changes:
-  cd /srv/mergerfs/warehouse/anchor
-  docker compose down && docker compose build --no-cache && docker compose up -d
+## Anchor 3 Update Workflow
+
+No auto-sync bridge — every change requires manual deploy.
+
+**Frontend or backend JS changes:**
+1. Edit in `casmas-bridge/anchor3/` via MCP write tools
+2. `git_commit_push`
+3. Copy updated file(s) to `/srv/mergerfs/warehouse/anchor3/`
+4. `docker rm -f anchor3 && docker compose up -d --build`
+
+**Dockerfile or package.json:**  
+Same as above — always a full rebuild.
+
+## Anchor 2 Update Workflow (legacy)
+
+1. Edit in `casmas-bridge/anchor/` via MCP write tools
+2. `git_commit_push`
+3. Files auto-applied every 3hr, or trigger ⇄ Sync Bridge in UI
+4. `docker cp` to container OR `docker restart anchor` for hot-apply
 
 ## Important Notes
 
-- anchor and anchor-mcp do NOT use Docker Hub — local builds only, no Watchtower
-- anchor runs outside OMV GUI via plain docker compose
-- anchor-mcp runs outside OMV GUI via plain docker compose
-- Bridge volume: casmas-bridge repo is mounted at /bridge inside anchor container
-- Data: /srv/mergerfs/warehouse/anchor/data/notes.db (encrypted SQLite)
-- Config: /srv/mergerfs/warehouse/anchor/.env
-```
+- anchor3 and anchor-mcp do NOT use Docker Hub — local builds only, no Watchtower
+- Anchor 3 Cloudflare tunnel: `anchor.thecasmas.com` → port 1234 (container anchor3)
+- Anchor 2 port 7778 (host network) — no external tunnel, no Cloudflare
+- Live docker-compose files on OMV contain hardcoded secrets — never sync to repo
+- Data: `anchor3/data/notes3.db` and `anchor/data/notes.db` are separate — notes were migrated via SQLite ATTACH INSERT OR IGNORE when anchor3 went live

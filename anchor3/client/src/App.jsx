@@ -33,6 +33,10 @@ export function App() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  useEffect(() => {
+    if (!loading) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, 0)));
+  }, [loading]);
+
   const refreshModal = useCallback((updatedNote) => {
     if (updatedNote) setModal(updatedNote);
     loadAll();

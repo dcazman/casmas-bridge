@@ -1,5 +1,5 @@
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#0d1117;color:#e2e8f0;font-size:16px;line-height:1.6}
+body{font-family:system-ui,sans-serif;background:#0d1117;color:#e2e8f0;font-size:16px;line-height:1.6;overflow-anchor:none}
 
 /* ── Header ── */
 .hdr{background:linear-gradient(135deg,#1e3a5f 0%,#1a2540 50%,#1a1f35 100%);border-bottom:1px solid #2d4a7a;padding:16px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 2px 32px rgba(37,99,235,0.18),0 0 80px rgba(96,165,250,0.05)}.hdr-logo{width:72px;height:72px;object-fit:contain;border-radius:12px;flex-shrink:0;filter:drop-shadow(0 0 10px rgba(96,165,250,0.4))}
