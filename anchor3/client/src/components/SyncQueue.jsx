@@ -27,14 +27,13 @@ export function SyncQueue({ status, onSync }) {
   }
 
   async function runRebuild() {
-    if (!confirm('Full Docker rebuild — service will be down ~1-2 min. Continue?')) return;
-    setMsg('⏳ Rebuilding…');
+    if (!confirm('Queue a Docker rebuild? Service will restart in ~1-2 min. Continue?')) return;
+    setMsg('⏳ Queuing rebuild…');
     try {
       const r = await fetch('/api/rebuild', { method: 'POST' });
       const d = await r.json();
-      setMsg(d.ok ? '✓ Rebuild done — reloading in 5s…' : '✗ ' + (d.error || 'Rebuild failed'));
-      if (d.ok) setTimeout(() => location.reload(), 5000);
-    } catch { setMsg('✗ Request failed (reload manually)'); }
+      setMsg(d.ok ? '✓ Rebuild queued — service will restart within ~2 min' : '✗ ' + (d.error || 'Failed'));
+    } catch { setMsg('✗ Request failed'); }
   }
 
   async function sendDigest() {

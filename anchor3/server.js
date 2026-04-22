@@ -77,10 +77,12 @@ app.post('/api/alert', async (req, res) => {
 });
 
 app.post('/api/rebuild', (req, res) => {
-  exec('docker-compose -f /app/docker-compose.yml up --build -d 2>&1', (err, stdout) => {
-    if (err) return res.json({ ok: false, error: stdout || err.message });
+  try {
+    require('fs').writeFileSync('/data/rebuild-trigger', Date.now().toString());
     res.json({ ok: true });
-  });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // ── Private Thoughts ─────────────────────────────────────────────────────────
