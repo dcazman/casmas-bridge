@@ -71,9 +71,16 @@ export function AskAnchor() {
           <button class="btn btn-primary" onClick={() => chat('haiku')} disabled={!rooster || loading}>Ask</button>
         </div>
         <div class="chat-mr">
-          <button onClick={toggleRooster} style={`font-size:.75rem;padding:3px 10px;border-radius:6px;border:none;cursor:pointer;background:${rooster ? '#14532d' : '#374151'};color:${rooster ? '#4ade80' : '#9ca3af'}`}>
-            🐓 Rooster: {rooster ? 'ON' : 'OFF'}
-          </button>
+          {rooster && (
+            <button onClick={toggleRooster} style={`font-size:.75rem;padding:3px 10px;border-radius:6px;border:none;cursor:pointer;background:#14532d;color:#4ade80`}>
+              🐓 Rooster: ON
+            </button>
+          )}
+          {!rooster && (
+            <button onClick={toggleRooster} style="font-size:.75rem;padding:3px 10px;border-radius:6px;border:none;cursor:pointer;background:none;color:#334155;text-decoration:underline dotted">
+              rooster off
+            </button>
+          )}
           <span class="model-lbl">Need Claude's brain?</span>
           <button class="btn-opus" onClick={() => chat('claude')}>Ask Claude ($)</button>
         </div>

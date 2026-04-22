@@ -24,7 +24,7 @@ export function Header({ engine }) {
     return () => clearInterval(t);
   }, []);
 
-  const engineLabel = engine === 'rooster' ? '🐓 Rooster (local)' : '🤖 Anthropic API';
+  const engineLabel = engine === 'rooster' ? '🐓 Rooster' : '🤖 Anthropic API';
 
   return (
     <header class="hdr">
