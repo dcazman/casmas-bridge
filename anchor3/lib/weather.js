@@ -86,6 +86,7 @@ async function getTempestRaw(token) {
     lowF:        today.air_temp_low       != null ? Math.round(today.air_temp_low)    : null,
     precipChance: maxPrecipChance,
     forecastConditions: today.conditions  || null,
+    todayEmoji:         ICON_EMOJI[today.icon] || null,
     forecast: (data.forecast?.daily || []).slice(1, 4).map(d => ({
       dayName:      new Date(d.day_start_local * 1000).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' }),
       highF:        d.air_temp_high != null ? Math.round(d.air_temp_high) : null,

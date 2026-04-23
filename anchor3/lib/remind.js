@@ -193,56 +193,107 @@ function cmdBlock(ref) {
 async function buildDigestEmail() {
   const reminders     = getActiveReminders();
   const openLoopNotes = getOpenLoopNotes();
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const now   = new Date();
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tz = { timeZone: 'America/New_York' };
   const dueToday = reminders.filter(n => { const d = new Date(n.remind_at); return d >= today && d < tomorrow; });
   const upcoming = reminders.filter(n => { const d = new Date(n.remind_at); return d >= tomorrow; }).slice(0, 5);
   const { count: pending } = getPending();
-  const tz = { timeZone: 'America/New_York' };
-  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', ...tz });
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', ...tz });
 
-  let body = `☀️ Anchor 3 — ${dateStr}\n\n`;
+  let weekCount = 0;
+  try {
+    const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    weekCount = db.prepare("SELECT COUNT(*) as c FROM notes WHERE created_at >= ?").get(since)?.c || 0;
+  } catch {}
+
+  // 3-day weather grid
+  let weatherSection = '';
+  try {
+    const { getTempestToken, getTempestRaw } = require('./weather');
+    const token = getTempestToken();
+    if (token) {
+      const w = await getTempestRaw(token);
+      const days = [
+        {
+          label: now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', ...tz }),
+          emoji: w.todayEmoji || '🌤',
+          highF: w.highF, lowF: w.lowF, pct: w.precipChance,
+        },
+        ...w.forecast.slice(0, 2).map((f, i) => {
+          const d = new Date(now); d.setDate(d.getDate() + i + 1);
+          return {
+            label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', ...tz }),
+            emoji: f.emoji || '🌤',
+            highF: f.highF, lowF: f.lowF, pct: f.precipChance,
+          };
+        }),
+      ];
+      const COL = 15;
+      const lp = (s, n) => { s = String(s ?? ''); return (s + ' '.repeat(n)).slice(0, n); };
+      const r0 = days.map(d => lp(d.label, COL)).join('  |  ');
+      const r1 = '─'.repeat(r0.length);
+      const r2 = days.map(d => lp(`${d.emoji} ${d.highF ?? '—'}°/${d.lowF ?? '—'}°`, COL)).join('  |  ');
+      const r3 = days.map(d => lp(d.pct > 0 ? `🌧 ${d.pct}% rain` : 'no rain', COL)).join('  |  ');
+      const feels = w.feelsF != null && w.feelsF !== w.tempF ? ` feels ${w.feelsF}°` : '';
+      const gust  = w.gustMph ? ` gusting ${w.gustMph}mph` : '';
+      weatherSection = `${r0}\n${r1}\n${r2}\n${r3}\nNow: ${w.tempF ?? '—'}°F${feels}  💧 ${w.humidity ?? '—'}%  💨 ${w.windMph ?? '—'}mph ${w.windDir}${gust}\n`;
+    }
+  } catch (e) { console.warn('[remind] weather failed:', e.message); }
+
+  const hr = (s) => `${s}\n${'─'.repeat(36)}\n`;
+
+  let body = `☀️  Anchor — ${dateStr}\n\n`;
+  if (weatherSection) body += weatherSection + '\n';
 
   if (dueToday.length) {
-    body += `📅 Due Today\n`;
+    body += hr('📅 Due Today');
     for (const n of dueToday) {
       const num  = n.remind_num ? `${n.remind_num})` : '•';
       const text = (n.formatted || '').split('\n')[0].trim().substring(0, 70);
       const time = new Date(n.remind_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
-      body += `  ${num} ${text} — ${time}\n`;
+      body += `  ${num}  ${text} — ${time}\n`;
     }
     body += '\n';
   }
 
   if (upcoming.length) {
-    body += `🗓 Coming Up\n`;
+    body += hr('🗓 Coming Up');
     for (const n of upcoming) {
       const num  = n.remind_num ? `${n.remind_num})` : '•';
       const text = (n.formatted || '').split('\n')[0].trim().substring(0, 60);
       const when = new Date(n.remind_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, ...tz });
-      body += `  ${num} ${text} — ${when}\n`;
+      body += `  ${num}  ${text} — ${when}\n`;
     }
     body += '\n';
   }
 
   if (openLoopNotes.length) {
-    body += `🔓 Open Loops\n`;
+    body += hr('🔓 Open Loops');
     for (const n of openLoopNotes) {
       const num  = n.loop_num ? `#${n.loop_num}` : '•';
       const text = (n.formatted || n.raw_input || '').split('\n')[0].trim().substring(0, 90);
-      body += `  ${num} ${text}\n`;
+      body += `  ${num}  ${text}\n`;
     }
     body += '\n';
   }
 
-  if (pending > 0) body += `📋 ${pending} unsynced notes\n\n`;
-  if (!dueToday.length && !upcoming.length && !openLoopNotes.length && !pending) body += `✅ All clear.\n\n`;
+  if (!dueToday.length && !upcoming.length && !openLoopNotes.length) body += `✅ All clear.\n\n`;
 
-  body += `---\n${cmdBlock()}\nanchor3.local:1234`;
+  const stats = [];
+  if (weekCount > 0) stats.push(`${weekCount} notes this week`);
+  if (pending > 0)   stats.push(`${pending} unsynced`);
+  if (stats.length)  body += `📊  ${stats.join('  ·  ')}\n`;
+
+  body += `\nTo act: done N  ·  snooze N  ·  snooze N friday 3pm  ·  close N\n`;
+
+  const { getTip } = require('./tips');
+  body += `\n${'─'.repeat(40)}\n💡  ${getTip()}\n\nanchor.thecasmas.com`;
 
   const subject = dueToday.length
-    ? `☀️ Anchor 3 — ${dueToday.length} due today · ${dateStr}`
-    : `☀️ Anchor 3 — ${dateStr}`;
+    ? `☀️ Anchor — ${dueToday.length} due today · ${dateStr}`
+    : `☀️ Anchor — ${dateStr}`;
 
   return { subject, body };
 }
