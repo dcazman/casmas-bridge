@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { typeColor, fmtDate, relTime } from '../helpers';
 
 export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop }) {
@@ -9,12 +9,16 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
   const [dragOver,      setDragOver]      = useState(false);
   const [cbText,        setCbText]        = useState(null);
   const [viewing,       setViewing]       = useState(false);
+  const [hoverPreview,  setHoverPreview]  = useState(null);
+  const hoverTimer = useRef(null);
 
   const color     = typeColor(note.type);
   const fullText  = cbText ?? (note.formatted || note.raw_input || '');
   const isPending = note.status === 'pending';
   const isRemind  = note.type === 'remind';
   const hasChecks = /^\s*\[[ x]\]/im.test(fullText);
+
+  const isOverdue     = isRemind && note.remind_at && (new Date(note.remind_at).getTime() < Date.now());
 
   const rawFirstLine  = fullText.split('\n').find(l => l.trim()) || '';
   const collapsedText = hasChecks
@@ -81,6 +85,77 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
     } catch {}
   }
 
+  function handleMouseEnter(e) {
+    clearTimeout(hoverTimer.current);
+    const rect = e.currentTarget.getBoundingClientRect();
+    hoverTimer.current = setTimeout(() => {
+      const showRight = rect.right + 288 < window.innerWidth;
+      const top = Math.min(rect.top, window.innerHeight - 340);
+      const left = showRight ? rect.right + 8 : rect.left - 288;
+      setHoverPreview({ top, left });
+    }, 280);
+  }
+
+  function handleMouseLeave() {
+    clearTimeout(hoverTimer.current);
+    setHoverPreview(null);
+  }
+
+  function renderHoverPreview() {
+    if (!hoverPreview) return null;
+    return (
+      <div
+        class="card-preview"
+        style={`position:fixed;top:${hoverPreview.top}px;left:${hoverPreview.left}px`}
+        onMouseEnter={() => clearTimeout(hoverTimer.current)}
+        onMouseLeave={() => setHoverPreview(null)}
+      >
+        <div class="cp-header">
+          <span class="cp-badge" style={`color:${color};border-color:${color}40;background:${color}15`}>
+            {note.type}
+            {note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
+            {note.loop_num != null && <span style="margin-left:4px">#{note.loop_num}</span>}
+          </span>
+          <span class="cp-meta-date">{fullDate}</span>
+        </div>
+        {isRemind && (
+          <div class="cp-remind-due">🔔 {fmtDate(note.remind_at || note.created_at)}</div>
+        )}
+        {hasChecks ? (
+          <div class="cp-body">
+            <div class="cp-progress">{checkDone}/{checkTotal} done</div>
+            {fullText.split('\n').map((line, i) => {
+              const unc = /^\s*\[ \]/.test(line);
+              const chk = /^\s*\[x\]/i.test(line);
+              if (unc || chk) {
+                const label = line.replace(/^\s*\[[ x]\]\s*/i, '');
+                return (
+                  <div key={i} class="cp-cb-line">
+                    <span class={chk ? 'cp-chk' : 'cp-unc'}>{chk ? '☑' : '☐'}</span>
+                    <span class={chk ? 'cp-cb-lbl done' : 'cp-cb-lbl'}>{label}</span>
+                  </div>
+                );
+              }
+              return line.trim() ? <div key={i} class="cp-other">{line}</div> : null;
+            })}
+          </div>
+        ) : (
+          <div class="cp-body cp-text-body">
+            {fullText.length > 480 ? fullText.slice(0, 480) + '…' : fullText}
+          </div>
+        )}
+        {tags.length > 0 && (
+          <div class="cp-tags">
+            {tags.map(t => <span key={t} class="cp-tag">{t}</span>)}
+          </div>
+        )}
+        {note.loop_num != null && (
+          <div class="cp-age">Open {relTime(note.created_at)}</div>
+        )}
+      </div>
+    );
+  }
+
   function renderBody() {
     if (!expanded) {
       if (hasChecks) {
@@ -128,6 +203,8 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
     e.dataTransfer.setData('application/json', JSON.stringify({ id: note.id, type: note.type }));
     e.dataTransfer.effectAllowed = 'move';
     setDragging(true);
+    clearTimeout(hoverTimer.current);
+    setHoverPreview(null);
   }
 
   function handleDragEnd() {
@@ -160,7 +237,7 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
   return (
     <>
     <div
-      class={`card${isPending ? ' pending' : ''}${isRemind ? ' remind' : ''}${expanded ? ' expanded' : ''}${dragging ? ' card-dragging' : ''}${dragOver ? ' card-drag-over' : ''}`}
+      class={`card${isPending ? ' pending' : ''}${isRemind ? ' remind' : ''}${isOverdue ? ' overdue' : ''}${expanded ? ' expanded' : ''}${dragging ? ' card-dragging' : ''}${dragOver ? ' card-drag-over' : ''}`}
       style={`border-color:${color}30`}
       draggable="true"
       onDragStart={handleDragStart}
@@ -168,8 +245,10 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      <div class="card-top" onClick={() => setExpanded(v => !v)} title={expanded ? '' : fullText}>
+      <div class="card-top" onClick={() => setExpanded(v => !v)}>
         <div class="card-top-row">
           <div class="drag-handle" onClick={e => e.stopPropagation()} title="Drag to reorder or move to another lane">⠿</div>
           <div class="card-badge" style={`color:${color};border-color:${color}40;background:${color}15`}>
@@ -301,6 +380,7 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
         </div>
       </div>
     )}
+    {renderHoverPreview()}
     </>
   );
 }

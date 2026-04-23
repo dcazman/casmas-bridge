@@ -250,3 +250,26 @@ select{background:#0d1117;color:#e2e8f0;border:1px solid #2d4a7a;border-radius:8
 .pt-edit{margin-bottom:6px}
 .pt-edit-btns{display:flex;gap:6px;margin-top:6px}
 .pt-empty{color:#475569;font-size:.85rem;text-align:center;padding:24px 0}
+
+/* ── Overdue ── */
+.card.overdue{border-left:3px solid #ef4444 !important;background:#160a0a}
+.card.overdue .remind-due{color:#ef4444;background:#2d0a0a;border-color:#ef444430}
+
+/* ── Card view button ── */
+.card-btn-view{background:none;border:none;cursor:pointer;opacity:.45;padding:3px 5px;border-radius:4px;transition:opacity .15s,color .15s;color:#94a3b8;display:inline-flex;align-items:center}
+.card-btn-view:hover{opacity:1;color:#7dd3fc}
+
+/* ── Hover preview ── */
+.card-preview{width:272px;background:#1a2035;border:1px solid #2d3a54;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.04);padding:12px;z-index:9999;pointer-events:auto}
+.cp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+.cp-badge{font-size:.65rem;font-weight:700;border:1px solid;border-radius:10px;padding:2px 7px;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0}
+.cp-meta-date{font-size:.65rem;color:#475569;white-space:nowrap}
+.cp-remind-due{font-size:.72rem;color:#f472b6;background:#2d0a1a;padding:2px 8px;border-radius:20px;border:1px solid #f472b630;display:inline-block;margin-bottom:8px}
+.cp-body{font-size:.78rem;color:#94a3b8;line-height:1.55;max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#334155 transparent}
+.cp-text-body{white-space:pre-wrap;word-break:break-word}
+.cp-progress{font-size:.68rem;color:#60a5fa;margin-bottom:6px}
+.cp-cb-line{display:flex;align-items:flex-start;gap:6px;margin-bottom:4px}
+.cp-chk{color:#4ade80;flex-shrink:0;font-size:.9rem}.cp-unc{color:#334155;flex-shrink:0;font-size:.9rem}
+.cp-cb-lbl{font-size:.78rem;color:#94a3b8;line-height:1.5}.cp-cb-lbl.done{color:#334155;text-decoration:line-through}
+.cp-other{font-size:.75rem;color:#475569;padding:1px 0}.cp-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
+.cp-tag{font-size:.63rem;background:#1e3a5f;color:#60a5fa;padding:1px 6px;border-radius:10px}.cp-age{font-size:.65rem;color:#334155;margin-top:6px}

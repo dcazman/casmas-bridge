@@ -42,6 +42,29 @@ export function App() {
     }
   }, [loading]);
 
+  useEffect(() => {
+    function onKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = document.activeElement?.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (e.key === 'n' && !inInput) {
+        e.preventDefault();
+        const ta = document.querySelector('.panels textarea');
+        if (ta) { ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); ta.focus(); }
+      }
+      if (e.key === '/' && !inInput) {
+        e.preventDefault();
+        const srch = document.querySelector('.board-controls input');
+        if (srch) srch.focus();
+      }
+      if (e.key === 'Escape' && inInput) {
+        document.activeElement.blur();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const refreshModal = useCallback((updatedNote) => {
     if (updatedNote) setModal(updatedNote);
     loadAll();
