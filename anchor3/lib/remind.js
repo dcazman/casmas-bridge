@@ -282,6 +282,28 @@ function startScheduler() {
     }
   });
 
+  // Daily DB backup at 2AM — writes /data/backups/notes3-YYYY-MM-DD.db, keeps last 7
+  cron.schedule('0 2 * * *', async () => {
+    const fs = require('fs');
+    const path = require('path');
+    const backupDir = '/data/backups';
+    try {
+      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const dest = path.join(backupDir, `notes3-${stamp}.db`);
+      await db.backup(dest);
+      console.log(`[backup] wrote ${dest}`);
+      const files = fs.readdirSync(backupDir)
+        .filter(f => f.startsWith('notes3-') && f.endsWith('.db'))
+        .sort();
+      while (files.length > 7) {
+        const old = files.shift();
+        fs.unlinkSync(path.join(backupDir, old));
+        console.log(`[backup] pruned ${old}`);
+      }
+    } catch (e) { console.error('[backup] failed:', e.message); }
+  }, { timezone: 'America/New_York' });
+
   console.log('[remind] scheduler ready');
 }
 
