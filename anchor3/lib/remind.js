@@ -238,13 +238,13 @@ async function buildDigestEmail() {
       const r3 = days.map(d => lp(d.pct > 0 ? `🌧 ${d.pct}% rain` : 'no rain', COL)).join('  |  ');
       const feels = w.feelsF != null && w.feelsF !== w.tempF ? ` feels ${w.feelsF}°` : '';
       const gust  = w.gustMph ? ` gusting ${w.gustMph}mph` : '';
-      weatherSection = `${r0}\n${r1}\n${r2}\n${r3}\nNow: ${w.tempF ?? '—'}°F${feels}  💧 ${w.humidity ?? '—'}%  💨 ${w.windMph ?? '—'}mph ${w.windDir}${gust}\n`;
+      weatherSection = `${r0}\n${r1}\n${r2}\n${r3}\n${r1}\nNow: ${w.tempF ?? '—'}°F${feels}  💧 ${w.humidity ?? '—'}%  💨 ${w.windMph ?? '—'}mph ${w.windDir}${gust}\n`;
     }
   } catch (e) { console.warn('[remind] weather failed:', e.message); }
 
   const hr = (s) => `${s}\n${'─'.repeat(36)}\n`;
 
-  let body = `☀️  Anchor — ${dateStr}\n\n`;
+  let body = '';
   if (weatherSection) body += weatherSection + '\n';
 
   if (dueToday.length) {
