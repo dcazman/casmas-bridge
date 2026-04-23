@@ -33,7 +33,7 @@ Read `md/work-claude-handoff.md` at the start of a session. Check `md/session-la
 
 ## AI engine
 
-Anchor uses **Ollama** (mistral, 192.168.50.50:11434) by default for classification and chat. Suggest the Anthropic API only when heavy synthesis is needed.
+Anchor uses **Anthropic API** (Haiku for classification/sync, Opus for Ask Anchor). Ollama is decommissioned — `USE_OLLAMA=false` in `.env`.
 
 ## Source of truth
 

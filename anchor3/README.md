@@ -6,7 +6,7 @@ Personal second-brain and note system. Preact/Vite frontend, Express backend, SQ
 
 - **Frontend:** Vite + Preact, port 7779 (mapped to 1234 in Docker)
 - **Backend:** Express, SQLite via better-sqlite3
-- **AI:** Ollama (mistral default) or Anthropic API fallback
+- **AI:** Anthropic API (Haiku for sync, Opus for Ask Anchor) — Ollama decommissioned
 - **Deploy:** Docker on OMV (192.168.50.23)
 
 ## Paths
@@ -55,14 +55,26 @@ Frontend changes need the updated file copied to the live path before rebuild.
 | `zs` | Zach-Son |
 | `es` | Ethan-Son |
 | `afl` | Andy-FatherInLaw |
+| `ma` | Maureen-Aunt |
+| `ka` | Kathy-Aunt |
+| `ms` | Micky-Stepmother |
+| `lb` | Lee-Brother |
+| `csl` | Charity-SisterInLaw |
 | `kd` | Kevin-Dog |
 | `mc` | Mat-Cat |
+| `pcc` | Phil-Cat |
+| `acc` | Ace-Cat |
+| `liz` | Herschel-Lizard |
+| `hen` | hens |
+| `hhr` | hey-hey-Rooster |
 | `pi` | pi (permanent facts) |
 | `ls` / `li` | list |
 | `re` | remind |
 | `r` | random |
 | `ol` | open-loop |
 | `cal` | calendar |
+| `anc` | anchor |
+| `emp` | employment |
 | `ch` | claude-handoff |
 | `pt` | private-thoughts |
 
@@ -76,15 +88,16 @@ Commands (no sync needed, post directly):
 - `done N` — delete
 - `snooze N` — push 1 week
 - `snooze N friday 3pm` — push to specific time
+- `change N to new text` — rewrite body (append date to also reschedule)
+- `close N` — resolve open loop #N
 
 ## Environment
 
 ```
 ENCRYPTION_KEY=          # required, 32-char
-ANTHROPIC_API_KEY=       # optional (Ollama default)
-USE_OLLAMA=true
-OLLAMA_URL=http://192.168.50.50:11434
-SMTP_HOST / SMTP_USER / SMTP_PASS / FROM_EMAIL / ALERT_EMAIL
+ANTHROPIC_API_KEY=       # required
+USE_OLLAMA=false
+SMTP_HOST / SMTP_USER / SMTP_PASS / FROM_EMAIL / ALERT_EMAIL / ALERT_EMAIL2
 IMAP_HOST / IMAP_USER / IMAP_PASS / ANCHOR_INBOUND=anchor@thecasmas.com
 TEMPEST_TOKEN=           # optional weather widget
 ```

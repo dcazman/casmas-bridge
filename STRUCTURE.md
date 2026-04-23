@@ -50,8 +50,7 @@ casmas-bridge/
   attachments/
   .env                                   ← secrets (never commit)
 
-/srv/mergerfs/warehouse/anchor/          ← Anchor 2 production (pending decom)
-  data/notes.db
+/srv/mergerfs/warehouse/anchor/          ← Anchor 2 production (DECOMMISSIONED — offline)
 
 /srv/mergerfs/warehouse/anchor-mcp/      ← anchor-mcp production (live)
 /srv/mergerfs/warehouse/casmas-bridge/   ← this repo (git clone on NAS)
@@ -70,17 +69,12 @@ No auto-sync bridge — every change requires manual deploy.
 **Dockerfile or package.json:**  
 Same as above — always a full rebuild.
 
-## Anchor 2 Update Workflow (legacy)
+## Anchor 2 — DECOMMISSIONED
 
-1. Edit in `casmas-bridge/anchor/` via MCP write tools
-2. `git_commit_push`
-3. Files auto-applied every 3hr, or trigger ⇄ Sync Bridge in UI
-4. `docker cp` to container OR `docker restart anchor` for hot-apply
+**Do not edit or deploy.** Container stopped and removed April 2026. The `anchor/` directory is a historical archive only.
 
 ## Important Notes
 
 - anchor3 and anchor-mcp do NOT use Docker Hub — local builds only, no Watchtower
 - Anchor 3 Cloudflare tunnel: `anchor.thecasmas.com` → port 1234 (container anchor3)
-- Anchor 2 port 7778 (host network) — no external tunnel, no Cloudflare
 - Live docker-compose files on OMV contain hardcoded secrets — never sync to repo
-- Data: `anchor3/data/notes3.db` and `anchor/data/notes.db` are separate — notes were migrated via SQLite ATTACH INSERT OR IGNORE when anchor3 went live

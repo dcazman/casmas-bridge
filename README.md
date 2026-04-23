@@ -5,7 +5,7 @@ Git-based bridge between Claude and the Casmas home server stack. Acts as the so
 ## What lives here
 
 ```
-anchor/          Anchor 2 source (being decommissioned — replaced by anchor3)
+anchor/          Anchor 2 source (DECOMMISSIONED — replaced by anchor3)
 anchor3/         Anchor 3 source (LIVE — Preact/Vite frontend, Express API)
 anchor-mcp/      MCP server exposing Anchor tools to Claude
 md/
@@ -98,22 +98,23 @@ Anchor 3 has no auto-sync bridge. All changes require manual deploy.
   - `done N` — delete
   - `snooze N` — push 1 week
   - `snooze N friday 3pm` — push to time
+  - `change N to new text` — rewrite body (append date to also reschedule)
 
 ### Open loops
 
 - `cat ol` — tracked, shown in 7AM digest email under 🔓 Open Loops
-- To close: delete or reclassify the note
+- To close: type `close N` in Add Note, or delete/reclassify
 
 ### AI engine
 
-- Default: Rooster (Ollama mistral at 192.168.50.50:11434) — `USE_OLLAMA=true`
-- Fallback: Anthropic API (Haiku for sync, Opus for Ask Anchor)
-- Header shows 🐓 Rooster (local) or 🤖 Anthropic API
+- **Anthropic API** — Haiku for classification/sync, Opus for Ask Anchor
+- Ollama decommissioned — `USE_OLLAMA=false` in `.env`
+- Header shows 🤖 Anthropic API
 
 ### Email
 
 - 7AM daily digest: due today, coming up, open loops, pending count
-- 15-min cron: individual reminder fires when due
+- 5-min cron: individual reminder fires ~30 min before due time
 - Inbound: anchor@thecasmas.com → IMAP ingestion (markSeen:true prevents re-ingestion)
 
 ### Database backup
