@@ -6,10 +6,10 @@ const { sendEmail } = require('./email');
 
 function getDueReminders() {
   try {
-    const now = new Date().toISOString();
+    const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     return db.prepare(
       "SELECT * FROM notes WHERE remind_at IS NOT NULL AND remind_at <= ? AND (remind_sent IS NULL OR remind_sent=0)"
-    ).all(now).map(decryptNote);
+    ).all(soon).map(decryptNote);
   } catch { return []; }
 }
 
@@ -319,7 +319,7 @@ function startScheduler() {
     } catch (e) { console.error('[remind] digest email failed:', e.message); }
   }, { timezone: 'America/New_York' });
 
-  cron.schedule('*/15 * * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     const due = getDueReminders();
     if (!due.length) return;
     for (const n of due) {
