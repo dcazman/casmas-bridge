@@ -17,7 +17,7 @@ md/
 | Service | Path on NAS | Public URL | Status |
 |---------|-------------|------------|--------|
 | anchor3 | /srv/mergerfs/warehouse/anchor3/ | anchor.thecasmas.com | **LIVE** |
-| anchor | /srv/mergerfs/warehouse/anchor/ | (none — port 7778 only) | Pending decom |
+| anchor | /srv/mergerfs/warehouse/anchor/ | (none — port 7778 only) | **DECOMMISSIONED** |
 | anchor-mcp | /srv/mergerfs/warehouse/anchor-mcp/ | mcp.thecasmas.com | Live |
 
 ## Deploy flow — Anchor 3
@@ -39,12 +39,6 @@ Anchor 3 has no auto-sync bridge. All changes require manual deploy.
 - Live files: `/srv/mergerfs/warehouse/anchor3/`
 - Data: `/srv/mergerfs/warehouse/anchor3/data/notes3.db`
 - Attachments: `/srv/mergerfs/warehouse/anchor3/attachments/`
-
-## Deploy flow — Anchor 2 (legacy)
-
-JS-only changes: push to git → Anchor auto-applies every 3hr, or click ⇄ Sync Bridge in UI.
-
-Dockerfile/package.json changes: require full rebuild via 🔨 Rebuild button.
 
 ## Anchor 3 feature summary
 
@@ -121,6 +115,12 @@ Dockerfile/package.json changes: require full rebuild via 🔨 Rebuild button.
 - 7AM daily digest: due today, coming up, open loops, pending count
 - 15-min cron: individual reminder fires when due
 - Inbound: anchor@thecasmas.com → IMAP ingestion (markSeen:true prevents re-ingestion)
+
+### Database backup
+
+- Daily at 2AM ET — `/data/backups/notes3-YYYY-MM-DD.db`
+- Keeps last 7 snapshots, auto-prunes older ones
+- Backups live on the same OMV volume as the live db (`/srv/mergerfs/warehouse/anchor3/data/backups/`)
 
 ### iOS shortcut
 
