@@ -175,6 +175,7 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
           <div class="card-badge" style={`color:${color};border-color:${color}40;background:${color}15`}>
             {note.type}
             {note.remind_num != null && <span style="margin-left:4px">#{note.remind_num}</span>}
+            {note.loop_num != null && <span style="margin-left:4px">#{note.loop_num}</span>}
           </div>
           {hasChecks && !expanded && (
             <span class="cb-badge">{checkDone}/{checkTotal}</span>
