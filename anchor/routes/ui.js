@@ -133,11 +133,13 @@ router.post('/thought-unlock', (req, res) => {
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
-function queryNotes(q, type, tag, sort, showReminders) {
+function queryNotes(q, type, tag, sort, showReminders, status) {
   let query = 'SELECT * FROM notes WHERE 1=1'; const params = [];
+  if (status) { query += ' AND status=?'; params.push(status); }
+  else { query += " AND status='processed'"; }
   if (q)   { query += ' AND (formatted LIKE ? OR raw_input LIKE ? OR tags LIKE ?)'; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
   if (type){ query += ' AND type=?'; params.push(type); }
-  else if (!showReminders) { query += " AND type != 'remind'"; }
+  else if (!showReminders && !status) { query += " AND type != 'remind'"; }
   if (tag) { query += ' AND tags LIKE ?'; params.push('%'+tag+'%'); }
   const so = { 'newest':'ORDER BY created_at DESC','oldest':'ORDER BY created_at ASC','type':'ORDER BY type ASC,created_at DESC','unsynced':"ORDER BY (status='pending') DESC,created_at DESC",'open-loops':"ORDER BY (open_loops IS NOT NULL AND open_loops!='') DESC,created_at DESC",'type-date':'ORDER BY type ASC,created_at DESC' };
   query += ' ' + (so[sort]||so['newest']) + ' LIMIT 30';
@@ -145,9 +147,9 @@ function queryNotes(q, type, tag, sort, showReminders) {
 }
 
 router.get('/notes-html', (req, res) => {
-  const { q, type, tag, sort, reminders } = req.query;
+  const { q, type, tag, sort, reminders, status } = req.query;
   const showReminders = reminders === '1' || type === 'remind';
-  const notes = queryNotes(q, type, tag||'', sort, showReminders);
+  const notes = queryNotes(q, type, tag||'', sort, showReminders, status);
   res.send(notes.length ? notes.map(renderNote).join('') : '<div class="empty">No notes yet.</div>');
 });
 
@@ -167,7 +169,7 @@ router.post('/remind-cmd', (req, res) => {
 
 router.get('/', (req, res) => {
   const { q, type, tag, sort } = req.query;
-  const notes = queryNotes(q, type, tag, sort, false);
+  const notes = queryNotes(q, type, tag, sort, false, null);
   const { count: pc } = getPending();
   const ls  = getLastSync(); const lss = ls ? ls.toLocaleString() : 'Never';
   const as  = shouldSync();
@@ -369,6 +371,13 @@ router.get('/', (req, res) => {
         </div>
         <div class="status" id="ns"></div>
       </div>
+      ${pc > 0 ? `<div class="panel" id="syncLane">
+        <h2 onclick="tp('slb','slc')"><span class="dot" style="background:#22d3ee"></span>⏳ Needs Classification <span style="font-size:.8rem;color:#94a3b8;font-weight:400;margin-left:4px">${pc} waiting</span><span class="chev open" id="slc">▼</span></h2>
+        <div id="slb">
+          <div style="font-size:.8rem;color:#64748b;margin-bottom:12px">Notes waiting to be classified and synced. Reclassify each one and it will move to the correct lane.</div>
+          <div class="notes-list" id="sync-lane-list"></div>
+        </div>
+      </div>` : ''}
       <div class="panel">
         <h2 onclick="tp('sb','sc')"><span class="dot" style="background:#f59e0b"></span>Sync Queue<span class="chev" id="sc">▼</span></h2>
         <div id="sb" class="collapsed">
@@ -552,6 +561,31 @@ router.get('/', (req, res) => {
     window.scrollTo(0,0);
     function renderTimestamps(){document.querySelectorAll('.note-date[data-ts]').forEach(el=>{const ts=el.getAttribute('data-ts');if(ts){const u=ts.includes('T')?ts:ts.replace(' ','T')+'Z';el.textContent=new Date(u).toLocaleString();}});}
     renderTimestamps();
+    // ── Sync Lane ────────────────────────────────────────────────
+    function loadSyncLane(){
+      const list=document.getElementById('sync-lane-list');if(!list)return;
+      fetch('/notes-html?sort=oldest&status=pending').then(r=>r.text()).then(html=>{list.innerHTML=html;renderTimestamps();});
+    }
+    loadSyncLane();
+    const _origReclassify=reclassify;
+    reclassify=async function(id,type){
+      await _origReclassify(id,type);
+      setTimeout(()=>{
+        const noteEl=document.getElementById('note-'+id);
+        if(noteEl){
+          const lane=document.getElementById('sync-lane-list');
+          if(lane&&lane.contains(noteEl))noteEl.remove();
+          const remaining=document.querySelectorAll('#sync-lane-list .note');
+          if(remaining.length===0){
+            const panel=document.getElementById('syncLane');
+            if(panel)panel.style.display='none';
+          } else {
+            const hdr=document.querySelector('#syncLane h2 span:nth-child(3)');
+            if(hdr)hdr.textContent=remaining.length+' waiting';
+          }
+        }
+      },600);
+    };
     function clock(){const el=document.getElementById('hdrTime');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}
     clock();setInterval(clock,30000);
     async function loadWeather(){
