@@ -5,12 +5,18 @@ Git-based bridge between Claude and the Casmas home server stack. Acts as the so
 ## What lives here
 
 ```
-anchor/          Anchor 2 source (DECOMMISSIONED — replaced by anchor3)
+anchor/          ⛔ DECOMMISSIONED — do not edit, do not use
 anchor3/         Anchor 3 source (LIVE — Preact/Vite frontend, Express API)
 anchor-mcp/      MCP server exposing Anchor tools to Claude
 md/
   session-latest.md   Auto-generated session context (updated by Anchor)
 ```
+
+## ⚠️ CRITICAL FOR ALL CLAUDE INSTANCES
+
+**`anchor/` is dead. It does not run. It is not deployed. Ignore it entirely.**
+
+All Anchor work goes in `anchor3/`. The live service is at `anchor.thecasmas.com`, port 1234 on the LAN (maps to internal 7779). Use the `rebuild_service anchor3` MCP tool to deploy changes.
 
 ## Services
 

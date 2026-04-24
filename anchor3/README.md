@@ -21,13 +21,20 @@ Personal second-brain and note system. Preact/Vite frontend, Express backend, SQ
 
 ## Deploy
 
-No auto-sync — all changes require manual rebuild:
+No auto-sync — all changes require manual rebuild.
 
+**CRITICAL — always edit files in TWO places:**
+1. Git source: `/srv/mergerfs/warehouse/casmas-bridge/anchor3/` (via MCP write/str_replace tools)
+2. Live source: `/srv/mergerfs/warehouse/anchor3/` (copy after editing, or edit directly)
+
+The `rebuild_service anchor3` MCP tool handles both: it syncs from casmas-bridge and rebuilds.
+
+**The `anchor/` directory in casmas-bridge is DECOMMISSIONED. Never edit it. All work goes in `anchor3/`.**
+
+Rebuild command (if doing manually):
 ```bash
-docker rm -f anchor3 && docker compose up -d --build
+cd /srv/mergerfs/warehouse/anchor3 && docker compose up -d --build
 ```
-
-Frontend changes need the updated file copied to the live path before rebuild.
 
 ## CAT shortcuts
 
