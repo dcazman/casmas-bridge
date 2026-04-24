@@ -3,8 +3,9 @@
 # Add to OMV cron: 0 3 * * * /srv/mergerfs/warehouse/casmas-bridge/anchor3/scripts/backup.sh
 #
 # Restore:
+#   export ENCRYPTION_KEY=...
 #   openssl enc -d -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY \
-#     -in anchor3/backup.sql.enc | sqlite3 /srv/mergerfs/warehouse/anchor3/data/notes3.db
+#     -in anchor3/backup.sql.enc -out /srv/mergerfs/warehouse/anchor3/data/notes3.db
 
 set -euo pipefail
 
@@ -15,8 +16,7 @@ OUT=$REPO/anchor3/backup.sql.enc
 ENCRYPTION_KEY=$(docker exec anchor3 printenv ENCRYPTION_KEY)
 export ENCRYPTION_KEY
 
-docker exec anchor3 sqlite3 /data/notes3.db .dump \
-  | openssl enc -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY -out "$OUT"
+openssl enc -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY -in "$DB" -out "$OUT"
 
 cd "$REPO"
 git add anchor3/backup.sql.enc
