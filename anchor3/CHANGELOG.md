@@ -2,6 +2,36 @@
 
 ---
 
+## 2026-04-24 (session 2)
+
+### List view toggle
+- New `⊞ Board / ≡ List` toggle in the controls bar
+- List view shows all notes grouped by type in a compact 2-column grid
+- Each row: `#num`, bold title line, subtitle line, remind indicator, tags (max 2), relative date, hover edit/delete
+- Overdue reminders highlighted in red; row has red left border
+- Private Thoughts appear as an inline section in list view (floating PT panel hidden while list is active)
+- Responsive: drops to 1-column below 700px
+- New component: `client/src/components/ListView.jsx`
+- New CSS namespace: `lv-*`, `view-toggle`, `view-toggle-btn` in `styles.css`
+
+### Edit button → direct edit mode
+- Clicking the pencil `✏` button on a card now opens the modal directly in edit mode
+- No longer requires a second click on the Edit button inside the modal
+- Signal threaded: Card `onClick('edit')` → Lane → App `setModal({ note, edit: true })` → `Modal openInEdit` prop
+
+### DB backup encryption
+- `anchor3/scripts/backup.sh` now reads `ENCRYPTION_KEY` from the running container (`docker exec anchor3 printenv ENCRYPTION_KEY`) and encrypts the raw SQLite file with AES-256-CBC via openssl
+- No host dependencies beyond `docker`, `openssl`, and `git` — sqlite3 not required anywhere
+- Output: `anchor3/backup.sql.enc` committed to GitHub nightly via OMV crontab
+- Restore: `openssl enc -d -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY -in anchor3/backup.sql.enc -out /srv/mergerfs/warehouse/anchor3/data/notes3.db`
+
+### HowToRestore.md
+- New file: `anchor3/HowToRestore.md`
+- Step-by-step restore procedure: get key from running container, stop container, decrypt, restart, verify
+- Includes worst-case scenario table (container gone, key gone, both gone)
+
+---
+
 ## 2026-04-24
 
 ### Hidden PT Lane + s/show/h/hide commands
@@ -42,6 +72,7 @@
   - `client/src/components/Card.jsx` — individual card display and interaction
   - `client/src/components/AddNote.jsx` — note input, command interception
   - `client/src/components/PrivateThoughts.jsx` — PT panel, password gate
+  - `client/src/components/ListView.jsx` — compact list view, grouped by type
   - `client/src/styles.css` — all styles
   - `routes/notes.js` — POST/GET/PUT/DELETE for notes
   - `server.js` — Express app, all API routes registered here

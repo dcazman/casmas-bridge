@@ -91,6 +91,17 @@ Multi-type: `cat wt,wp` creates two notes. List mode: `cat wt ls` auto-checkboxe
 
 - **`# Title`** — first line starting with `#` renders as a bold heading on the card face. Useful for naming list cards (e.g. `# Grocery Run` above your checkboxes).
 
+## Views
+
+Toggle between **Board** and **List** using the `⊞ Board / ≡ List` buttons in the controls bar.
+
+| View | Description |
+|------|-------------|
+| Board | Lanes per type, horizontal scroll rows of cards (default) |
+| List | Compact 2-column grid, all notes grouped by type — no lane structure |
+
+In list view each row shows: `#num`, title line, subtitle, remind indicator, tags, relative date. Hover to reveal edit/delete buttons. Private Thoughts appear as an inline section (floating PT panel is hidden while list view is active).
+
 ## Private Thoughts
 
 Hidden by default on every page load. Toggle via Add Note (no note is saved):
