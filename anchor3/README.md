@@ -100,7 +100,7 @@ Toggle between **Board** and **List** using the `⊞ Board / ≡ List` buttons i
 | Board | Lanes per type, horizontal scroll rows of cards (default) |
 | List | Compact 2-column grid, all notes grouped by type — no lane structure |
 
-In list view each row shows: `#num`, title line, subtitle, remind indicator, tags, relative date. Hover to reveal edit/delete buttons. Private Thoughts appear as an inline section (floating PT panel is hidden while list view is active).
+In list view each row shows: `#num`, title line, subtitle, remind indicator, tags, relative date. Hover to reveal edit/delete buttons. Private Thoughts appear as an inline section (floating PT panel is hidden while list view is active). PT notes only appear in list view if PT is already unlocked in the current session — unlock in board view first, then switch to list.
 
 ## Private Thoughts
 

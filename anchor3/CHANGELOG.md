@@ -9,7 +9,7 @@
 - List view shows all notes grouped by type in a compact 2-column grid
 - Each row: `#num`, bold title line, subtitle line, remind indicator, tags (max 2), relative date, hover edit/delete
 - Overdue reminders highlighted in red; row has red left border
-- Private Thoughts appear as an inline section in list view (floating PT panel hidden while list is active)
+- Private Thoughts appear as an inline section in list view (floating PT panel hidden while list is active); requires PT to be unlocked in board view first — fetches via the private token in sessionStorage
 - Responsive: drops to 1-column below 700px
 - New component: `client/src/components/ListView.jsx`
 - New CSS namespace: `lv-*`, `view-toggle`, `view-toggle-btn` in `styles.css`
