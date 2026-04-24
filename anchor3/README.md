@@ -87,6 +87,19 @@ cd /srv/mergerfs/warehouse/anchor3 && docker compose up -d --build
 
 Multi-type: `cat wt,wp` creates two notes. List mode: `cat wt ls` auto-checkboxes every line.
 
+## Note Formatting
+
+- **`# Title`** — first line starting with `#` renders as a bold heading on the card face. Useful for naming list cards (e.g. `# Grocery Run` above your checkboxes).
+
+## Private Thoughts
+
+Hidden by default on every page load. Toggle via Add Note (no note is saved):
+
+| Input | Action |
+|-------|--------|
+| `s` or `show` | Show Private Thoughts section |
+| `h` or `hide` | Hide Private Thoughts section |
+
 ## Reminders
 
 Format: `re call dentist, monday 9am`
