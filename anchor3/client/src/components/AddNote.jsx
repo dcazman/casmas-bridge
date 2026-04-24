@@ -1,6 +1,6 @@
 import { useState, useRef } from 'preact/hooks';
 
-export function AddNote({ onAdd }) {
+export function AddNote({ onAdd, onPTCommand }) {
   const [text,    setText]    = useState('');
   const [file,    setFile]    = useState(null);
   const [status,  setStatus]  = useState('');
@@ -11,6 +11,14 @@ export function AddNote({ onAdd }) {
 
   async function submitNote() {
     if (!text.trim() && !file) return;
+    // PT show/hide commands — intercept before saving
+    const trimmed = text.trim().toLowerCase();
+    if (!file && (trimmed === 's' || trimmed === 'show')) {
+      setText(''); onPTCommand && onPTCommand('show'); return;
+    }
+    if (!file && (trimmed === 'h' || trimmed === 'hide')) {
+      setText(''); onPTCommand && onPTCommand('hide'); return;
+    }
     setLoading(true); setStatus('');
     try {
       const fd = new FormData();

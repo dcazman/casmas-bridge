@@ -21,7 +21,11 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
   const isOverdue     = isRemind && note.remind_at && (new Date(note.remind_at).getTime() < Date.now());
 
   const rawFirstLine  = fullText.split('\n').find(l => l.trim()) || '';
-  const collapsedText = hasChecks
+  const isTitle       = rawFirstLine.trimStart().startsWith('#');
+  const titleText     = isTitle ? rawFirstLine.trimStart().slice(1).trim() : null;
+  const collapsedText = isTitle
+    ? titleText || '(empty)'
+    : hasChecks
     ? rawFirstLine.replace(/^\s*\[[ x]\]\s*/i, '') || '(empty)'
     : (rawFirstLine || '(empty)');
 
@@ -158,6 +162,9 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
 
   function renderBody() {
     if (!expanded) {
+      if (isTitle) {
+        return <div class="card-text" style="font-weight:700;font-size:.95rem">{collapsedText}</div>;
+      }
       if (hasChecks) {
         const lines = fullText.split('\n');
         const idx   = lines.findIndex(l => /^\s*\[[ x]\]/i.test(l));
@@ -179,8 +186,10 @@ export function Card({ note, onClick, onDelete, onTagClick, laneType, onCardDrop
     }
     return (
       <div class="card-text full">
+        {isTitle && <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">{titleText}</div>}
         <div class="cb-progress">{checkDone}/{checkTotal} done</div>
         {fullText.split('\n').map((line, i) => {
+          if (i === 0 && isTitle) return null;
           const unchecked = /^\s*\[ \]/.test(line);
           const checked   = /^\s*\[x\]/i.test(line);
           if (unchecked || checked) {

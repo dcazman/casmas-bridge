@@ -18,7 +18,7 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
   function handleTagClick(tag) { setTagFilter(tag); }
 
   const filtered = useMemo(() => {
-    let result = notes;
+    let result = notes.filter(n => n.type !== 'private-thoughts');
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(n => ((n.formatted || n.raw_input || '') + ' ' + (n.tags || '')).toLowerCase().includes(q));

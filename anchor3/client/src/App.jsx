@@ -17,6 +17,7 @@ export function App() {
   const [sort,       setSort]       = useState('newest');
   const [modal,      setModal]      = useState(null);
   const [loading,    setLoading]    = useState(true);
+  const [showPT,     setShowPT]     = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
@@ -83,7 +84,7 @@ export function App() {
       <Header engine={status.engine} />
       <div class="main">
         <div class="panels">
-          <AddNote onAdd={loadAll} />
+          <AddNote onAdd={loadAll} onPTCommand={cmd => setShowPT(cmd === 'show')} />
           <Weather />
           <SyncQueue status={status} onSync={loadAll} />
           <div class="panel-stack">
@@ -102,7 +103,7 @@ export function App() {
           onCardClick={setModal}
           onDelete={loadAll}
         />
-        <PrivateThoughts onCardClick={setModal} />
+        <PrivateThoughts onCardClick={setModal} visible={showPT} />
       </div>
       {modal && <Modal note={modal} onClose={closeModal} onMutate={refreshModal} />}
     </div>

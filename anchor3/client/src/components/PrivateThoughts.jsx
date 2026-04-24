@@ -5,7 +5,7 @@ const PT_KEY = 'pt_token';
 const tok = () => sessionStorage.getItem(PT_KEY) || '';
 const COLOR = '#a855f7';
 
-export function PrivateThoughts({ onCardClick }) {
+export function PrivateThoughts({ onCardClick, visible }) {
   const [phase,  setPhase]  = useState('loading');
   const [notes,  setNotes]  = useState([]);
   const [count,  setCount]  = useState(null);
@@ -14,6 +14,10 @@ export function PrivateThoughts({ onCardClick }) {
   const [newPw,  setNewPw]  = useState('');
   const [err,    setErr]    = useState('');
   const [open,      setOpen]      = useState(false);
+
+  useEffect(() => {
+    if (visible !== undefined) setOpen(!!visible);
+  }, [visible]);
   const [aiOn,      setAiOn]      = useState(false);
   const [cfg,       setCfg]       = useState(false);
   const [labelFilter, setLabelFilter] = useState('');
