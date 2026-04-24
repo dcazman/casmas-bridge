@@ -15,12 +15,18 @@ const ICON_BUF  = fs.existsSync(ICON_PATH) ? fs.readFileSync(ICON_PATH) : Buffer
 function renderListContent(text, noteId) {
   const lines = (text || '').split('\n').filter(l => l.trim());
   if (!lines.length) return '<div class="list-items"></div>';
-  const firstIsLabel = lines.length > 1 && !/^\[.\]/i.test(lines[0].trim());
   let html = '';
-  if (firstIsLabel) {
+  let startIdx = 0;
+  // #title on first line — render as bold header, no checkbox
+  if (lines.length > 0 && lines[0].trim().startsWith('#')) {
+    const titleText = lines[0].trim().slice(1).trim();
+    html += `<div style="font-weight:700;color:#e2e8f0;margin-bottom:8px;font-size:1rem;line-height:1.3">${esc(titleText)}</div>`;
+    startIdx = 1;
+  } else if (lines.length > 1 && !/^\[.\]/i.test(lines[0].trim())) {
+    // legacy: first non-checkbox line treated as section label
     html += `<div style="font-weight:600;color:#22d3ee;margin-bottom:8px;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">${esc(lines[0].trim())}</div>`;
+    startIdx = 1;
   }
-  const startIdx = firstIsLabel ? 1 : 0;
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
     const checked = /^\[x\]/i.test(line.trim());
@@ -139,7 +145,7 @@ function queryNotes(q, type, tag, sort, showReminders, status) {
   else { query += " AND status='processed'"; }
   if (q)   { query += ' AND (formatted LIKE ? OR raw_input LIKE ? OR tags LIKE ?)'; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
   if (type){ query += ' AND type=?'; params.push(type); }
-  else if (!showReminders && !status) { query += " AND type != 'remind'"; }
+  else if (!showReminders && !status) { query += " AND type != 'remind' AND type != 'personal-thought'"; }
   if (tag) { query += ' AND tags LIKE ?'; params.push('%'+tag+'%'); }
   const so = { 'newest':'ORDER BY created_at DESC','oldest':'ORDER BY created_at ASC','type':'ORDER BY type ASC,created_at DESC','unsynced':"ORDER BY (status='pending') DESC,created_at DESC",'open-loops':"ORDER BY (open_loops IS NOT NULL AND open_loops!='') DESC,created_at DESC",'type-date':'ORDER BY type ASC,created_at DESC' };
   query += ' ' + (so[sort]||so['newest']) + ' LIMIT 30';
@@ -378,6 +384,10 @@ router.get('/', (req, res) => {
           <div class="notes-list" id="sync-lane-list"></div>
         </div>
       </div>` : ''}
+      <div class="panel" id="ptLane" style="display:none">
+        <h2><span class="dot" style="background:#7c3aed"></span>💭 Personal Thoughts <span style="font-size:.75rem;color:#64748b;font-weight:400;margin-left:4px">session only · type h to hide</span></h2>
+        <div class="notes-list" id="pt-lane-list"></div>
+      </div>
       <div class="panel">
         <h2 onclick="tp('sb','sc')"><span class="dot" style="background:#f59e0b"></span>Sync Queue<span class="chev" id="sc">▼</span></h2>
         <div id="sb" class="collapsed">
@@ -622,7 +632,25 @@ router.get('/', (req, res) => {
       try{
         const fd=new FormData();if(v)fd.append('raw',v);if(f)fd.append('file',f);
         const r=await fetch('/note',{method:'POST',body:fd});const d=await r.json();
-        if(d.ok){document.getElementById('inp').value='';clearFile();document.getElementById('ns').textContent=d.split>1?'✓ Split into '+d.split+' notes':'✓ Saved';document.getElementById('pc').textContent=d.pendingCount;if(d.pendingCount>0)document.getElementById('syncBtn').disabled=false;setTimeout(()=>{document.getElementById('ns').textContent='';},2000);setTimeout(()=>location.reload(),600);}
+        if(d.ok){
+          if(d.uiCommand==='show-pt'){
+            document.getElementById('inp').value='';
+            const lane=document.getElementById('ptLane');
+            if(lane){
+              lane.style.display='block';
+              fetch('/notes-html?type=personal-thought&sort=newest').then(r=>r.text()).then(html=>{
+                const list=document.getElementById('pt-lane-list');if(list){list.innerHTML=html;renderTimestamps();}
+              });
+            }
+            return;
+          }
+          if(d.uiCommand==='hide-pt'){
+            document.getElementById('inp').value='';
+            const lane=document.getElementById('ptLane');
+            if(lane)lane.style.display='none';
+            return;
+          }
+          document.getElementById('inp').value='';clearFile();document.getElementById('ns').textContent=d.split>1?'✓ Split into '+d.split+' notes':'✓ Saved';document.getElementById('pc').textContent=d.pendingCount;if(d.pendingCount>0)document.getElementById('syncBtn').disabled=false;setTimeout(()=>{document.getElementById('ns').textContent='';},2000);setTimeout(()=>location.reload(),600);}
         else{document.getElementById('ns').textContent='✗ '+(d.error||'Failed');}
       }catch(e){document.getElementById('ns').textContent='✗ Failed';}
     }

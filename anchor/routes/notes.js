@@ -44,6 +44,10 @@ router.post('/', upload.single('file'), async (req, res) => {
       const fn = (isImg ? '[Image: ' : '[File: ') + req.file.originalname + ']\n' + e.trim();
       raw = raw ? raw+'\n\n'+fn : fn;
     }
+    // UI commands — intercept before saving
+    if (/^(?:s|show)$/i.test(raw)) return res.json({ ok: true, uiCommand: 'show-pt' });
+    if (/^(?:h|hide)$/i.test(raw)) return res.json({ ok: true, uiCommand: 'hide-pt' });
+
     const um = raw.match(/^(https?:\/\/\S+)$/);
     if (um) raw = await fetchUrl(um[1]);
     if (!raw) return res.json({ ok: false, error: 'No input' });
