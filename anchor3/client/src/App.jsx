@@ -103,7 +103,7 @@ export function App() {
           onCardClick={setModal}
           onDelete={loadAll}
         />
-        <PrivateThoughts onCardClick={setModal} visible={showPT} />
+        {showPT && <PrivateThoughts onCardClick={setModal} visible={showPT} />}
       </div>
       {modal && <Modal note={modal} onClose={closeModal} onMutate={refreshModal} />}
     </div>
