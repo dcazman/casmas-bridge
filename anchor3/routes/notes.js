@@ -61,9 +61,10 @@ function getAttachmentsForNotes(noteIds) {
 
 router.get('/', (req, res) => {
   try {
-    const { sort } = req.query;
+    const { sort, pt } = req.query;
     const order = sort === 'oldest' ? 'ORDER BY created_at ASC' : 'ORDER BY created_at DESC';
-    const notes = db.prepare(`SELECT * FROM notes WHERE type != 'private-thoughts' ${order} LIMIT 500`).all().map(decryptNote);
+    const ptFilter = pt === '1' ? '' : "WHERE type != 'private-thoughts'";
+    const notes = db.prepare(`SELECT * FROM notes ${ptFilter} ${order} LIMIT 500`).all().map(decryptNote);
     const attachMap = getAttachmentsForNotes(notes.map(n => n.id));
     const result = notes.map(n => ({ ...n, attachments: attachMap[n.id] || [] }));
     res.json({ ok: true, notes: result });
