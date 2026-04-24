@@ -15,7 +15,7 @@ OUT=$REPO/anchor3/backup.sql.enc
 ENCRYPTION_KEY=$(docker exec anchor3 printenv ENCRYPTION_KEY)
 export ENCRYPTION_KEY
 
-sqlite3 "$DB" .dump \
+docker exec anchor3 sqlite3 /data/notes3.db .dump \
   | openssl enc -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY -out "$OUT"
 
 cd "$REPO"
