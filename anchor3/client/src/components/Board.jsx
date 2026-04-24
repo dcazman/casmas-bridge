@@ -1,6 +1,7 @@
 'use strict';
 import { useMemo, useState } from 'preact/hooks';
 import { Lane }       from './Lane';
+import { ListView }   from './ListView';
 import { TYPE_GROUPS } from '../helpers';
 
 const TYPE_ORDER = TYPE_GROUPS.flatMap(g => g.types);
@@ -9,7 +10,7 @@ function loadLS(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
 
-export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sort, setSort, onCardClick, onDelete }) {
+export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sort, setSort, onCardClick, onDelete, listView, onToggleView, showPT }) {
   const [tagFilter,   setTagFilter]   = useState('');
   const [collapseAll, setCollapseAll] = useState(false);
   const [laneOrder,   setLaneOrder]   = useState(() => loadLS('a3-lane-order', []));
@@ -120,33 +121,54 @@ export function Board({ notes, search, setSearch, typeFilter, setTypeFilter, sor
           <button class="btn btn-secondary" style="padding:6px 14px;font-size:.85rem"
             onClick={() => { setSearch(''); setTypeFilter(''); setTagFilter(''); }}>Clear</button>
         )}
-        <button class="btn btn-secondary" style="padding:6px 14px;font-size:.85rem;margin-left:auto"
-          onClick={() => setCollapseAll(v => v === false ? true : false)}
-          title={collapseAll === false ? 'Expand all lanes' : 'Collapse all lanes'}>
-          {collapseAll === false ? '▶ Expand all' : '▼ Collapse all'}
-        </button>
-      </div>
-      {sortedLanes.length === 0 && (
-        <div style="color:#334155;font-size:.9rem;padding:40px;text-align:center">
-          {notes.length === 0 ? 'No notes yet. Add your first note above.' : 'No notes match your search.'}
+        {!listView && (
+          <button class="btn btn-secondary" style="padding:6px 14px;font-size:.85rem"
+            onClick={() => setCollapseAll(v => v === false ? true : false)}
+            title={collapseAll === false ? 'Expand all lanes' : 'Collapse all lanes'}>
+            {collapseAll === false ? '▶ Expand all' : '▼ Collapse all'}
+          </button>
+        )}
+        <div class="view-toggle" style="margin-left:auto">
+          <button class={`view-toggle-btn${!listView ? ' active' : ''}`} onClick={() => onToggleView(false)}>⊞ Board</button>
+          <button class={`view-toggle-btn${listView  ? ' active' : ''}`} onClick={() => onToggleView(true)}>≡ List</button>
         </div>
-      )}
-      {sortedLanes.map(({ type, notes: laneNotes }, idx) => (
-        <Lane
-          key={type}
-          type={type}
-          notes={getOrderedNotes(type, laneNotes)}
+      </div>
+      {listView ? (
+        <ListView
+          notes={notes}
+          search={search}
+          typeFilter={typeFilter}
+          tagFilter={tagFilter}
+          showPT={showPT}
           onCardClick={onCardClick}
           onDelete={onDelete}
           onTagClick={handleTagClick}
-          forceOpen={collapseAll}
-          isFirst={idx === 0}
-          isLast={idx === sortedLanes.length - 1}
-          onMoveUp={() => moveLane(type, -1)}
-          onMoveDown={() => moveLane(type, 1)}
-          onCardDrop={(dragId, fromType, beforeId) => handleCardDrop(dragId, fromType, type, beforeId)}
         />
-      ))}
+      ) : (
+        <>
+          {sortedLanes.length === 0 && (
+            <div style="color:#334155;font-size:.9rem;padding:40px;text-align:center">
+              {notes.length === 0 ? 'No notes yet. Add your first note above.' : 'No notes match your search.'}
+            </div>
+          )}
+          {sortedLanes.map(({ type, notes: laneNotes }, idx) => (
+            <Lane
+              key={type}
+              type={type}
+              notes={getOrderedNotes(type, laneNotes)}
+              onCardClick={onCardClick}
+              onDelete={onDelete}
+              onTagClick={handleTagClick}
+              forceOpen={collapseAll}
+              isFirst={idx === 0}
+              isLast={idx === sortedLanes.length - 1}
+              onMoveUp={() => moveLane(type, -1)}
+              onMoveDown={() => moveLane(type, 1)}
+              onCardDrop={(dragId, fromType, beforeId) => handleCardDrop(dragId, fromType, type, beforeId)}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }

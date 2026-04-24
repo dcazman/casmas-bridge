@@ -18,6 +18,7 @@ export function App() {
   const [modal,      setModal]      = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [showPT,     setShowPT]     = useState(false);
+  const [listView,   setListView]   = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
@@ -102,8 +103,11 @@ export function App() {
           setSort={setSort}
           onCardClick={(note, mode) => setModal({ note, edit: mode === 'edit' })}
           onDelete={loadAll}
+          listView={listView}
+          onToggleView={setListView}
+          showPT={showPT}
         />
-        {showPT && <PrivateThoughts onCardClick={(note, mode) => setModal({ note, edit: mode === 'edit' })} visible={showPT} />}
+        {showPT && !listView && <PrivateThoughts onCardClick={(note, mode) => setModal({ note, edit: mode === 'edit' })} visible={showPT} />}
       </div>
       {modal && <Modal note={modal.note} openInEdit={modal.edit} onClose={closeModal} onMutate={refreshModal} />}
     </div>
