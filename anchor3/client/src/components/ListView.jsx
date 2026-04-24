@@ -1,5 +1,7 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useState, useEffect } from 'preact/hooks';
 import { typeColor, fmtDate, relTime, TYPE_GROUPS } from '../helpers';
+
+const PT_KEY = 'pt_token';
 
 const TYPE_ORDER = TYPE_GROUPS.flatMap(g => g.types);
 
@@ -69,8 +71,20 @@ function NoteRow({ note, onCardClick, onDelete }) {
 }
 
 export function ListView({ notes, search, typeFilter, tagFilter, showPT, onCardClick, onDelete }) {
+  const [ptNotes, setPtNotes] = useState([]);
+
+  useEffect(() => {
+    if (!showPT) { setPtNotes([]); return; }
+    const token = sessionStorage.getItem(PT_KEY);
+    if (!token) { setPtNotes([]); return; }
+    fetch('/api/private/notes', { headers: { 'x-pt-token': token } })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setPtNotes(d.notes); })
+      .catch(() => {});
+  }, [showPT]);
+
   const filtered = useMemo(() => {
-    let r = showPT ? notes : notes.filter(n => n.type !== 'private-thoughts');
+    let r = [...notes, ...(showPT ? ptNotes : [])];
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(n => ((n.formatted || n.raw_input || '') + ' ' + (n.tags || '')).toLowerCase().includes(q));
@@ -81,7 +95,7 @@ export function ListView({ notes, search, typeFilter, tagFilter, showPT, onCardC
       r = r.filter(n => (n.tags || '').toLowerCase().split(',').map(t => t.trim()).includes(tq));
     }
     return r;
-  }, [notes, search, typeFilter, tagFilter, showPT]);
+  }, [notes, ptNotes, search, typeFilter, tagFilter, showPT]);
 
   const groups = useMemo(() => {
     const map = {};

@@ -23,14 +23,14 @@ export function App() {
   const loadAll = useCallback(async () => {
     try {
       const [nr, sr] = await Promise.all([
-        fetch(`/api/notes?sort=${sort}&pt=${showPT ? '1' : '0'}`).then(r => r.json()),
+        fetch(`/api/notes?sort=${sort}`).then(r => r.json()),
         fetch('/api/status').then(r => r.json()),
       ]);
       if (nr.ok) setNotes(nr.notes);
       if (sr.ok) setStatus(sr);
     } catch (e) { console.error('loadAll failed:', e); }
     setLoading(false);
-  }, [sort, showPT]);
+  }, [sort]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
