@@ -14,7 +14,7 @@ export function Modal({ note, onClose, onMutate, openInEdit = false }) {
   useEffect(() => {
     setEditText(note.formatted || note.raw_input || '');
     setEditTags(note.tags || '');
-    setEditing(false);
+    setEditing(openInEdit);
     setRcStatus('');
     setRemindMsg('');
   }, [note.id]);
