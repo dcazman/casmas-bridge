@@ -67,7 +67,7 @@ export function App() {
   }, []);
 
   const refreshModal = useCallback((updatedNote) => {
-    if (updatedNote) setModal(updatedNote);
+    if (updatedNote) setModal({ note: updatedNote, edit: false });
     loadAll();
   }, [loadAll]);
 
@@ -100,12 +100,12 @@ export function App() {
           setTypeFilter={setTypeFilter}
           sort={sort}
           setSort={setSort}
-          onCardClick={setModal}
+          onCardClick={(note, mode) => setModal({ note, edit: mode === 'edit' })}
           onDelete={loadAll}
         />
-        {showPT && <PrivateThoughts onCardClick={setModal} visible={showPT} />}
+        {showPT && <PrivateThoughts onCardClick={(note, mode) => setModal({ note, edit: mode === 'edit' })} visible={showPT} />}
       </div>
-      {modal && <Modal note={modal} onClose={closeModal} onMutate={refreshModal} />}
+      {modal && <Modal note={modal.note} openInEdit={modal.edit} onClose={closeModal} onMutate={refreshModal} />}
     </div>
   );
 }

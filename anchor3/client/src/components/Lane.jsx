@@ -60,7 +60,7 @@ export function Lane({ type, notes, onCardClick, onDelete, onTagClick, forceOpen
               <Card
                 key={n.id}
                 note={n}
-                onClick={() => onCardClick(n)}
+                onClick={mode => onCardClick(n, mode)}
                 onDelete={onDelete}
                 onTagClick={onTagClick}
                 laneType={type}

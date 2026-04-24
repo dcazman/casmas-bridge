@@ -3,8 +3,8 @@ import { typeColor, fmtDate, TYPE_GROUPS } from '../helpers';
 
 const ALL_TYPES = TYPE_GROUPS.flatMap(g => g.types);
 
-export function Modal({ note, onClose, onMutate }) {
-  const [editing,  setEditing]  = useState(false);
+export function Modal({ note, onClose, onMutate, openInEdit = false }) {
+  const [editing,  setEditing]  = useState(openInEdit);
   const [editText, setEditText] = useState(note.formatted || note.raw_input || '');
   const [editTags, setEditTags] = useState(note.tags || '');
   const [saving,   setSaving]   = useState(false);
