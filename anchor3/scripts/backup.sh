@@ -12,7 +12,8 @@ REPO=/srv/mergerfs/warehouse/casmas-bridge
 DB=/srv/mergerfs/warehouse/anchor3/data/notes3.db
 OUT=$REPO/anchor3/backup.sql.enc
 
-set -a; source "$REPO/anchor3/.env"; set +a
+ENCRYPTION_KEY=$(docker exec anchor3 printenv ENCRYPTION_KEY)
+export ENCRYPTION_KEY
 
 sqlite3 "$DB" .dump \
   | openssl enc -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY -out "$OUT"
